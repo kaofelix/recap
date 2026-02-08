@@ -11,11 +11,45 @@ fn list_commits(repo_path: String, limit: Option<usize>) -> Result<Vec<git::Comm
     git::list_commits(&repo_path, limit)
 }
 
+#[tauri::command]
+fn get_commit_files(
+    repo_path: String,
+    commit_id: String,
+) -> Result<Vec<git::ChangedFile>, String> {
+    git::get_commit_files(&repo_path, &commit_id)
+}
+
+#[tauri::command]
+fn get_file_diff(
+    repo_path: String,
+    commit_id: String,
+    file_path: String,
+) -> Result<git::FileDiff, String> {
+    git::get_file_diff(&repo_path, &commit_id, &file_path)
+}
+
+#[tauri::command]
+fn get_current_branch(repo_path: String) -> Result<String, String> {
+    git::get_current_branch(&repo_path)
+}
+
+#[tauri::command]
+fn validate_repo(path: String) -> Result<git::RepoInfo, String> {
+    git::validate_repo(&path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, list_commits])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            list_commits,
+            get_commit_files,
+            get_file_diff,
+            get_current_branch,
+            validate_repo
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

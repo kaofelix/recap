@@ -1,5 +1,104 @@
-use git2::Repository;
+use git2::{Delta, DiffOptions, Repository};
 use serde::Serialize;
+
+/// Status of a file in a commit
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub enum FileStatus {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Copied,
+    Unmodified,
+}
+
+impl From<Delta> for FileStatus {
+    fn from(delta: Delta) -> Self {
+        match delta {
+            Delta::Added => FileStatus::Added,
+            Delta::Deleted => FileStatus::Deleted,
+            Delta::Modified => FileStatus::Modified,
+            Delta::Renamed => FileStatus::Renamed,
+            Delta::Copied => FileStatus::Copied,
+            _ => FileStatus::Unmodified,
+        }
+    }
+}
+
+/// Represents a changed file in a commit
+#[derive(Debug, Clone, Serialize)]
+pub struct ChangedFile {
+    /// Path to the file
+    pub path: String,
+    /// Status of the file change
+    pub status: FileStatus,
+    /// Number of lines added
+    pub additions: u32,
+    /// Number of lines deleted
+    pub deletions: u32,
+    /// Original path for renamed files
+    pub old_path: Option<String>,
+}
+
+/// Type of diff line
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub enum LineType {
+    Context,
+    Addition,
+    Deletion,
+}
+
+/// A single line in a diff
+#[derive(Debug, Clone, Serialize)]
+pub struct DiffLine {
+    /// The content of the line (without leading +/- marker)
+    pub content: String,
+    /// The type of line
+    pub line_type: LineType,
+    /// Line number in the old file (if applicable)
+    pub old_line_no: Option<u32>,
+    /// Line number in the new file (if applicable)
+    pub new_line_no: Option<u32>,
+}
+
+/// A hunk in a diff
+#[derive(Debug, Clone, Serialize)]
+pub struct DiffHunk {
+    /// Starting line in old file
+    pub old_start: u32,
+    /// Number of lines in old file
+    pub old_lines: u32,
+    /// Starting line in new file
+    pub new_start: u32,
+    /// Number of lines in new file
+    pub new_lines: u32,
+    /// Lines in this hunk
+    pub lines: Vec<DiffLine>,
+}
+
+/// The complete diff for a file
+#[derive(Debug, Clone, Serialize)]
+pub struct FileDiff {
+    /// Original path (for renames)
+    pub old_path: Option<String>,
+    /// New/current path
+    pub new_path: String,
+    /// Hunks in the diff
+    pub hunks: Vec<DiffHunk>,
+    /// Whether this is a binary file
+    pub is_binary: bool,
+}
+
+/// Information about a repository
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoInfo {
+    /// Path to the repository
+    pub path: String,
+    /// Name of the repository (directory name)
+    pub name: String,
+    /// Current branch name
+    pub branch: String,
+}
 
 /// Represents a git commit with essential metadata
 #[derive(Debug, Clone, Serialize)]
@@ -64,6 +163,290 @@ pub fn list_commits(repo_path: &str, limit: Option<usize>) -> Result<Vec<Commit>
     }
 
     Ok(commits)
+}
+
+/// Gets the list of files changed in a specific commit
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `commit_id` - SHA of the commit to inspect
+///
+/// # Returns
+/// A vector of ChangedFile structs or an error message
+pub fn get_commit_files(repo_path: &str, commit_id: &str) -> Result<Vec<ChangedFile>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let oid = git2::Oid::from_str(commit_id)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
+
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    let tree = commit
+        .tree()
+        .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+    // Get parent tree (or empty tree for root commit)
+    let parent_tree = if commit.parent_count() > 0 {
+        Some(
+            commit
+                .parent(0)
+                .map_err(|e| format!("Failed to get parent commit: {}", e))?
+                .tree()
+                .map_err(|e| format!("Failed to get parent tree: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    let mut diff_opts = DiffOptions::new();
+    let diff = repo
+        .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    let mut files: Vec<ChangedFile> = Vec::new();
+
+    // Collect file stats
+    let stats = diff
+        .stats()
+        .map_err(|e| format!("Failed to get diff stats: {}", e))?;
+    let _ = stats; // We'll get per-file stats differently
+
+    for delta_idx in 0..diff.deltas().len() {
+        let delta = diff.get_delta(delta_idx).expect("Delta should exist");
+
+        let new_file = delta.new_file();
+        let old_file = delta.old_file();
+
+        let path = new_file
+            .path()
+            .or_else(|| old_file.path())
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let old_path = if delta.status() == Delta::Renamed {
+            old_file.path().map(|p| p.to_string_lossy().to_string())
+        } else {
+            None
+        };
+
+        // Get line stats for this file
+        let mut additions = 0u32;
+        let mut deletions = 0u32;
+
+        // Use a patch to get accurate line counts
+        if let Ok(patch) = git2::Patch::from_diff(&diff, delta_idx) {
+            if let Some(patch) = patch {
+                let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+                additions = adds as u32;
+                deletions = dels as u32;
+            }
+        }
+
+        files.push(ChangedFile {
+            path,
+            status: delta.status().into(),
+            additions,
+            deletions,
+            old_path,
+        });
+    }
+
+    Ok(files)
+}
+
+/// Gets the diff for a specific file in a commit
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `commit_id` - SHA of the commit
+/// * `file_path` - Path to the file to get diff for
+///
+/// # Returns
+/// A FileDiff struct or an error message
+pub fn get_file_diff(
+    repo_path: &str,
+    commit_id: &str,
+    file_path: &str,
+) -> Result<FileDiff, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let oid = git2::Oid::from_str(commit_id)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
+
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    let tree = commit
+        .tree()
+        .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+    let parent_tree = if commit.parent_count() > 0 {
+        Some(
+            commit
+                .parent(0)
+                .map_err(|e| format!("Failed to get parent commit: {}", e))?
+                .tree()
+                .map_err(|e| format!("Failed to get parent tree: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    let mut diff_opts = DiffOptions::new();
+    diff_opts.pathspec(file_path);
+
+    let diff = repo
+        .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    // Find the delta for our file
+    let delta = diff
+        .get_delta(0)
+        .ok_or_else(|| format!("File '{}' not found in commit", file_path))?;
+
+    let new_file = delta.new_file();
+    let old_file = delta.old_file();
+
+    let new_path = new_file
+        .path()
+        .or_else(|| old_file.path())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let old_path = if delta.status() == Delta::Renamed || delta.status() == Delta::Copied {
+        old_file.path().map(|p| p.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    // Check if binary
+    let is_binary = new_file.is_binary() || old_file.is_binary();
+
+    if is_binary {
+        return Ok(FileDiff {
+            old_path,
+            new_path,
+            hunks: Vec::new(),
+            is_binary: true,
+        });
+    }
+
+    // Get patch for detailed diff
+    let patch = git2::Patch::from_diff(&diff, 0)
+        .map_err(|e| format!("Failed to create patch: {}", e))?
+        .ok_or_else(|| "Failed to create patch for file".to_string())?;
+
+    let mut hunks = Vec::new();
+
+    for hunk_idx in 0..patch.num_hunks() {
+        let (hunk, _) = patch
+            .hunk(hunk_idx)
+            .map_err(|e| format!("Failed to get hunk: {}", e))?;
+
+        let mut lines = Vec::new();
+
+        for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+            let line = patch
+                .line_in_hunk(hunk_idx, line_idx)
+                .map_err(|e| format!("Failed to get line: {}", e))?;
+
+            let line_type = match line.origin() {
+                '+' => LineType::Addition,
+                '-' => LineType::Deletion,
+                _ => LineType::Context,
+            };
+
+            let content = String::from_utf8_lossy(line.content()).to_string();
+
+            lines.push(DiffLine {
+                content,
+                line_type,
+                old_line_no: line.old_lineno(),
+                new_line_no: line.new_lineno(),
+            });
+        }
+
+        hunks.push(DiffHunk {
+            old_start: hunk.old_start(),
+            old_lines: hunk.old_lines(),
+            new_start: hunk.new_start(),
+            new_lines: hunk.new_lines(),
+            lines,
+        });
+    }
+
+    Ok(FileDiff {
+        old_path,
+        new_path,
+        hunks,
+        is_binary: false,
+    })
+}
+
+/// Gets the current branch name for a repository
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// The branch name or an error message
+pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
+
+    if head.is_branch() {
+        head.shorthand()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "Branch name is not valid UTF-8".to_string())
+    } else {
+        // Detached HEAD - return the commit SHA
+        head.target()
+            .map(|oid| oid.to_string())
+            .ok_or_else(|| "HEAD has no target".to_string())
+    }
+}
+
+/// Validates that a path is a git repository and returns info about it
+///
+/// # Arguments
+/// * `path` - Path to validate
+///
+/// # Returns
+/// A RepoInfo struct or an error message
+pub fn validate_repo(path: &str) -> Result<RepoInfo, String> {
+    let repo = Repository::open(path).map_err(|e| format!("Not a valid git repository: {}", e))?;
+
+    // Get repository root path
+    let repo_path = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory (bare repo)".to_string())?
+        .to_string_lossy()
+        .to_string();
+
+    // Get directory name
+    let name = std::path::Path::new(&repo_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Get current branch
+    let branch = get_current_branch(path)?;
+
+    Ok(RepoInfo {
+        path: repo_path,
+        name,
+        branch,
+    })
 }
 
 #[cfg(test)]
@@ -196,5 +579,322 @@ mod tests {
 
         // Timestamp should be a reasonable Unix timestamp (after 2020)
         assert!(commits[0].timestamp > 1577836800); // 2020-01-01
+    }
+
+    // Tests for get_commit_files
+
+    #[test]
+    fn test_get_commit_files_returns_added_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let latest_commit = &commits[0]; // "Add file" commit
+
+        let files =
+            get_commit_files(path, &latest_commit.id).expect("Should return changed files");
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "file.txt");
+        assert_eq!(files[0].status, FileStatus::Added);
+        assert!(files[0].additions > 0);
+    }
+
+    #[test]
+    fn test_get_commit_files_initial_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let initial_commit = &commits[1]; // "Initial commit"
+
+        let files =
+            get_commit_files(path, &initial_commit.id).expect("Should return changed files");
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "README.md");
+        assert_eq!(files[0].status, FileStatus::Added);
+    }
+
+    #[test]
+    fn test_get_commit_files_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify existing file
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Modify file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let modify_commit = &commits[0];
+
+        let files =
+            get_commit_files(path_str, &modify_commit.id).expect("Should return changed files");
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "file.txt");
+        assert_eq!(files[0].status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn test_get_commit_files_deleted_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Delete file
+        std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Delete file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let delete_commit = &commits[0];
+
+        let files =
+            get_commit_files(path_str, &delete_commit.id).expect("Should return changed files");
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "file.txt");
+        assert_eq!(files[0].status, FileStatus::Deleted);
+    }
+
+    #[test]
+    fn test_get_commit_files_invalid_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_commit_files(path, "0000000000000000000000000000000000000000");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to find commit"));
+    }
+
+    #[test]
+    fn test_get_commit_files_invalid_commit_id_format() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_commit_files(path, "not-a-valid-sha");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid commit ID"));
+    }
+
+    // Tests for get_file_diff
+
+    #[test]
+    fn test_get_file_diff_returns_diff() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let latest_commit = &commits[0]; // "Add file" commit
+
+        let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+        assert!(!diff.hunks.is_empty());
+
+        // Check that hunks have lines
+        let hunk = &diff.hunks[0];
+        assert!(!hunk.lines.is_empty());
+
+        // Added file should have all additions
+        let additions: Vec<_> = hunk
+            .lines
+            .iter()
+            .filter(|l| l.line_type == LineType::Addition)
+            .collect();
+        assert!(!additions.is_empty());
+    }
+
+    #[test]
+    fn test_get_file_diff_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify existing file
+        std::fs::write(path.join("file.txt"), "line1\nline2\nmodified").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Modify file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+
+        let diff =
+            get_file_diff(path_str, &commits[0].id, "file.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+
+        // Should have both deletions and additions
+        let has_deletion = diff
+            .hunks
+            .iter()
+            .any(|h| h.lines.iter().any(|l| l.line_type == LineType::Deletion));
+        let has_addition = diff
+            .hunks
+            .iter()
+            .any(|h| h.lines.iter().any(|l| l.line_type == LineType::Addition));
+
+        assert!(has_deletion || has_addition);
+    }
+
+    #[test]
+    fn test_get_file_diff_file_not_in_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let latest_commit = &commits[0];
+
+        let result = get_file_diff(path, &latest_commit.id, "nonexistent.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found in commit"));
+    }
+
+    #[test]
+    fn test_get_file_diff_line_numbers() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let latest_commit = &commits[0];
+
+        let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
+
+        // For added file, lines should have new_line_no set
+        for hunk in &diff.hunks {
+            for line in &hunk.lines {
+                if line.line_type == LineType::Addition {
+                    assert!(line.new_line_no.is_some());
+                }
+            }
+        }
+    }
+
+    // Tests for get_current_branch
+
+    #[test]
+    fn test_get_current_branch_returns_branch_name() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let branch = get_current_branch(path).expect("Should return branch name");
+
+        // Default branch could be "master" or "main" depending on git config
+        assert!(branch == "master" || branch == "main");
+    }
+
+    #[test]
+    fn test_get_current_branch_new_branch() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and checkout new branch
+        Command::new("git")
+            .args(["checkout", "-b", "feature-branch"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        let path_str = path.to_str().unwrap();
+        let branch = get_current_branch(path_str).expect("Should return branch name");
+
+        assert_eq!(branch, "feature-branch");
+    }
+
+    #[test]
+    fn test_get_current_branch_detached_head() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, None).expect("Should return commits");
+
+        // Checkout specific commit (detached HEAD)
+        Command::new("git")
+            .args(["checkout", &commits[1].id])
+            .current_dir(path)
+            .output()
+            .expect("Failed to checkout commit");
+
+        let branch = get_current_branch(path_str).expect("Should return something");
+
+        // Should return the commit SHA when in detached HEAD
+        assert_eq!(branch.len(), 40);
+        assert!(branch.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_get_current_branch_invalid_path() {
+        let result = get_current_branch("/nonexistent/path");
+        assert!(result.is_err());
+    }
+
+    // Tests for validate_repo
+
+    #[test]
+    fn test_validate_repo_returns_info() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let info = validate_repo(path).expect("Should return repo info");
+
+        assert!(info.path.len() > 0);
+        assert!(info.name.len() > 0);
+        assert!(info.branch == "master" || info.branch == "main");
+    }
+
+    #[test]
+    fn test_validate_repo_invalid_path() {
+        let result = validate_repo("/nonexistent/path");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Not a valid git repository"));
+    }
+
+    #[test]
+    fn test_validate_repo_not_a_repo() {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = validate_repo(path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repo_path_is_normalized() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let info = validate_repo(path).expect("Should return repo info");
+
+        // Path should be absolute
+        assert!(info.path.starts_with('/'));
     }
 }
