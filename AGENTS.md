@@ -24,6 +24,17 @@ bun run tauri dev
 bun run tauri build
 ```
 
+## Dev Server
+
+Use `gob` to run the dev server in the background:
+
+```bash
+gob add bun run tauri dev   # Start dev server
+gob list                    # See running jobs
+gob stdout <id>             # View output
+gob stop <id>               # Stop server
+```
+
 ## Task Management
 
 Use `dex` to track tasks:
