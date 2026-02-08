@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { invoke } from "@tauri-apps/api/core";
 import { render, screen, userEvent } from "./utils";
+import { tauriMocks } from "./setup";
 import App from "../App";
 
 describe("Sample Test - Verify Testing Setup", () => {
@@ -18,7 +18,7 @@ describe("Sample Test - Verify Testing Setup", () => {
 
   it("calls Tauri invoke when greeting", async () => {
     const user = userEvent.setup();
-    vi.mocked(invoke).mockResolvedValue("Hello, Test!");
+    tauriMocks.invoke.mockResolvedValue("Hello, Test!");
 
     render(<App />);
 
@@ -28,13 +28,13 @@ describe("Sample Test - Verify Testing Setup", () => {
     await user.type(input, "Test");
     await user.click(button);
 
-    expect(invoke).toHaveBeenCalledWith("greet", { name: "Test" });
+    expect(tauriMocks.invoke).toHaveBeenCalledWith("greet", { name: "Test" });
     expect(await screen.findByText("Hello, Test!")).toBeInTheDocument();
   });
 });
 
 describe("Tauri Mocks", () => {
-  it("invoke is mocked", () => {
-    expect(vi.isMockFunction(invoke)).toBe(true);
+  it("invoke is mocked and callable", () => {
+    expect(vi.isMockFunction(tauriMocks.invoke)).toBe(true);
   });
 });
