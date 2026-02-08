@@ -194,3 +194,20 @@ body {
   background-color: var(--color-accent-muted);
   color: var(--color-text-primary);
 }
+
+/* Fix react-diff-viewer: blank content lines should have normal background
+   The library applies emptyLine class when content is empty/falsy, treating 
+   real blank lines the same as placeholders. We want only placeholders grey.
+   
+   Strategy: Make all empty-line cells normal background, then use :has() to 
+   re-apply grey only to rows that contain an empty-gutter (true placeholders) */
+
+/* Default: all empty-line content cells get normal background */
+td[class*="empty-line"] {
+  background-color: var(--color-panel-bg) !important;
+}
+
+/* Re-apply grey for placeholder rows (rows containing empty-gutter cells) */
+tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
+  background-color: var(--color-bg-secondary) !important;
+}
