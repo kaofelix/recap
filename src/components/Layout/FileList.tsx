@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
-import { useSelectedRepo, useSelectedCommitId } from "../../store/appStore";
+import { useAppStore, useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
 import type { ChangedFile, FileStatus } from "../../types/file";
 
 export interface FileListProps {
@@ -50,6 +50,8 @@ function getStatusLetter(status: FileStatus): string {
 export function FileList({ className }: FileListProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
+  const selectedFilePath = useSelectedFilePath();
+  const selectFile = useAppStore((state) => state.selectFile);
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,9 +152,11 @@ export function FileList({ className }: FileListProps) {
             {files.map((file) => (
               <div
                 key={file.path}
+                onClick={() => selectFile(file.path)}
                 className={cn(
                   "px-2 py-1.5 rounded cursor-pointer flex items-center gap-2",
-                  "hover:bg-bg-hover"
+                  "hover:bg-bg-hover",
+                  selectedFilePath === file.path && "bg-accent-muted"
                 )}
               >
                 <span

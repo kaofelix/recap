@@ -1,10 +1,199 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
+import { useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
+import type { FileDiff, DiffHunk, DiffLine } from "../../types/diff";
 
 export interface DiffViewProps {
   className?: string;
 }
 
+type ViewMode = "split" | "unified";
+
+/**
+ * Render a single diff line
+ */
+function DiffLineRow({ line, showOldLineNo, showNewLineNo }: { 
+  line: DiffLine; 
+  showOldLineNo?: boolean;
+  showNewLineNo?: boolean;
+}) {
+  const bgClass = 
+    line.line_type === "Addition" ? "bg-diff-add-bg" :
+    line.line_type === "Deletion" ? "bg-diff-delete-bg" :
+    "";
+  
+  const textClass =
+    line.line_type === "Addition" ? "text-diff-add-text" :
+    line.line_type === "Deletion" ? "text-diff-delete-text" :
+    "text-text-primary";
+
+  const prefix =
+    line.line_type === "Addition" ? "+" :
+    line.line_type === "Deletion" ? "-" :
+    " ";
+
+  return (
+    <div className={cn("flex", bgClass)}>
+      {showOldLineNo !== false && (
+        <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
+          {line.old_line_no ?? ""}
+        </span>
+      )}
+      {showNewLineNo !== false && (
+        <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
+          {line.new_line_no ?? ""}
+        </span>
+      )}
+      <span className={cn("px-1 select-none shrink-0", textClass)}>{prefix}</span>
+      <pre className={cn("flex-1 px-1", textClass)}>
+        {line.content}
+      </pre>
+    </div>
+  );
+}
+
+/**
+ * Render a hunk header
+ */
+function HunkHeader({ hunk }: { hunk: DiffHunk }) {
+  return (
+    <div className="bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs">
+      @@ -{hunk.old_start},{hunk.old_lines} +{hunk.new_start},{hunk.new_lines} @@
+    </div>
+  );
+}
+
+/**
+ * Render diff in unified view
+ */
+function UnifiedDiff({ diff }: { diff: FileDiff }) {
+  return (
+    <div className="font-mono text-sm">
+      {diff.hunks.map((hunk, hunkIdx) => (
+        <div key={hunkIdx}>
+          <HunkHeader hunk={hunk} />
+          {hunk.lines.map((line, lineIdx) => (
+            <DiffLineRow key={lineIdx} line={line} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Render diff in split (side-by-side) view
+ */
+function SplitDiff({ diff }: { diff: FileDiff }) {
+  return (
+    <div className="font-mono text-sm flex">
+      {/* Left side (old) */}
+      <div className="flex-1 border-r border-panel-border overflow-x-auto">
+        {diff.hunks.map((hunk, hunkIdx) => (
+          <div key={hunkIdx}>
+            <div className="bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs">
+              @@ -{hunk.old_start},{hunk.old_lines} @@
+            </div>
+            {hunk.lines
+              .filter(line => line.line_type !== "Addition")
+              .map((line, lineIdx) => (
+                <DiffLineRow 
+                  key={lineIdx} 
+                  line={line} 
+                  showOldLineNo={true}
+                  showNewLineNo={false}
+                />
+              ))}
+          </div>
+        ))}
+      </div>
+      {/* Right side (new) */}
+      <div className="flex-1 overflow-x-auto">
+        {diff.hunks.map((hunk, hunkIdx) => (
+          <div key={hunkIdx}>
+            <div className="bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs">
+              @@ +{hunk.new_start},{hunk.new_lines} @@
+            </div>
+            {hunk.lines
+              .filter(line => line.line_type !== "Deletion")
+              .map((line, lineIdx) => (
+                <DiffLineRow 
+                  key={lineIdx} 
+                  line={{
+                    ...line,
+                    line_type: line.line_type === "Addition" ? "Addition" : "Context",
+                  }} 
+                  showOldLineNo={false}
+                  showNewLineNo={true}
+                />
+              ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DiffView({ className }: DiffViewProps) {
+  const selectedRepo = useSelectedRepo();
+  const selectedCommitId = useSelectedCommitId();
+  const selectedFilePath = useSelectedFilePath();
+  const [diff, setDiff] = useState<FileDiff | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem("diff-view-mode");
+    return (saved === "unified" || saved === "split") ? saved : "split";
+  });
+
+  // Persist view mode preference
+  useEffect(() => {
+    localStorage.setItem("diff-view-mode", viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!selectedRepo || !selectedCommitId || !selectedFilePath) {
+      setDiff(null);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchDiff() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await invoke<FileDiff>("get_file_diff", {
+          repoPath: selectedRepo!.path,
+          commitId: selectedCommitId,
+          filePath: selectedFilePath,
+        });
+
+        if (!cancelled) {
+          setDiff(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setDiff(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchDiff();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRepo, selectedCommitId, selectedFilePath]);
+
   return (
     <div
       className={cn(
@@ -20,26 +209,30 @@ export function DiffView({ className }: DiffViewProps) {
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="text-sm font-semibold text-text-primary">
-          src/App.tsx
+        <h2 className="text-sm font-semibold text-text-primary truncate">
+          {selectedFilePath ?? "Diff"}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <button
+            onClick={() => setViewMode("split")}
             className={cn(
               "px-2 py-0.5 rounded text-xs",
-              "bg-bg-secondary hover:bg-bg-hover",
               "border border-border-primary",
-              "text-text-primary"
+              viewMode === "split" 
+                ? "bg-accent-muted text-text-primary" 
+                : "bg-bg-secondary hover:bg-bg-hover text-text-secondary"
             )}
           >
             Split
           </button>
           <button
+            onClick={() => setViewMode("unified")}
             className={cn(
               "px-2 py-0.5 rounded text-xs",
-              "bg-bg-secondary hover:bg-bg-hover",
               "border border-border-primary",
-              "text-text-primary"
+              viewMode === "unified" 
+                ? "bg-accent-muted text-text-primary" 
+                : "bg-bg-secondary hover:bg-bg-hover text-text-secondary"
             )}
           >
             Unified
@@ -47,32 +240,40 @@ export function DiffView({ className }: DiffViewProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 font-mono text-sm">
-        {/* Placeholder diff content */}
-        <div className="space-y-0">
-          <div className="bg-diff-hunk-bg text-text-secondary px-2 py-1">
-            @@ -1,7 +1,9 @@
+      <div className="flex-1 overflow-auto">
+        {!selectedFilePath && (
+          <div className="text-sm text-text-secondary text-center py-8">
+            Select a file to view diff
           </div>
-          <div className="px-2 py-0.5 text-text-primary">
-            <span className="text-text-tertiary mr-3">1</span>
-            {"import React from 'react';"}
+        )}
+
+        {selectedFilePath && isLoading && (
+          <div className="text-sm text-text-secondary text-center py-8">
+            Loading diff...
           </div>
-          <div className="bg-diff-delete-bg px-2 py-0.5">
-            <span className="text-text-tertiary mr-3">2</span>
-            <span className="text-diff-delete-text">{"- import { useState } from 'react';"}</span>
+        )}
+
+        {selectedFilePath && error && (
+          <div className="text-sm text-red-500 text-center py-8">
+            Error: {error}
           </div>
-          <div className="bg-diff-add-bg px-2 py-0.5">
-            <span className="text-text-tertiary mr-3">2</span>
-            <span className="text-diff-add-text">{"+ import { useState, useEffect } from 'react';"}</span>
+        )}
+
+        {selectedFilePath && !isLoading && !error && diff?.is_binary && (
+          <div className="text-sm text-text-secondary text-center py-8">
+            Binary file cannot be displayed
           </div>
-          <div className="px-2 py-0.5 text-text-primary">
-            <span className="text-text-tertiary mr-3">3</span>
+        )}
+
+        {selectedFilePath && !isLoading && !error && diff && !diff.is_binary && diff.hunks.length === 0 && (
+          <div className="text-sm text-text-secondary text-center py-8">
+            No changes
           </div>
-          <div className="px-2 py-0.5 text-text-primary">
-            <span className="text-text-tertiary mr-3">4</span>
-            {"function App() {"}
-          </div>
-        </div>
+        )}
+
+        {!isLoading && !error && diff && !diff.is_binary && diff.hunks.length > 0 && (
+          viewMode === "split" ? <SplitDiff diff={diff} /> : <UnifiedDiff diff={diff} />
+        )}
       </div>
     </div>
   );

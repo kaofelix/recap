@@ -6,6 +6,7 @@ import {
   useSelectedRepoId,
   useSelectedRepo,
   useSelectedCommitId,
+  useSelectedFilePath,
 } from "./appStore";
 
 describe("appStore", () => {
@@ -254,8 +255,76 @@ describe("appStore", () => {
     });
   });
 
+  describe("selectFile", () => {
+    it("should select a file by path", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectFile("src/App.tsx");
+      });
+
+      expect(result.current.selectedFilePath).toBe("src/App.tsx");
+    });
+
+    it("should clear selection when passed null", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectFile("src/App.tsx");
+      });
+
+      act(() => {
+        result.current.selectFile(null);
+      });
+
+      expect(result.current.selectedFilePath).toBeNull();
+    });
+
+    it("should be cleared when commit selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectCommit("abc123");
+        result.current.selectFile("src/App.tsx");
+      });
+
+      expect(result.current.selectedFilePath).toBe("src/App.tsx");
+
+      act(() => {
+        result.current.selectCommit("def456");
+      });
+
+      expect(result.current.selectedFilePath).toBeNull();
+    });
+
+    it("should be cleared when repo selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/one");
+        result.current.addRepo("/path/two");
+      });
+
+      const [repo1, repo2] = result.current.repos;
+
+      act(() => {
+        result.current.selectRepo(repo1.id);
+        result.current.selectCommit("abc123");
+        result.current.selectFile("src/App.tsx");
+      });
+
+      expect(result.current.selectedFilePath).toBe("src/App.tsx");
+
+      act(() => {
+        result.current.selectRepo(repo2.id);
+      });
+
+      expect(result.current.selectedFilePath).toBeNull();
+    });
+  });
+
   describe("clearRepos", () => {
-    it("should remove all repos and clear selection", () => {
+    it("should remove all repos and clear all selections", () => {
       const { result } = renderHook(() => useAppStore());
 
       act(() => {
@@ -266,11 +335,13 @@ describe("appStore", () => {
       act(() => {
         result.current.selectRepo(result.current.repos[0].id);
         result.current.selectCommit("abc123");
+        result.current.selectFile("src/App.tsx");
       });
 
       expect(result.current.repos).toHaveLength(2);
       expect(result.current.selectedRepoId).not.toBeNull();
       expect(result.current.selectedCommitId).not.toBeNull();
+      expect(result.current.selectedFilePath).not.toBeNull();
 
       act(() => {
         result.current.clearRepos();
@@ -279,6 +350,7 @@ describe("appStore", () => {
       expect(result.current.repos).toHaveLength(0);
       expect(result.current.selectedRepoId).toBeNull();
       expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedFilePath).toBeNull();
     });
   });
 
@@ -340,6 +412,17 @@ describe("appStore", () => {
       });
 
       expect(selectedCommitResult.current).toBe("abc123def456");
+    });
+
+    it("useSelectedFilePath should return selected file path", () => {
+      const { result: storeResult } = renderHook(() => useAppStore());
+      const { result: selectedFileResult } = renderHook(() => useSelectedFilePath());
+
+      act(() => {
+        storeResult.current.selectFile("src/components/Button.tsx");
+      });
+
+      expect(selectedFileResult.current).toBe("src/components/Button.tsx");
     });
   });
 });

@@ -37,11 +37,15 @@ describe("AppLayout", () => {
   it("renders the diff view panel", () => {
     render(<AppLayout />);
     
-    // Use getAllByText since src/App.tsx appears in both file list and diff header
-    const appTsxElements = screen.getAllByText("src/App.tsx");
-    expect(appTsxElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Diff")).toBeInTheDocument();
     expect(screen.getByText("Split")).toBeInTheDocument();
     expect(screen.getByText("Unified")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no file is selected", () => {
+    render(<AppLayout />);
+    
+    expect(screen.getByText("Select a file to view diff")).toBeInTheDocument();
   });
 
   it("shows empty state when no repo is selected", () => {
@@ -52,12 +56,6 @@ describe("AppLayout", () => {
   });
 
 
-
-  it("renders diff content placeholder", () => {
-    render(<AppLayout />);
-    
-    expect(screen.getByText(/@@ -1,7 \+1,9 @@/)).toBeInTheDocument();
-  });
 
   it("renders three resizable panels", () => {
     render(<AppLayout />);

@@ -6,10 +6,12 @@ export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
   selectedCommitId: string | null;
+  selectedFilePath: string | null;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
   selectCommit: (id: string | null) => void;
+  selectFile: (path: string | null) => void;
   clearRepos: () => void;
 }
 
@@ -36,6 +38,7 @@ export const useAppStore = create<AppState>()(
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedFilePath: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -71,17 +74,22 @@ export const useAppStore = create<AppState>()(
         
         // Only select if repo exists or if clearing selection
         if (id === null || repos.some((r) => r.id === id)) {
-          // Clear commit selection when repo changes
-          set({ selectedRepoId: id, selectedCommitId: null });
+          // Clear commit and file selection when repo changes
+          set({ selectedRepoId: id, selectedCommitId: null, selectedFilePath: null });
         }
       },
 
       selectCommit: (id: string | null) => {
-        set({ selectedCommitId: id });
+        // Clear file selection when commit changes
+        set({ selectedCommitId: id, selectedFilePath: null });
+      },
+
+      selectFile: (path: string | null) => {
+        set({ selectedFilePath: path });
       },
 
       clearRepos: () => {
-        set({ repos: [], selectedRepoId: null, selectedCommitId: null });
+        set({ repos: [], selectedRepoId: null, selectedCommitId: null, selectedFilePath: null });
       },
     }),
     {
@@ -98,3 +106,4 @@ export const useSelectedRepo = () =>
     state.repos.find((r) => r.id === state.selectedRepoId) ?? null
   );
 export const useSelectedCommitId = () => useAppStore((state) => state.selectedCommitId);
+export const useSelectedFilePath = () => useAppStore((state) => state.selectedFilePath);
