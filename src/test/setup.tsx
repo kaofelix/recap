@@ -64,3 +64,18 @@ export const tauriMocks = {
   emit: mockEmit,
   open: mockOpen,
 };
+
+// Mock react-resizable-panels
+vi.mock("react-resizable-panels", () => ({
+  Group: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="panel-group" className={className}>{children}</div>
+  ),
+  Panel: ({ children, id }: { children: React.ReactNode; id?: string }) => (
+    <div data-testid={`panel-${id || "unknown"}`}>{children}</div>
+  ),
+  Separator: () => <div data-testid="panel-separator" />,
+  useDefaultLayout: () => ({
+    getDefaultLayout: () => [20, 25, 55],
+    onLayoutChange: vi.fn(),
+  }),
+}));
