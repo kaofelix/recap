@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { cn } from "../../lib/utils";
 import { useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
-import type { FileDiff, DiffHunk, DiffLine } from "../../types/diff";
+import type { FileDiff } from "../../types/diff";
 
 export interface DiffViewProps {
   className?: string;
@@ -11,213 +12,29 @@ export interface DiffViewProps {
 type ViewMode = "split" | "unified";
 
 /**
- * Render a single diff line
+ * Convert our FileDiff hunks into old/new text strings for react-diff-viewer
  */
-function DiffLineRow({ line, showOldLineNo, showNewLineNo }: { 
-  line: DiffLine; 
-  showOldLineNo?: boolean;
-  showNewLineNo?: boolean;
-}) {
-  const bgClass = 
-    line.line_type === "Addition" ? "bg-diff-add-bg" :
-    line.line_type === "Deletion" ? "bg-diff-delete-bg" :
-    "";
-  
-  const textClass =
-    line.line_type === "Addition" ? "text-diff-add-text" :
-    line.line_type === "Deletion" ? "text-diff-delete-text" :
-    "text-text-primary";
+function diffToStrings(diff: FileDiff): { oldValue: string; newValue: string } {
+  const oldLines: string[] = [];
+  const newLines: string[] = [];
 
-  const prefix =
-    line.line_type === "Addition" ? "+" :
-    line.line_type === "Deletion" ? "-" :
-    " ";
-
-  return (
-    <div className={cn("flex", bgClass)}>
-      {showOldLineNo !== false && (
-        <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
-          {line.old_line_no ?? ""}
-        </span>
-      )}
-      {showNewLineNo !== false && (
-        <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
-          {line.new_line_no ?? ""}
-        </span>
-      )}
-      <span className={cn("px-1 select-none shrink-0", textClass)}>{prefix}</span>
-      <pre className={cn("flex-1 px-1", textClass)}>
-        {line.content}
-      </pre>
-    </div>
-  );
-}
-
-/**
- * Render a hunk header
- */
-function HunkHeader({ hunk }: { hunk: DiffHunk }) {
-  return (
-    <div className="bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs">
-      @@ -{hunk.old_start},{hunk.old_lines} +{hunk.new_start},{hunk.new_lines} @@
-    </div>
-  );
-}
-
-/**
- * Render diff in unified view
- */
-function UnifiedDiff({ diff }: { diff: FileDiff }) {
-  return (
-    <div className="font-mono text-sm">
-      {diff.hunks.map((hunk, hunkIdx) => (
-        <div key={hunkIdx}>
-          <HunkHeader hunk={hunk} />
-          {hunk.lines.map((line, lineIdx) => (
-            <DiffLineRow key={lineIdx} line={line} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * A row in the split view - either a line or an empty placeholder
- */
-interface SplitRow {
-  left: DiffLine | null;
-  right: DiffLine | null;
-}
-
-/**
- * Convert hunk lines into paired rows for split view.
- * Context lines appear on both sides, deletions on left only, additions on right only.
- */
-function createSplitRows(lines: DiffLine[]): SplitRow[] {
-  const rows: SplitRow[] = [];
-  let i = 0;
-  
-  while (i < lines.length) {
-    const line = lines[i];
-    
-    if (line.line_type === "Context") {
-      // Context lines go on both sides
-      rows.push({ left: line, right: line });
-      i++;
-    } else if (line.line_type === "Deletion") {
-      // Collect consecutive deletions
-      const deletions: DiffLine[] = [];
-      while (i < lines.length && lines[i].line_type === "Deletion") {
-        deletions.push(lines[i]);
-        i++;
+  for (const hunk of diff.hunks) {
+    for (const line of hunk.lines) {
+      if (line.line_type === "Context") {
+        oldLines.push(line.content);
+        newLines.push(line.content);
+      } else if (line.line_type === "Deletion") {
+        oldLines.push(line.content);
+      } else if (line.line_type === "Addition") {
+        newLines.push(line.content);
       }
-      // Collect consecutive additions that follow
-      const additions: DiffLine[] = [];
-      while (i < lines.length && lines[i].line_type === "Addition") {
-        additions.push(lines[i]);
-        i++;
-      }
-      // Pair them up
-      const maxLen = Math.max(deletions.length, additions.length);
-      for (let j = 0; j < maxLen; j++) {
-        rows.push({
-          left: deletions[j] ?? null,
-          right: additions[j] ?? null,
-        });
-      }
-    } else if (line.line_type === "Addition") {
-      // Addition without preceding deletion
-      rows.push({ left: null, right: line });
-      i++;
     }
   }
-  
-  return rows;
-}
 
-/**
- * Render a single side of a split row
- */
-function SplitCell({ line, side }: { line: DiffLine | null; side: "left" | "right" }) {
-  if (!line) {
-    // Empty placeholder
-    return (
-      <div className="flex bg-bg-secondary/50">
-        <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
-          
-        </span>
-        <span className="px-1 select-none shrink-0"> </span>
-        <pre className="flex-1 px-1"> </pre>
-      </div>
-    );
-  }
-
-  const bgClass = 
-    line.line_type === "Addition" ? "bg-diff-add-bg" :
-    line.line_type === "Deletion" ? "bg-diff-delete-bg" :
-    "";
-  
-  const textClass =
-    line.line_type === "Addition" ? "text-diff-add-text" :
-    line.line_type === "Deletion" ? "text-diff-delete-text" :
-    "text-text-primary";
-
-  const prefix =
-    line.line_type === "Addition" ? "+" :
-    line.line_type === "Deletion" ? "-" :
-    " ";
-
-  const lineNo = side === "left" ? line.old_line_no : line.new_line_no;
-
-  return (
-    <div className={cn("flex", bgClass)}>
-      <span className="w-12 px-2 text-right text-text-tertiary select-none shrink-0 border-r border-panel-border">
-        {lineNo ?? ""}
-      </span>
-      <span className={cn("px-1 select-none shrink-0", textClass)}>{prefix}</span>
-      <pre className={cn("flex-1 px-1", textClass)}>
-        {line.content}
-      </pre>
-    </div>
-  );
-}
-
-/**
- * Render diff in split (side-by-side) view
- */
-function SplitDiff({ diff }: { diff: FileDiff }) {
-  return (
-    <div className="font-mono text-sm">
-      {diff.hunks.map((hunk, hunkIdx) => {
-        const rows = createSplitRows(hunk.lines);
-        return (
-          <div key={hunkIdx}>
-            {/* Hunk header spanning both sides */}
-            <div className="flex">
-              <div className="flex-1 bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs border-r border-panel-border">
-                @@ -{hunk.old_start},{hunk.old_lines} @@
-              </div>
-              <div className="flex-1 bg-diff-hunk-bg text-text-secondary px-2 py-1 text-xs">
-                @@ +{hunk.new_start},{hunk.new_lines} @@
-              </div>
-            </div>
-            {/* Paired rows */}
-            {rows.map((row, rowIdx) => (
-              <div key={rowIdx} className="flex">
-                <div className="flex-1 border-r border-panel-border overflow-hidden">
-                  <SplitCell line={row.left} side="left" />
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <SplitCell line={row.right} side="right" />
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
+  return {
+    oldValue: oldLines.join("\n"),
+    newValue: newLines.join("\n"),
+  };
 }
 
 export function DiffView({ className }: DiffViewProps) {
@@ -278,6 +95,54 @@ export function DiffView({ className }: DiffViewProps) {
       cancelled = true;
     };
   }, [selectedRepo, selectedCommitId, selectedFilePath]);
+
+  // Convert diff to strings for the viewer
+  const { oldValue, newValue } = useMemo(() => {
+    if (!diff || diff.is_binary || diff.hunks.length === 0) {
+      return { oldValue: "", newValue: "" };
+    }
+    return diffToStrings(diff);
+  }, [diff]);
+
+  // Custom styles for the diff viewer
+  const diffStyles = {
+    variables: {
+      light: {
+        diffViewerBackground: "var(--color-panel-bg)",
+        diffViewerColor: "var(--color-text-primary)",
+        addedBackground: "var(--color-diff-add-bg)",
+        addedColor: "var(--color-diff-add-text)",
+        removedBackground: "var(--color-diff-delete-bg)",
+        removedColor: "var(--color-diff-delete-text)",
+        wordAddedBackground: "var(--color-diff-add-word-bg)",
+        wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+        addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+        removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+        gutterBackground: "var(--color-panel-header-bg)",
+        gutterColor: "var(--color-text-tertiary)",
+        codeFoldBackground: "var(--color-bg-secondary)",
+        codeFoldGutterBackground: "var(--color-bg-secondary)",
+        emptyLineBackground: "var(--color-bg-secondary)",
+      },
+      dark: {
+        diffViewerBackground: "var(--color-panel-bg)",
+        diffViewerColor: "var(--color-text-primary)",
+        addedBackground: "var(--color-diff-add-bg)",
+        addedColor: "var(--color-diff-add-text)",
+        removedBackground: "var(--color-diff-delete-bg)",
+        removedColor: "var(--color-diff-delete-text)",
+        wordAddedBackground: "var(--color-diff-add-word-bg)",
+        wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+        addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+        removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+        gutterBackground: "var(--color-panel-header-bg)",
+        gutterColor: "var(--color-text-tertiary)",
+        codeFoldBackground: "var(--color-bg-secondary)",
+        codeFoldGutterBackground: "var(--color-bg-secondary)",
+        emptyLineBackground: "var(--color-bg-secondary)",
+      },
+    },
+  };
 
   return (
     <div
@@ -357,7 +222,15 @@ export function DiffView({ className }: DiffViewProps) {
         )}
 
         {!isLoading && !error && diff && !diff.is_binary && diff.hunks.length > 0 && (
-          viewMode === "split" ? <SplitDiff diff={diff} /> : <UnifiedDiff diff={diff} />
+          <ReactDiffViewer
+            oldValue={oldValue}
+            newValue={newValue}
+            splitView={viewMode === "split"}
+            useDarkTheme={document.documentElement.classList.contains("dark")}
+            compareMethod={DiffMethod.WORDS}
+            styles={diffStyles}
+            hideLineNumbers={false}
+          />
         )}
       </div>
     </div>

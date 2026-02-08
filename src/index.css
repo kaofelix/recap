@@ -31,9 +31,13 @@
   --color-diff-add-bg: #dafbe1;
   --color-diff-add-highlight: #aceebb;
   --color-diff-add-text: #116329;
+  --color-diff-add-word-bg: #aceebb;
+  --color-diff-add-gutter-bg: #ccffd8;
   --color-diff-delete-bg: #ffebe9;
   --color-diff-delete-highlight: #ffc1bb;
   --color-diff-delete-text: #82071e;
+  --color-diff-delete-word-bg: #ffc1bb;
+  --color-diff-delete-gutter-bg: #ffd7d5;
   --color-diff-hunk-bg: #f6f8fa;
   
   /* Status colors */
@@ -81,9 +85,13 @@
   --color-diff-add-bg: #12261e;
   --color-diff-add-highlight: #1f4a33;
   --color-diff-add-text: #3fb950;
+  --color-diff-add-word-bg: #1f4a33;
+  --color-diff-add-gutter-bg: #1a4028;
   --color-diff-delete-bg: #2d1117;
   --color-diff-delete-highlight: #5c2429;
   --color-diff-delete-text: #f85149;
+  --color-diff-delete-word-bg: #5c2429;
+  --color-diff-delete-gutter-bg: #4b1f24;
   --color-diff-hunk-bg: #161b22;
   
   /* Status colors */

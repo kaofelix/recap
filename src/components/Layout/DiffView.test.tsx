@@ -83,8 +83,8 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     await waitFor(() => {
-      // In split view, context lines appear on both sides
-      expect(screen.getAllByText("import React from 'react';").length).toBeGreaterThan(0);
+      // Check that the diff viewer is rendered
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
   });
 
@@ -185,22 +185,26 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     await waitFor(() => {
-      // In split view, context lines appear on both sides
-      expect(screen.getAllByText("test").length).toBeGreaterThan(0);
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    // Default is split, click unified
+    // Default is split
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute("data-split-view", "true");
+
+    // Click unified
     const unifiedButton = screen.getByText("Unified");
     fireEvent.click(unifiedButton);
 
     // Check localStorage was updated
     expect(localStorage.getItem("diff-view-mode")).toBe("unified");
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute("data-split-view", "false");
 
     // Click split
     const splitButton = screen.getByText("Split");
     fireEvent.click(splitButton);
 
     expect(localStorage.getItem("diff-view-mode")).toBe("split");
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute("data-split-view", "true");
   });
 
   it("persists view mode preference", () => {

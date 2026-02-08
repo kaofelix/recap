@@ -71,6 +71,22 @@ export const tauriMocks = {
   dialogOpen: mockDialogOpen,
 };
 
+// Mock react-diff-viewer-continued (has worker bundle issues in test env)
+vi.mock("react-diff-viewer-continued", () => ({
+  default: ({ oldValue, newValue, splitView }: { oldValue: string; newValue: string; splitView: boolean }) => (
+    <div data-testid="diff-viewer" data-split-view={splitView}>
+      <div data-testid="diff-old">{oldValue}</div>
+      <div data-testid="diff-new">{newValue}</div>
+    </div>
+  ),
+  DiffMethod: {
+    CHARS: "CHARS",
+    WORDS: "WORDS",
+    LINES: "LINES",
+    SENTENCES: "SENTENCES",
+  },
+}));
+
 // Mock react-resizable-panels
 vi.mock("react-resizable-panels", () => ({
   Group: ({ children, className }: { children: React.ReactNode; className?: string }) => (
