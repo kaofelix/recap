@@ -1,10 +1,19 @@
 import { cn } from "../../lib/utils";
+import { AddRepoButton } from "../Toolbar";
+import { useSelectedRepo } from "../../store";
 
 export interface ToolbarProps {
   className?: string;
 }
 
 export function Toolbar({ className }: ToolbarProps) {
+  const selectedRepo = useSelectedRepo();
+
+  const handleAddRepoError = (message: string) => {
+    // TODO: Replace with toast notification
+    console.error("Failed to add repository:", message);
+  };
+
   return (
     <header
       className={cn(
@@ -18,16 +27,19 @@ export function Toolbar({ className }: ToolbarProps) {
         <span className="text-text-secondary text-sm font-medium">
           Repository:
         </span>
-        <button
-          className={cn(
-            "px-3 py-1 rounded text-sm",
-            "bg-bg-secondary hover:bg-bg-hover",
-            "border border-border-primary",
-            "text-text-primary"
-          )}
-        >
-          Select Repository...
-        </button>
+        {selectedRepo ? (
+          <span
+            className={cn(
+              "px-3 py-1 rounded text-sm",
+              "bg-bg-secondary",
+              "border border-border-primary",
+              "text-text-primary"
+            )}
+          >
+            {selectedRepo.name}
+          </span>
+        ) : null}
+        <AddRepoButton onError={handleAddRepoError} />
       </div>
 
       <div className="flex items-center gap-2">

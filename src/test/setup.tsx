@@ -42,7 +42,8 @@ beforeEach(() => {
 const mockInvoke = vi.fn();
 const mockListen = vi.fn(() => Promise.resolve(() => {}));
 const mockEmit = vi.fn();
-const mockOpen = vi.fn();
+const mockOpenerOpen = vi.fn();
+const mockDialogOpen = vi.fn();
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: mockInvoke,
@@ -54,7 +55,11 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
-  open: mockOpen,
+  open: mockOpenerOpen,
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: mockDialogOpen,
 }));
 
 // Export mocks for use in tests
@@ -62,7 +67,8 @@ export const tauriMocks = {
   invoke: mockInvoke,
   listen: mockListen,
   emit: mockEmit,
-  open: mockOpen,
+  openerOpen: mockOpenerOpen,
+  dialogOpen: mockDialogOpen,
 };
 
 // Mock react-resizable-panels
