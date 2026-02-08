@@ -26,7 +26,12 @@ describe("AppLayout", () => {
     render(<AppLayout />);
     
     expect(screen.getByText("Changed Files")).toBeInTheDocument();
-    expect(screen.getByText("(5 files)")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no commit is selected", () => {
+    render(<AppLayout />);
+    
+    expect(screen.getByText("Select a commit to view changed files")).toBeInTheDocument();
   });
 
   it("renders the diff view panel", () => {
@@ -46,13 +51,7 @@ describe("AppLayout", () => {
     expect(screen.getByText("Select a repository to view commits")).toBeInTheDocument();
   });
 
-  it("renders placeholder file items with status indicators", () => {
-    render(<AppLayout />);
-    
-    expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
-    expect(screen.getByText("src/utils/helpers.ts")).toBeInTheDocument();
-    expect(screen.getByText("package.json")).toBeInTheDocument();
-  });
+
 
   it("renders diff content placeholder", () => {
     render(<AppLayout />);

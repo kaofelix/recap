@@ -5,9 +5,11 @@ import type { Repository } from "../types/repository";
 export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
+  selectedCommitId: string | null;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
+  selectCommit: (id: string | null) => void;
   clearRepos: () => void;
 }
 
@@ -33,6 +35,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       repos: [],
       selectedRepoId: null,
+      selectedCommitId: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -68,12 +71,17 @@ export const useAppStore = create<AppState>()(
         
         // Only select if repo exists or if clearing selection
         if (id === null || repos.some((r) => r.id === id)) {
-          set({ selectedRepoId: id });
+          // Clear commit selection when repo changes
+          set({ selectedRepoId: id, selectedCommitId: null });
         }
       },
 
+      selectCommit: (id: string | null) => {
+        set({ selectedCommitId: id });
+      },
+
       clearRepos: () => {
-        set({ repos: [], selectedRepoId: null });
+        set({ repos: [], selectedRepoId: null, selectedCommitId: null });
       },
     }),
     {
@@ -89,3 +97,4 @@ export const useSelectedRepo = () =>
   useAppStore((state) =>
     state.repos.find((r) => r.id === state.selectedRepoId) ?? null
   );
+export const useSelectedCommitId = () => useAppStore((state) => state.selectedCommitId);

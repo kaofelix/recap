@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "../../lib/utils";
-import { useSelectedRepo } from "../../store/appStore";
+import { useAppStore, useSelectedRepo, useSelectedCommitId } from "../../store/appStore";
 import type { Commit } from "../../types/commit";
 
 export interface SidebarProps {
@@ -25,6 +25,8 @@ function shortSha(sha: string): string {
 
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
+  const selectedCommitId = useSelectedCommitId();
+  const selectCommit = useAppStore((state) => state.selectCommit);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,13 +117,14 @@ export function Sidebar({ className }: SidebarProps) {
 
         {!isLoading && !error && commits.length > 0 && (
           <div className="space-y-1">
-            {commits.map((commit, index) => (
+            {commits.map((commit) => (
               <div
                 key={commit.id}
+                onClick={() => selectCommit(commit.id)}
                 className={cn(
                   "p-2 rounded cursor-pointer",
                   "hover:bg-bg-hover",
-                  index === 0 && "bg-accent-muted"
+                  selectedCommitId === commit.id && "bg-accent-muted"
                 )}
               >
                 <div className="text-sm font-medium text-text-primary truncate">

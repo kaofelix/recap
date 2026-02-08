@@ -5,6 +5,7 @@ import {
   useRepos,
   useSelectedRepoId,
   useSelectedRepo,
+  useSelectedCommitId,
 } from "./appStore";
 
 describe("appStore", () => {
@@ -203,6 +204,56 @@ describe("appStore", () => {
     });
   });
 
+  describe("selectCommit", () => {
+    it("should select a commit by id", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectCommit("abc123");
+      });
+
+      expect(result.current.selectedCommitId).toBe("abc123");
+    });
+
+    it("should clear selection when passed null", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectCommit("abc123");
+      });
+
+      act(() => {
+        result.current.selectCommit(null);
+      });
+
+      expect(result.current.selectedCommitId).toBeNull();
+    });
+
+    it("should be cleared when repo selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/one");
+        result.current.addRepo("/path/two");
+      });
+
+      const [repo1, repo2] = result.current.repos;
+
+      act(() => {
+        result.current.selectRepo(repo1.id);
+        result.current.selectCommit("abc123");
+      });
+
+      expect(result.current.selectedCommitId).toBe("abc123");
+
+      act(() => {
+        result.current.selectRepo(repo2.id);
+      });
+
+      expect(result.current.selectedCommitId).toBeNull();
+    });
+  });
+
   describe("clearRepos", () => {
     it("should remove all repos and clear selection", () => {
       const { result } = renderHook(() => useAppStore());
@@ -214,10 +265,12 @@ describe("appStore", () => {
 
       act(() => {
         result.current.selectRepo(result.current.repos[0].id);
+        result.current.selectCommit("abc123");
       });
 
       expect(result.current.repos).toHaveLength(2);
       expect(result.current.selectedRepoId).not.toBeNull();
+      expect(result.current.selectedCommitId).not.toBeNull();
 
       act(() => {
         result.current.clearRepos();
@@ -225,6 +278,7 @@ describe("appStore", () => {
 
       expect(result.current.repos).toHaveLength(0);
       expect(result.current.selectedRepoId).toBeNull();
+      expect(result.current.selectedCommitId).toBeNull();
     });
   });
 
@@ -275,6 +329,17 @@ describe("appStore", () => {
       const { result } = renderHook(() => useSelectedRepo());
 
       expect(result.current).toBeNull();
+    });
+
+    it("useSelectedCommitId should return selected commit id", () => {
+      const { result: storeResult } = renderHook(() => useAppStore());
+      const { result: selectedCommitResult } = renderHook(() => useSelectedCommitId());
+
+      act(() => {
+        storeResult.current.selectCommit("abc123def456");
+      });
+
+      expect(selectedCommitResult.current).toBe("abc123def456");
     });
   });
 });
