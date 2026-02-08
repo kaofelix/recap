@@ -89,6 +89,17 @@ pub struct FileDiff {
     pub is_binary: bool,
 }
 
+/// File contents for a specific file in a commit (before and after)
+#[derive(Debug, Clone, Serialize)]
+pub struct FileContents {
+    /// Content before the commit (None if file was added)
+    pub old_content: Option<String>,
+    /// Content after the commit (None if file was deleted)
+    pub new_content: Option<String>,
+    /// Whether this is a binary file
+    pub is_binary: bool,
+}
+
 /// Information about a repository
 #[derive(Debug, Clone, Serialize)]
 pub struct RepoInfo {
@@ -384,6 +395,112 @@ pub fn get_file_diff(
         old_path,
         new_path,
         hunks,
+        is_binary: false,
+    })
+}
+
+/// Gets the full file contents before and after a commit for a specific file
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `commit_id` - SHA of the commit
+/// * `file_path` - Path to the file to get contents for
+///
+/// # Returns
+/// A FileContents struct with old and new content, or an error message
+pub fn get_file_contents(
+    repo_path: &str,
+    commit_id: &str,
+    file_path: &str,
+) -> Result<FileContents, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let oid = git2::Oid::from_str(commit_id)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
+
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    let tree = commit
+        .tree()
+        .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+    let parent_tree = if commit.parent_count() > 0 {
+        Some(
+            commit
+                .parent(0)
+                .map_err(|e| format!("Failed to get parent commit: {}", e))?
+                .tree()
+                .map_err(|e| format!("Failed to get parent tree: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    // Helper to get file content from a tree
+    let get_content = |tree: &git2::Tree, path: &str| -> Option<Result<String, String>> {
+        match tree.get_path(std::path::Path::new(path)) {
+            Ok(entry) => {
+                let object = match entry.to_object(&repo) {
+                    Ok(obj) => obj,
+                    Err(e) => return Some(Err(format!("Failed to get object: {}", e))),
+                };
+                if let Some(blob) = object.as_blob() {
+                    if blob.is_binary() {
+                        return Some(Err("Binary file".to_string()));
+                    }
+                    match std::str::from_utf8(blob.content()) {
+                        Ok(s) => Some(Ok(s.to_string())),
+                        Err(_) => Some(Err("File is not valid UTF-8".to_string())),
+                    }
+                } else {
+                    Some(Err("Not a blob".to_string()))
+                }
+            }
+            Err(_) => None, // File doesn't exist in this tree
+        }
+    };
+
+    // Get new content (in the commit)
+    let new_result = get_content(&tree, file_path);
+    
+    // Get old content (in parent, if exists)
+    let old_result = parent_tree.as_ref().and_then(|pt| get_content(pt, file_path));
+
+    // Check if either is binary
+    let is_binary = matches!(&new_result, Some(Err(e)) if e == "Binary file")
+        || matches!(&old_result, Some(Err(e)) if e == "Binary file");
+
+    if is_binary {
+        return Ok(FileContents {
+            old_content: None,
+            new_content: None,
+            is_binary: true,
+        });
+    }
+
+    // Verify the file actually changed in this commit
+    if new_result.is_none() && old_result.is_none() {
+        return Err(format!("File '{}' not found in commit", file_path));
+    }
+
+    let old_content = match old_result {
+        Some(Ok(content)) => Some(content),
+        Some(Err(e)) if e != "Binary file" => return Err(e),
+        _ => None,
+    };
+
+    let new_content = match new_result {
+        Some(Ok(content)) => Some(content),
+        Some(Err(e)) if e != "Binary file" => return Err(e),
+        _ => None,
+    };
+
+    Ok(FileContents {
+        old_content,
+        new_content,
         is_binary: false,
     })
 }
@@ -896,5 +1013,93 @@ mod tests {
 
         // Path should be absolute
         assert!(info.path.starts_with('/'));
+    }
+
+    // Tests for get_file_contents
+
+    #[test]
+    fn test_get_file_contents_added_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let add_commit = &commits[0]; // "Add file" commit
+
+        let contents =
+            get_file_contents(path, &add_commit.id, "file.txt").expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert!(contents.old_content.is_none()); // File didn't exist before
+        assert_eq!(contents.new_content, Some("content".to_string()));
+    }
+
+    #[test]
+    fn test_get_file_contents_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify existing file
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Modify file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+
+        let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
+            .expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert_eq!(contents.old_content, Some("content".to_string()));
+        assert_eq!(contents.new_content, Some("modified content".to_string()));
+    }
+
+    #[test]
+    fn test_get_file_contents_deleted_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Delete file
+        std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Delete file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+
+        let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
+            .expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert_eq!(contents.old_content, Some("content".to_string()));
+        assert!(contents.new_content.is_none()); // File was deleted
+    }
+
+    #[test]
+    fn test_get_file_contents_file_not_in_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+
+        let result = get_file_contents(path, &commits[0].id, "nonexistent.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found in commit"));
     }
 }

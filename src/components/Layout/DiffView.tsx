@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { cn } from "../../lib/utils";
 import { useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
-import type { FileDiff } from "../../types/diff";
+import type { FileContents } from "../../types/diff";
 
 export interface DiffViewProps {
   className?: string;
@@ -11,37 +11,11 @@ export interface DiffViewProps {
 
 type ViewMode = "split" | "unified";
 
-/**
- * Convert our FileDiff hunks into old/new text strings for react-diff-viewer
- */
-function diffToStrings(diff: FileDiff): { oldValue: string; newValue: string } {
-  const oldLines: string[] = [];
-  const newLines: string[] = [];
-
-  for (const hunk of diff.hunks) {
-    for (const line of hunk.lines) {
-      if (line.line_type === "Context") {
-        oldLines.push(line.content);
-        newLines.push(line.content);
-      } else if (line.line_type === "Deletion") {
-        oldLines.push(line.content);
-      } else if (line.line_type === "Addition") {
-        newLines.push(line.content);
-      }
-    }
-  }
-
-  return {
-    oldValue: oldLines.join("\n"),
-    newValue: newLines.join("\n"),
-  };
-}
-
 export function DiffView({ className }: DiffViewProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedFilePath = useSelectedFilePath();
-  const [diff, setDiff] = useState<FileDiff | null>(null);
+  const [fileContents, setFileContents] = useState<FileContents | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -56,31 +30,31 @@ export function DiffView({ className }: DiffViewProps) {
 
   useEffect(() => {
     if (!selectedRepo || !selectedCommitId || !selectedFilePath) {
-      setDiff(null);
+      setFileContents(null);
       setError(null);
       return;
     }
 
     let cancelled = false;
 
-    async function fetchDiff() {
+    async function fetchFileContents() {
       setIsLoading(true);
       setError(null);
 
       try {
-        const result = await invoke<FileDiff>("get_file_diff", {
+        const result = await invoke<FileContents>("get_file_contents", {
           repoPath: selectedRepo!.path,
           commitId: selectedCommitId,
           filePath: selectedFilePath,
         });
 
         if (!cancelled) {
-          setDiff(result);
+          setFileContents(result);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
-          setDiff(null);
+          setFileContents(null);
         }
       } finally {
         if (!cancelled) {
@@ -89,20 +63,17 @@ export function DiffView({ className }: DiffViewProps) {
       }
     }
 
-    fetchDiff();
+    fetchFileContents();
 
     return () => {
       cancelled = true;
     };
   }, [selectedRepo, selectedCommitId, selectedFilePath]);
 
-  // Convert diff to strings for the viewer
-  const { oldValue, newValue } = useMemo(() => {
-    if (!diff || diff.is_binary || diff.hunks.length === 0) {
-      return { oldValue: "", newValue: "" };
-    }
-    return diffToStrings(diff);
-  }, [diff]);
+  // Get old and new values for the diff viewer
+  const oldValue = fileContents?.old_content ?? "";
+  const newValue = fileContents?.new_content ?? "";
+  const hasChanges = oldValue !== newValue;
 
   // Custom styles for the diff viewer
   const diffStyles = {
@@ -209,19 +180,19 @@ export function DiffView({ className }: DiffViewProps) {
           </div>
         )}
 
-        {selectedFilePath && !isLoading && !error && diff?.is_binary && (
+        {selectedFilePath && !isLoading && !error && fileContents?.is_binary && (
           <div className="text-sm text-text-secondary text-center py-8">
             Binary file cannot be displayed
           </div>
         )}
 
-        {selectedFilePath && !isLoading && !error && diff && !diff.is_binary && diff.hunks.length === 0 && (
+        {selectedFilePath && !isLoading && !error && fileContents && !fileContents.is_binary && !hasChanges && (
           <div className="text-sm text-text-secondary text-center py-8">
             No changes
           </div>
         )}
 
-        {!isLoading && !error && diff && !diff.is_binary && diff.hunks.length > 0 && (
+        {!isLoading && !error && fileContents && !fileContents.is_binary && hasChanges && (
           <ReactDiffViewer
             oldValue={oldValue}
             newValue={newValue}

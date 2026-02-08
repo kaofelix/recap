@@ -29,6 +29,15 @@ fn get_file_diff(
 }
 
 #[tauri::command]
+fn get_file_contents(
+    repo_path: String,
+    commit_id: String,
+    file_path: String,
+) -> Result<git::FileContents, String> {
+    git::get_file_contents(&repo_path, &commit_id, &file_path)
+}
+
+#[tauri::command]
 fn get_current_branch(repo_path: String) -> Result<String, String> {
     git::get_current_branch(&repo_path)
 }
@@ -48,6 +57,7 @@ pub fn run() {
             list_commits,
             get_commit_files,
             get_file_diff,
+            get_file_contents,
             get_current_branch,
             validate_repo
         ])

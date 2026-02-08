@@ -52,26 +52,13 @@ describe("DiffView", () => {
   });
 
   it("displays diff when loaded successfully", async () => {
-    const mockDiff = {
-      old_path: null,
-      new_path: "src/App.tsx",
+    const mockContents = {
+      old_content: "import React from 'react';\nimport { useState } from 'react';",
+      new_content: "import React from 'react';\nimport { useState, useEffect } from 'react';",
       is_binary: false,
-      hunks: [
-        {
-          old_start: 1,
-          old_lines: 3,
-          new_start: 1,
-          new_lines: 4,
-          lines: [
-            { content: "import React from 'react';", line_type: "Context", old_line_no: 1, new_line_no: 1 },
-            { content: "import { useState } from 'react';", line_type: "Deletion", old_line_no: 2, new_line_no: null },
-            { content: "import { useState, useEffect } from 'react';", line_type: "Addition", old_line_no: null, new_line_no: 2 },
-          ],
-        },
-      ],
     };
 
-    mockInvoke.mockResolvedValue(mockDiff);
+    mockInvoke.mockResolvedValue(mockContents);
 
     useAppStore.setState({
       repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
@@ -89,14 +76,13 @@ describe("DiffView", () => {
   });
 
   it("shows binary file message", async () => {
-    const mockDiff = {
-      old_path: null,
-      new_path: "image.png",
+    const mockContents = {
+      old_content: null,
+      new_content: null,
       is_binary: true,
-      hunks: [],
     };
 
-    mockInvoke.mockResolvedValue(mockDiff);
+    mockInvoke.mockResolvedValue(mockContents);
 
     useAppStore.setState({
       repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
@@ -129,12 +115,11 @@ describe("DiffView", () => {
     });
   });
 
-  it("calls get_file_diff with correct parameters", async () => {
+  it("calls get_file_contents with correct parameters", async () => {
     mockInvoke.mockResolvedValue({
-      old_path: null,
-      new_path: "src/App.tsx",
+      old_content: null,
+      new_content: "content",
       is_binary: false,
-      hunks: [],
     });
 
     useAppStore.setState({
@@ -147,7 +132,7 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("get_file_diff", {
+      expect(mockInvoke).toHaveBeenCalledWith("get_file_contents", {
         repoPath: "/test/my-repo",
         commitId: "commit123",
         filePath: "src/utils.ts",
@@ -156,24 +141,13 @@ describe("DiffView", () => {
   });
 
   it("toggles between split and unified view", async () => {
-    const mockDiff = {
-      old_path: null,
-      new_path: "src/App.tsx",
+    const mockContents = {
+      old_content: "old content",
+      new_content: "new content",
       is_binary: false,
-      hunks: [
-        {
-          old_start: 1,
-          old_lines: 1,
-          new_start: 1,
-          new_lines: 1,
-          lines: [
-            { content: "test", line_type: "Context", old_line_no: 1, new_line_no: 1 },
-          ],
-        },
-      ],
     };
 
-    mockInvoke.mockResolvedValue(mockDiff);
+    mockInvoke.mockResolvedValue(mockContents);
 
     useAppStore.setState({
       repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
@@ -219,10 +193,9 @@ describe("DiffView", () => {
 
   it("displays file path in header", async () => {
     mockInvoke.mockResolvedValue({
-      old_path: null,
-      new_path: "src/components/Button.tsx",
+      old_content: null,
+      new_content: "content",
       is_binary: false,
-      hunks: [],
     });
 
     useAppStore.setState({
@@ -235,5 +208,74 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
+  });
+
+  it("shows no changes message when old and new content are the same", async () => {
+    const mockContents = {
+      old_content: "same content",
+      new_content: "same content",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "unchanged.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No changes")).toBeInTheDocument();
+    });
+  });
+
+  it("handles added files (null old_content)", async () => {
+    const mockContents = {
+      old_content: null,
+      new_content: "new file content",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "new-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+  });
+
+  it("handles deleted files (null new_content)", async () => {
+    const mockContents = {
+      old_content: "deleted file content",
+      new_content: null,
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "deleted-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
   });
 });

@@ -50,3 +50,16 @@ export interface FileDiff {
   /** Whether this is a binary file */
   is_binary: boolean;
 }
+
+/**
+ * File contents before and after a commit.
+ * Mirrors the Rust FileContents struct from the backend.
+ */
+export interface FileContents {
+  /** Content before the commit (null if file was added) */
+  old_content: string | null;
+  /** Content after the commit (null if file was deleted) */
+  new_content: string | null;
+  /** Whether this is a binary file */
+  is_binary: boolean;
+}
