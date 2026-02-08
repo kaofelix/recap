@@ -39,12 +39,11 @@ describe("AppLayout", () => {
     expect(screen.getByText("Unified")).toBeInTheDocument();
   });
 
-  it("renders placeholder commit items", () => {
+  it("shows empty state when no repo is selected", () => {
     render(<AppLayout />);
     
-    // Check for placeholder commits
-    expect(screen.getByText(/feat: add new feature #1/)).toBeInTheDocument();
-    expect(screen.getByText(/abc1231/)).toBeInTheDocument();
+    // When no repo is selected, show prompt to select one
+    expect(screen.getByText("Select a repository to view commits")).toBeInTheDocument();
   });
 
   it("renders placeholder file items with status indicators", () => {
