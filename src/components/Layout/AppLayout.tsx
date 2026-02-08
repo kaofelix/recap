@@ -50,12 +50,12 @@ export function AppLayout({ className }: AppLayoutProps) {
           collapsible
           collapsedSize="0px"
         >
-          <Sidebar className="h-full border-r border-panel-border" />
+          <Sidebar className="h-full" />
         </Panel>
 
         <Separator
           className={cn(
-            "w-1 bg-transparent hover:bg-accent-primary/50",
+            "w-px bg-panel-border hover:bg-accent-primary/50",
             "transition-colors duration-150",
             "data-[active]:bg-accent-primary"
           )}
@@ -70,12 +70,12 @@ export function AppLayout({ className }: AppLayoutProps) {
           collapsible
           collapsedSize="0px"
         >
-          <FileList className="h-full border-r border-panel-border" />
+          <FileList className="h-full" />
         </Panel>
 
         <Separator
           className={cn(
-            "w-1 bg-transparent hover:bg-accent-primary/50",
+            "w-px bg-panel-border hover:bg-accent-primary/50",
             "transition-colors duration-150",
             "data-[active]:bg-accent-primary"
           )}
