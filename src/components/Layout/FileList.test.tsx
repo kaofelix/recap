@@ -79,10 +79,11 @@ describe("FileList", () => {
     render(<FileList />);
 
     await waitFor(() => {
-      expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
+      // Filename is shown separately from directory
+      expect(screen.getByText("App.tsx")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
+    expect(screen.getByText("Button.tsx")).toBeInTheDocument();
     expect(screen.getByText("(2 files)")).toBeInTheDocument();
   });
 

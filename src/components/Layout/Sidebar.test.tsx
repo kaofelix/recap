@@ -223,10 +223,11 @@ describe("Sidebar", () => {
       render(<Sidebar />);
 
       await waitFor(() => {
-        expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
+        // Filename is shown separately from directory
+        expect(screen.getByText("App.tsx")).toBeInTheDocument();
       });
 
-      expect(screen.getByText("src/new-file.ts")).toBeInTheDocument();
+      expect(screen.getByText("new-file.ts")).toBeInTheDocument();
       expect(screen.getByText("M")).toBeInTheDocument(); // Modified indicator
       expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
     });

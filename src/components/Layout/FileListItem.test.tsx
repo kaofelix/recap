@@ -12,12 +12,28 @@ describe("FileListItem", () => {
     old_path: null,
   };
 
-  it("renders file path", () => {
+  it("renders directory in muted color and filename in primary color", () => {
     render(
       <FileListItem file={mockFile} isSelected={false} onClick={() => {}} />
     );
 
-    expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
+    expect(screen.getByText("src/")).toBeInTheDocument();
+    expect(screen.getByText("App.tsx")).toBeInTheDocument();
+    
+    // Directory should have muted color
+    expect(screen.getByText("src/")).toHaveClass("text-text-secondary");
+    // Filename should have primary color and be bold
+    expect(screen.getByText("App.tsx")).toHaveClass("text-text-primary", "font-medium");
+  });
+
+  it("renders only filename when no directory", () => {
+    const rootFile: ChangedFile = { ...mockFile, path: "README.md" };
+    render(
+      <FileListItem file={rootFile} isSelected={false} onClick={() => {}} />
+    );
+
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+    expect(screen.queryByText("/")).not.toBeInTheDocument();
   });
 
   it("renders status badge with correct letter", () => {
@@ -43,7 +59,7 @@ describe("FileListItem", () => {
       <FileListItem file={mockFile} isSelected={false} onClick={handleClick} />
     );
 
-    fireEvent.click(screen.getByText("src/App.tsx"));
+    fireEvent.click(screen.getByText("App.tsx"));
 
     expect(handleClick).toHaveBeenCalledTimes(1);
   });

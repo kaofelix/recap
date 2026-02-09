@@ -50,7 +50,24 @@ function getStatusBadgeClasses(status: FileStatus): string {
   }
 }
 
+/**
+ * Split a file path into directory and filename parts.
+ * Returns { dir, filename } where dir includes the trailing slash.
+ */
+function splitPath(path: string): { dir: string; filename: string } {
+  const lastSlash = path.lastIndexOf("/");
+  if (lastSlash === -1) {
+    return { dir: "", filename: path };
+  }
+  return {
+    dir: path.slice(0, lastSlash + 1),
+    filename: path.slice(lastSlash + 1),
+  };
+}
+
 export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
+  const { dir, filename } = splitPath(file.path);
+
   return (
     <div
       onClick={onClick}
@@ -69,8 +86,9 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
       >
         {getStatusLetter(file.status)}
       </span>
-      <span className="text-sm text-text-primary truncate flex-1">
-        {file.path}
+      <span className="text-sm truncate flex-1 min-w-0">
+        {dir && <span className="text-text-secondary">{dir}</span>}
+        <span className="text-text-primary font-medium">{filename}</span>
       </span>
       {(file.additions > 0 || file.deletions > 0) && (
         <span className="text-xs shrink-0 flex gap-1">
