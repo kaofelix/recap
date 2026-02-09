@@ -92,7 +92,7 @@ export function Sidebar({ className }: SidebarProps) {
     };
   }, [selectedRepo, viewMode]);
 
-  // Fetch changes for changes mode
+  // Fetch changes for changes mode with polling
   useEffect(() => {
     if (!selectedRepo || viewMode !== "changes") {
       setChanges([]);
@@ -126,10 +126,15 @@ export function Sidebar({ className }: SidebarProps) {
       }
     }
 
+    // Initial fetch
     fetchChanges();
+
+    // Poll every 2 seconds
+    const intervalId = setInterval(fetchChanges, 2000);
 
     return () => {
       cancelled = true;
+      clearInterval(intervalId);
     };
   }, [selectedRepo, viewMode]);
 

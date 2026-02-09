@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
 import { Sidebar } from "./Sidebar";
@@ -310,6 +316,193 @@ describe("Sidebar", () => {
       await waitFor(() => {
         expect(screen.getByText("+10")).toBeInTheDocument();
         expect(screen.getByText("-5")).toBeInTheDocument();
+      });
+    });
+
+    describe("auto-refresh", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("polls for changes every 2 seconds when in Changes view", async () => {
+        const mockChanges = [
+          {
+            path: "src/App.tsx",
+            status: "Modified",
+            additions: 10,
+            deletions: 5,
+            old_path: null,
+          },
+        ];
+
+        mockInvoke.mockResolvedValue(mockChanges);
+
+        useAppStore.setState({
+          repos: [
+            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+          ],
+          selectedRepoId: "1",
+          viewMode: "changes",
+        });
+
+        render(<Sidebar />);
+
+        // Initial fetch happens immediately - flush the promise
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(mockInvoke).toHaveBeenCalledTimes(1);
+
+        // Advance time by 2 seconds - should trigger poll
+        await act(async () => {
+          vi.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+        expect(mockInvoke).toHaveBeenCalledTimes(2);
+
+        // Advance time by another 2 seconds
+        await act(async () => {
+          vi.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+        expect(mockInvoke).toHaveBeenCalledTimes(3);
+      });
+
+      it("stops polling when switching to History view", async () => {
+        mockInvoke.mockResolvedValue([]);
+
+        useAppStore.setState({
+          repos: [
+            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+          ],
+          selectedRepoId: "1",
+          viewMode: "changes",
+        });
+
+        render(<Sidebar />);
+
+        // Initial fetch
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        const changesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+
+        // Switch to history view
+        await act(async () => {
+          useAppStore.setState({ viewMode: "history" });
+        });
+
+        // Advance time by 4 seconds
+        await act(async () => {
+          vi.advanceTimersByTime(4000);
+          await Promise.resolve();
+        });
+
+        // Should not have made any more get_working_changes calls
+        const newChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(newChangesCalls).toBe(changesCalls);
+      });
+
+      it("stops polling when component unmounts", async () => {
+        mockInvoke.mockResolvedValue([]);
+
+        useAppStore.setState({
+          repos: [
+            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+          ],
+          selectedRepoId: "1",
+          viewMode: "changes",
+        });
+
+        const { unmount } = render(<Sidebar />);
+
+        // Initial fetch
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(mockInvoke).toHaveBeenCalledTimes(1);
+
+        // Unmount the component
+        unmount();
+
+        // Advance time by 4 seconds
+        await act(async () => {
+          vi.advanceTimersByTime(4000);
+          await Promise.resolve();
+        });
+
+        // Should not have made any more calls
+        expect(mockInvoke).toHaveBeenCalledTimes(1);
+      });
+
+      it("updates display when file list changes", async () => {
+        const initialChanges = [
+          {
+            path: "src/App.tsx",
+            status: "Modified",
+            additions: 5,
+            deletions: 2,
+            old_path: null,
+          },
+        ];
+
+        const updatedChanges = [
+          {
+            path: "src/App.tsx",
+            status: "Modified",
+            additions: 5,
+            deletions: 2,
+            old_path: null,
+          },
+          {
+            path: "src/NewFile.tsx",
+            status: "Untracked",
+            additions: 10,
+            deletions: 0,
+            old_path: null,
+          },
+        ];
+
+        mockInvoke
+          .mockResolvedValueOnce(initialChanges)
+          .mockResolvedValueOnce(updatedChanges);
+
+        useAppStore.setState({
+          repos: [
+            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+          ],
+          selectedRepoId: "1",
+          viewMode: "changes",
+        });
+
+        render(<Sidebar />);
+
+        // Initial fetch
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        expect(screen.getByText("App.tsx")).toBeInTheDocument();
+        expect(screen.queryByText("NewFile.tsx")).not.toBeInTheDocument();
+
+        // Advance time to trigger poll
+        await act(async () => {
+          vi.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+
+        // Should show the new file
+        expect(screen.getByText("App.tsx")).toBeInTheDocument();
+        expect(screen.getByText("NewFile.tsx")).toBeInTheDocument();
       });
     });
   });
