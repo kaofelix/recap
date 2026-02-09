@@ -104,4 +104,12 @@ describe("highlightCode", () => {
     expect(result).toContain("&gt;");
     expect(result).not.toContain("<script>");
   });
+
+  it("handles undefined input", () => {
+    expect(highlightCode(undefined, "javascript")).toBe("");
+  });
+
+  it("handles null input", () => {
+    expect(highlightCode(null, "typescript")).toBe("");
+  });
 });

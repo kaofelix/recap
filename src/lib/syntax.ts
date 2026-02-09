@@ -1,9 +1,23 @@
 import Prism from "prismjs";
 
-// Import additional languages
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-tsx";
+// Import additional languages (order matters due to dependencies)
+// Core languages first
+import "prismjs/components/prism-markup"; // Required for JSX
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-javascript";
+
+// Languages with dependencies
+import "prismjs/components/prism-typescript"; // Depends on javascript
+import "prismjs/components/prism-jsx"; // Depends on markup, javascript
+import "prismjs/components/prism-tsx"; // Depends on typescript, jsx
+import "prismjs/components/prism-scss"; // Depends on css
+import "prismjs/components/prism-sass"; // Depends on css
+import "prismjs/components/prism-less"; // Depends on css
+import "prismjs/components/prism-java";
+import "prismjs/components/prism-scala"; // Depends on java
+import "prismjs/components/prism-kotlin"; // Depends on java
+
+// Independent languages
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-bash";
@@ -11,14 +25,7 @@ import "prismjs/components/prism-json";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-toml";
 import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-css";
-import "prismjs/components/prism-scss";
-import "prismjs/components/prism-sass";
-import "prismjs/components/prism-less";
 import "prismjs/components/prism-go";
-import "prismjs/components/prism-java";
-import "prismjs/components/prism-kotlin";
-import "prismjs/components/prism-scala";
 import "prismjs/components/prism-sql";
 import "prismjs/components/prism-graphql";
 import "prismjs/components/prism-docker";
@@ -118,7 +125,15 @@ function escapeHtml(text: string): string {
  * Returns HTML string with syntax highlighting spans.
  * If language is not supported, returns escaped HTML.
  */
-export function highlightCode(code: string, language: string | null): string {
+export function highlightCode(
+  code: string | undefined | null,
+  language: string | null
+): string {
+  // Handle undefined/null input
+  if (code == null) {
+    return "";
+  }
+
   if (!(language && Prism.languages[language])) {
     return escapeHtml(code);
   }
