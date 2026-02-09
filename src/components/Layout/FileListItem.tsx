@@ -110,7 +110,6 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
               sideOffset={5}
             >
               {file.path}
-              <Tooltip.Arrow className="fill-bg-tertiary" />
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
