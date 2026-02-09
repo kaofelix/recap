@@ -96,6 +96,34 @@ describe("appStore", () => {
       expect(result.current.repos[0].addedAt).toBeGreaterThanOrEqual(before);
       expect(result.current.repos[0].addedAt).toBeLessThanOrEqual(after);
     });
+
+    it("should auto-select the newly added repo", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/to/repo");
+      });
+
+      expect(result.current.selectedRepoId).toBe(result.current.repos[0].id);
+    });
+
+    it("should auto-select the second repo when added", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/one");
+      });
+
+      const firstId = result.current.repos[0].id;
+      expect(result.current.selectedRepoId).toBe(firstId);
+
+      act(() => {
+        result.current.addRepo("/path/two");
+      });
+
+      const secondId = result.current.repos[1].id;
+      expect(result.current.selectedRepoId).toBe(secondId);
+    });
   });
 
   describe("removeRepo", () => {

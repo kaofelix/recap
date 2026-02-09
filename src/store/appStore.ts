@@ -60,7 +60,8 @@ export const useAppStore = create<AppState>()(
           addedAt: Date.now(),
         };
 
-        set({ repos: [...repos, newRepo] });
+        // Auto-select the newly added repo
+        set({ repos: [...repos, newRepo], selectedRepoId: newRepo.id });
       },
 
       removeRepo: (id: string) => {

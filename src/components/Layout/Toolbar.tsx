@@ -1,14 +1,11 @@
 import { cn } from "../../lib/utils";
-import { AddRepoButton } from "../Toolbar";
-import { useSelectedRepo } from "../../store";
+import { AddRepoButton, RepoPickerButton } from "../Toolbar";
 
 export interface ToolbarProps {
   className?: string;
 }
 
 export function Toolbar({ className }: ToolbarProps) {
-  const selectedRepo = useSelectedRepo();
-
   const handleAddRepoError = (message: string) => {
     // TODO: Replace with toast notification
     console.error("Failed to add repository:", message);
@@ -27,18 +24,7 @@ export function Toolbar({ className }: ToolbarProps) {
         <span className="text-text-secondary text-sm font-medium">
           Repository:
         </span>
-        {selectedRepo ? (
-          <span
-            className={cn(
-              "px-3 py-1 rounded text-sm",
-              "bg-bg-secondary",
-              "border border-border-primary",
-              "text-text-primary"
-            )}
-          >
-            {selectedRepo.name}
-          </span>
-        ) : null}
+        <RepoPickerButton />
         <AddRepoButton onError={handleAddRepoError} />
       </div>
 

@@ -18,8 +18,6 @@ export interface AddRepoButtonProps {
 export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const addRepo = useAppStore((state) => state.addRepo);
-  const selectRepo = useAppStore((state) => state.selectRepo);
-  const repos = useAppStore((state) => state.repos);
 
   const handleClick = async () => {
     try {
@@ -45,16 +43,8 @@ export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
       // Validate with backend
       const repoInfo = await invoke<RepoInfo>("validate_repo", { path });
 
-      // Add to store
+      // Add to store (auto-selects the new repo)
       addRepo(repoInfo.path);
-
-      // Find the newly added repo and select it
-      // We need to get the updated repos after addRepo
-      const updatedRepos = useAppStore.getState().repos;
-      const newRepo = updatedRepos.find((r) => r.path === repoInfo.path);
-      if (newRepo) {
-        selectRepo(newRepo.id);
-      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
