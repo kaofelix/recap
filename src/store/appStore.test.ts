@@ -145,7 +145,28 @@ describe("appStore", () => {
       expect(result.current.repos[0].path).toBe("/path/two");
     });
 
-    it("should clear selection if removed repo was selected", () => {
+    it("should auto-select first remaining repo when removing selected repo", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/one");
+        result.current.addRepo("/path/two");
+      });
+
+      const [repo1, repo2] = result.current.repos;
+
+      // repo2 is auto-selected (last added)
+      expect(result.current.selectedRepoId).toBe(repo2.id);
+
+      act(() => {
+        result.current.removeRepo(repo2.id);
+      });
+
+      // Should auto-select repo1
+      expect(result.current.selectedRepoId).toBe(repo1.id);
+    });
+
+    it("should clear selection when removing the last repo", () => {
       const { result } = renderHook(() => useAppStore());
 
       act(() => {
@@ -155,16 +176,11 @@ describe("appStore", () => {
       const repoId = result.current.repos[0].id;
 
       act(() => {
-        result.current.selectRepo(repoId);
-      });
-
-      expect(result.current.selectedRepoId).toBe(repoId);
-
-      act(() => {
         result.current.removeRepo(repoId);
       });
 
       expect(result.current.selectedRepoId).toBeNull();
+      expect(result.current.repos).toHaveLength(0);
     });
 
     it("should not affect selection when removing different repo", () => {

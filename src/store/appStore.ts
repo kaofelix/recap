@@ -68,10 +68,20 @@ export const useAppStore = create<AppState>()(
         const { repos, selectedRepoId } = get();
         const newRepos = repos.filter((r) => r.id !== id);
 
+        // Auto-select first remaining repo if removed repo was selected
+        let newSelectedId = selectedRepoId;
+        if (selectedRepoId === id) {
+          newSelectedId = newRepos.length > 0 ? newRepos[0].id : null;
+        }
+
         set({
           repos: newRepos,
-          // Clear selection if removed repo was selected
-          selectedRepoId: selectedRepoId === id ? null : selectedRepoId,
+          selectedRepoId: newSelectedId,
+          // Clear commit/file selection when repo changes
+          ...(newSelectedId !== selectedRepoId && {
+            selectedCommitId: null,
+            selectedFilePath: null,
+          }),
         });
       },
 
