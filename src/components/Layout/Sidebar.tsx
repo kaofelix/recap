@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
+import { useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
-  useSelectedRepo,
   useSelectedCommitId,
-  useViewMode,
   useSelectedFilePath,
+  useSelectedRepo,
+  useViewMode,
 } from "../../store/appStore";
-import { FileListItem } from "./FileListItem";
 import type { Commit } from "../../types/commit";
 import type { ChangedFile } from "../../types/file";
+import { FileListItem } from "./FileListItem";
 
 export interface SidebarProps {
   className?: string;
@@ -30,8 +30,6 @@ function formatRelativeTime(timestamp: number): string {
 function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }
-
-
 
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
@@ -68,7 +66,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       try {
         const result = await invoke<Commit[]>("list_commits", {
-          repoPath: selectedRepo!.path,
+          repoPath: selectedRepo?.path,
           limit: 50,
         });
 
@@ -110,7 +108,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       try {
         const result = await invoke<ChangedFile[]>("get_working_changes", {
-          repoPath: selectedRepo!.path,
+          repoPath: selectedRepo?.path,
         });
 
         if (!cancelled) {
@@ -135,45 +133,42 @@ export function Sidebar({ className }: SidebarProps) {
     };
   }, [selectedRepo, viewMode]);
 
-  const isLoading = viewMode === "history" ? isLoadingCommits : isLoadingChanges;
+  const isLoading =
+    viewMode === "history" ? isLoadingCommits : isLoadingChanges;
   const error = viewMode === "history" ? commitsError : changesError;
 
   return (
-    <div
-      className={cn(
-        "h-full flex flex-col",
-        "bg-panel-bg",
-        className
-      )}
-    >
+    <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       {/* Header with view mode toggle */}
       <div
         className={cn(
-          "h-10 flex items-center px-2",
-          "border-b border-panel-border",
+          "flex h-10 items-center px-2",
+          "border-panel-border border-b",
           "bg-panel-header-bg"
         )}
       >
         <div className="flex gap-1">
           <button
-            onClick={() => setViewMode("history")}
             className={cn(
-              "px-3 py-1 text-sm font-medium rounded transition-colors",
+              "rounded px-3 py-1 font-medium text-sm transition-colors",
               viewMode === "history"
                 ? "bg-accent-muted text-text-primary"
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
             )}
+            onClick={() => setViewMode("history")}
+            type="button"
           >
             History
           </button>
           <button
-            onClick={() => setViewMode("changes")}
             className={cn(
-              "px-3 py-1 text-sm font-medium rounded transition-colors",
+              "rounded px-3 py-1 font-medium text-sm transition-colors",
               viewMode === "changes"
                 ? "bg-accent-muted text-text-primary"
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
             )}
+            onClick={() => setViewMode("changes")}
+            type="button"
           >
             Changes
           </button>
@@ -183,72 +178,89 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Content area */}
       <div className="flex-1 overflow-auto p-2">
         {!selectedRepo && (
-          <div className="text-sm text-text-secondary text-center py-8">
-            Select a repository to view {viewMode === "history" ? "commits" : "changes"}
+          <div className="py-8 text-center text-sm text-text-secondary">
+            Select a repository to view{" "}
+            {viewMode === "history" ? "commits" : "changes"}
           </div>
         )}
 
         {selectedRepo && isLoading && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Loading {viewMode === "history" ? "commits" : "changes"}...
           </div>
         )}
 
         {selectedRepo && error && (
-          <div className="text-sm text-red-500 text-center py-8">
+          <div className="py-8 text-center text-red-500 text-sm">
             Error: {error}
           </div>
         )}
 
         {/* History mode: commit list */}
-        {viewMode === "history" && selectedRepo && !isLoading && !error && commits.length === 0 && (
-          <div className="text-sm text-text-secondary text-center py-8">
-            No commits found
-          </div>
-        )}
+        {viewMode === "history" &&
+          selectedRepo &&
+          !isLoading &&
+          !error &&
+          commits.length === 0 && (
+            <div className="py-8 text-center text-sm text-text-secondary">
+              No commits found
+            </div>
+          )}
 
-        {viewMode === "history" && !isLoading && !error && commits.length > 0 && (
-          <div className="space-y-1">
-            {commits.map((commit) => (
-              <div
-                key={commit.id}
-                onClick={() => selectCommit(commit.id)}
-                className={cn(
-                  "p-2 rounded cursor-pointer",
-                  "hover:bg-bg-hover",
-                  selectedCommitId === commit.id && "bg-accent-muted"
-                )}
-              >
-                <div className="text-sm font-medium text-text-primary truncate">
-                  {commit.message}
-                </div>
-                <div className="text-xs text-text-secondary mt-0.5">
-                  {shortSha(commit.id)} · {formatRelativeTime(commit.timestamp)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {viewMode === "history" &&
+          !isLoading &&
+          !error &&
+          commits.length > 0 && (
+            <div className="space-y-1">
+              {commits.map((commit) => (
+                <button
+                  className={cn(
+                    "w-full cursor-pointer rounded p-2 text-left",
+                    "hover:bg-bg-hover",
+                    selectedCommitId === commit.id && "bg-accent-muted"
+                  )}
+                  key={commit.id}
+                  onClick={() => selectCommit(commit.id)}
+                  type="button"
+                >
+                  <div className="truncate font-medium text-sm text-text-primary">
+                    {commit.message}
+                  </div>
+                  <div className="mt-0.5 text-text-secondary text-xs">
+                    {shortSha(commit.id)} ·{" "}
+                    {formatRelativeTime(commit.timestamp)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
 
         {/* Changes mode: file list */}
-        {viewMode === "changes" && selectedRepo && !isLoading && !error && changes.length === 0 && (
-          <div className="text-sm text-text-secondary text-center py-8">
-            No changes here... ✓
-          </div>
-        )}
+        {viewMode === "changes" &&
+          selectedRepo &&
+          !isLoading &&
+          !error &&
+          changes.length === 0 && (
+            <div className="py-8 text-center text-sm text-text-secondary">
+              No changes here... ✓
+            </div>
+          )}
 
-        {viewMode === "changes" && !isLoading && !error && changes.length > 0 && (
-          <div className="space-y-0.5">
-            {changes.map((file) => (
-              <FileListItem
-                key={file.path}
-                file={file}
-                isSelected={selectedFilePath === file.path}
-                onClick={() => selectFile(file.path)}
-              />
-            ))}
-          </div>
-        )}
+        {viewMode === "changes" &&
+          !isLoading &&
+          !error &&
+          changes.length > 0 && (
+            <div className="space-y-0.5">
+              {changes.map((file) => (
+                <FileListItem
+                  file={file}
+                  isSelected={selectedFilePath === file.path}
+                  key={file.path}
+                  onClick={() => selectFile(file.path)}
+                />
+              ))}
+            </div>
+          )}
       </div>
     </div>
   );

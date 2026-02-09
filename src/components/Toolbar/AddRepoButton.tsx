@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore } from "../../store/appStore";
 
@@ -46,8 +46,7 @@ export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
       // Add to store (auto-selects the new repo)
       addRepo(repoInfo.path);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       onError?.(message);
     } finally {
       setIsLoading(false);
@@ -56,17 +55,18 @@ export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
 
   return (
     <button
-      onClick={handleClick}
-      disabled={isLoading}
+      aria-label="Add repository"
       className={cn(
-        "px-3 py-1 rounded text-sm",
+        "rounded px-3 py-1 text-sm",
         "bg-accent-primary hover:bg-accent-hover",
-        "text-white font-medium",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
+        "font-medium text-white",
+        "disabled:cursor-not-allowed disabled:opacity-50",
         "transition-colors",
         className
       )}
-      aria-label="Add repository"
+      disabled={isLoading}
+      onClick={handleClick}
+      type="button"
     >
       {isLoading ? "Adding..." : "Add Repo"}
     </button>

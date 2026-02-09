@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useTheme, __testing } from "./useTheme";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { __testing, useTheme } from "./useTheme";
 
 describe("useTheme", () => {
   let originalMatchMedia: typeof window.matchMedia;
@@ -13,7 +13,7 @@ describe("useTheme", () => {
   beforeEach(() => {
     // Clear localStorage
     localStorage.clear();
-    
+
     // Reset internal state
     __testing.resetState();
 
@@ -37,7 +37,7 @@ describe("useTheme", () => {
   it("should default to system mode", () => {
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     expect(result.current.mode).toBe("system");
   });
 
@@ -45,7 +45,7 @@ describe("useTheme", () => {
     mockMediaQueryList.matches = false;
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     expect(result.current.resolvedTheme).toBe("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
@@ -54,7 +54,7 @@ describe("useTheme", () => {
     mockMediaQueryList.matches = true;
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     expect(result.current.resolvedTheme).toBe("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
@@ -62,11 +62,11 @@ describe("useTheme", () => {
   it("should persist theme choice to localStorage", () => {
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     act(() => {
       result.current.setTheme("dark");
     });
-    
+
     expect(localStorage.getItem("theme-mode")).toBe("dark");
   });
 
@@ -74,7 +74,7 @@ describe("useTheme", () => {
     localStorage.setItem("theme-mode", "dark");
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     expect(result.current.mode).toBe("dark");
     expect(result.current.resolvedTheme).toBe("dark");
   });
@@ -82,11 +82,11 @@ describe("useTheme", () => {
   it("should apply dark class when theme is dark", () => {
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     act(() => {
       result.current.setTheme("dark");
     });
-    
+
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
@@ -94,28 +94,28 @@ describe("useTheme", () => {
     document.documentElement.classList.add("dark");
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     act(() => {
       result.current.setTheme("light");
     });
-    
+
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
   it("should toggle between light and dark", () => {
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     // Start with light (system default with mocked light preference)
     expect(result.current.resolvedTheme).toBe("light");
-    
+
     // Toggle to dark
     act(() => {
       result.current.toggleTheme();
     });
     expect(result.current.resolvedTheme).toBe("dark");
     expect(result.current.mode).toBe("dark");
-    
+
     // Toggle back to light
     act(() => {
       result.current.toggleTheme();
@@ -127,14 +127,14 @@ describe("useTheme", () => {
   it("should handle system preference change when in system mode", () => {
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     act(() => {
       result.current.setTheme("system");
     });
-    
+
     expect(result.current.mode).toBe("system");
     expect(result.current.resolvedTheme).toBe("light");
-    
+
     // Simulate system preference change
     act(() => {
       mockMediaQueryList.matches = true;
@@ -146,7 +146,7 @@ describe("useTheme", () => {
         changeHandler();
       }
     });
-    
+
     // Mode should still be system, but resolved should change
     expect(result.current.mode).toBe("system");
     expect(result.current.resolvedTheme).toBe("dark");
@@ -156,7 +156,7 @@ describe("useTheme", () => {
     localStorage.setItem("theme-mode", "invalid");
     __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-    
+
     expect(result.current.mode).toBe("system");
   });
 });

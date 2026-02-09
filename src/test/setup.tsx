@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 
 // Cleanup after each test
 afterEach(() => {
@@ -40,7 +40,11 @@ beforeEach(() => {
 
 // Mock Tauri APIs
 const mockInvoke = vi.fn();
-const mockListen = vi.fn(() => Promise.resolve(() => {}));
+const mockListen = vi.fn(() =>
+  Promise.resolve(() => {
+    /* cleanup function - noop */
+  })
+);
 const mockEmit = vi.fn();
 const mockOpenerOpen = vi.fn();
 const mockDialogOpen = vi.fn();
@@ -73,8 +77,16 @@ export const tauriMocks = {
 
 // Mock react-diff-viewer-continued (has worker bundle issues in test env)
 vi.mock("react-diff-viewer-continued", () => ({
-  default: ({ oldValue, newValue, splitView }: { oldValue: string; newValue: string; splitView: boolean }) => (
-    <div data-testid="diff-viewer" data-split-view={splitView}>
+  default: ({
+    oldValue,
+    newValue,
+    splitView,
+  }: {
+    oldValue: string;
+    newValue: string;
+    splitView: boolean;
+  }) => (
+    <div data-split-view={splitView} data-testid="diff-viewer">
       <div data-testid="diff-old">{oldValue}</div>
       <div data-testid="diff-new">{newValue}</div>
     </div>
@@ -89,8 +101,16 @@ vi.mock("react-diff-viewer-continued", () => ({
 
 // Mock react-resizable-panels
 vi.mock("react-resizable-panels", () => ({
-  Group: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="panel-group" className={className}>{children}</div>
+  Group: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div className={className} data-testid="panel-group">
+      {children}
+    </div>
   ),
   Panel: ({ children, id }: { children: React.ReactNode; id?: string }) => (
     <div data-testid={`panel-${id || "unknown"}`}>{children}</div>

@@ -1,4 +1,10 @@
-import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  Content,
+  Portal,
+  Provider,
+  Root,
+  Trigger,
+} from "@radix-ui/react-tooltip";
 import { cn } from "../../lib/utils";
 import type { ChangedFile, FileStatus } from "../../types/file";
 
@@ -70,52 +76,55 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
   const { dir, filename } = splitPath(file.path);
 
   return (
-    <div
-      onClick={onClick}
+    <button
       className={cn(
-        "px-2 py-1.5 rounded cursor-pointer flex items-center gap-2",
+        "flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left",
         "hover:bg-bg-hover",
         isSelected && "bg-accent-muted"
       )}
+      onClick={onClick}
+      type="button"
     >
       <span
         className={cn(
-          "w-5 h-5 rounded text-xs font-medium flex items-center justify-center shrink-0",
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded font-medium text-xs",
           getStatusBadgeClasses(file.status)
         )}
         title={file.status}
       >
         {getStatusLetter(file.status)}
       </span>
-      <Tooltip.Provider delayDuration={300}>
-        <Tooltip.Root>
-          <Tooltip.Trigger asChild>
-            <span className="text-sm flex-1 min-w-0 flex">
+      <Provider delayDuration={300}>
+        <Root>
+          <Trigger asChild>
+            <span className="flex min-w-0 flex-1 text-sm">
               {dir && (
-                <span className="text-text-secondary truncate shrink">
+                <span className="shrink truncate text-text-secondary">
                   {dir}
                 </span>
               )}
-              <span className="text-text-primary font-medium shrink-0">{filename}</span>
+              <span className="shrink-0 font-medium text-text-primary">
+                {filename}
+              </span>
             </span>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content
+          </Trigger>
+          <Portal>
+            <Content
               className={cn(
-                "px-2 py-1 rounded text-xs",
+                "rounded px-2 py-1 text-xs",
                 "bg-bg-tertiary text-text-primary",
                 "border border-panel-border shadow-lg",
-                "animate-in fade-in-0 zoom-in-95 duration-100"
+                "fade-in-0 zoom-in-95 animate-in duration-100"
               )}
               sideOffset={5}
             >
               {file.path}
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+            </Content>
+          </Portal>
+        </Root>
+      </Provider>
       {(file.additions > 0 || file.deletions > 0) && (
-        <span className="text-xs shrink-0 flex gap-1">
+        <span className="flex shrink-0 gap-1 text-xs">
           {file.additions > 0 && (
             <span className="text-success">+{file.additions}</span>
           )}
@@ -124,6 +133,6 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
           )}
         </span>
       )}
-    </div>
+    </button>
   );
 }

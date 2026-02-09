@@ -26,7 +26,7 @@ export interface AppState {
 function extractRepoName(path: string): string {
   const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
   const segments = normalized.split("/");
-  return segments[segments.length - 1] || path;
+  return segments.at(-1) || path;
 }
 
 /**
@@ -47,7 +47,7 @@ export const useAppStore = create<AppState>()(
 
       addRepo: (path: string) => {
         const { repos } = get();
-        
+
         // Don't add duplicates
         if (repos.some((r) => r.path === path)) {
           return;
@@ -67,7 +67,7 @@ export const useAppStore = create<AppState>()(
       removeRepo: (id: string) => {
         const { repos, selectedRepoId } = get();
         const newRepos = repos.filter((r) => r.id !== id);
-        
+
         set({
           repos: newRepos,
           // Clear selection if removed repo was selected
@@ -77,11 +77,15 @@ export const useAppStore = create<AppState>()(
 
       selectRepo: (id: string | null) => {
         const { repos } = get();
-        
+
         // Only select if repo exists or if clearing selection
         if (id === null || repos.some((r) => r.id === id)) {
           // Clear commit and file selection when repo changes
-          set({ selectedRepoId: id, selectedCommitId: null, selectedFilePath: null });
+          set({
+            selectedRepoId: id,
+            selectedCommitId: null,
+            selectedFilePath: null,
+          });
         }
       },
 
@@ -100,7 +104,12 @@ export const useAppStore = create<AppState>()(
       },
 
       clearRepos: () => {
-        set({ repos: [], selectedRepoId: null, selectedCommitId: null, selectedFilePath: null });
+        set({
+          repos: [],
+          selectedRepoId: null,
+          selectedCommitId: null,
+          selectedFilePath: null,
+        });
       },
     }),
     {
@@ -111,11 +120,14 @@ export const useAppStore = create<AppState>()(
 
 // Selector hooks for common patterns
 export const useRepos = () => useAppStore((state) => state.repos);
-export const useSelectedRepoId = () => useAppStore((state) => state.selectedRepoId);
+export const useSelectedRepoId = () =>
+  useAppStore((state) => state.selectedRepoId);
 export const useSelectedRepo = () =>
-  useAppStore((state) =>
-    state.repos.find((r) => r.id === state.selectedRepoId) ?? null
+  useAppStore(
+    (state) => state.repos.find((r) => r.id === state.selectedRepoId) ?? null
   );
-export const useSelectedCommitId = () => useAppStore((state) => state.selectedCommitId);
-export const useSelectedFilePath = () => useAppStore((state) => state.selectedFilePath);
+export const useSelectedCommitId = () =>
+  useAppStore((state) => state.selectedCommitId);
+export const useSelectedFilePath = () =>
+  useAppStore((state) => state.selectedFilePath);
 export const useViewMode = () => useAppStore((state) => state.viewMode);

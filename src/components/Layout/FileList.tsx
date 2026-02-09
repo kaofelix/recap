@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
-import { useAppStore, useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
-import { FileListItem } from "./FileListItem";
+import {
+  useAppStore,
+  useSelectedCommitId,
+  useSelectedFilePath,
+  useSelectedRepo,
+} from "../../store/appStore";
 import type { ChangedFile } from "../../types/file";
+import { FileListItem } from "./FileListItem";
 
 export interface FileListProps {
   className?: string;
@@ -19,7 +24,7 @@ export function FileList({ className }: FileListProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedRepo || !selectedCommitId) {
+    if (!(selectedRepo && selectedCommitId)) {
       setFiles([]);
       setError(null);
       return;
@@ -33,7 +38,7 @@ export function FileList({ className }: FileListProps) {
 
       try {
         const result = await invoke<ChangedFile[]>("get_commit_files", {
-          repoPath: selectedRepo!.path,
+          repoPath: selectedRepo?.path,
           commitId: selectedCommitId,
         });
 
@@ -60,25 +65,19 @@ export function FileList({ className }: FileListProps) {
   }, [selectedRepo, selectedCommitId]);
 
   return (
-    <div
-      className={cn(
-        "h-full flex flex-col",
-        "bg-panel-bg",
-        className
-      )}
-    >
+    <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
         className={cn(
-          "h-10 flex items-center px-3",
-          "border-b border-panel-border",
+          "flex h-10 items-center px-3",
+          "border-panel-border border-b",
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="text-sm font-semibold text-text-primary">
+        <h2 className="font-semibold text-sm text-text-primary">
           Changed Files
         </h2>
         {files.length > 0 && (
-          <span className="ml-2 text-xs text-text-secondary">
+          <span className="ml-2 text-text-secondary text-xs">
             ({files.length} {files.length === 1 ? "file" : "files"})
           </span>
         )}
@@ -86,36 +85,36 @@ export function FileList({ className }: FileListProps) {
 
       <div className="flex-1 overflow-auto p-2">
         {!selectedCommitId && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Select a commit to view changed files
           </div>
         )}
 
         {selectedCommitId && isLoading && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Loading files...
           </div>
         )}
 
         {selectedCommitId && error && (
-          <div className="text-sm text-red-500 text-center py-8">
+          <div className="py-8 text-center text-red-500 text-sm">
             Error: {error}
           </div>
         )}
 
         {selectedCommitId && !isLoading && !error && files.length === 0 && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             No files changed
           </div>
         )}
 
-        {!isLoading && !error && files.length > 0 && (
+        {!(isLoading || error) && files.length > 0 && (
           <div className="space-y-0.5">
             {files.map((file) => (
               <FileListItem
-                key={file.path}
                 file={file}
                 isSelected={selectedFilePath === file.path}
+                key={file.path}
                 onClick={() => selectFile(file.path)}
               />
             ))}

@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { cn } from "../../lib/utils";
 import {
-  useSelectedRepo,
   useSelectedCommitId,
   useSelectedFilePath,
+  useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
 import type { FileContents, FileDiff } from "../../types/diff";
@@ -19,7 +19,10 @@ type DiffDisplayMode = "split" | "unified";
 /**
  * Convert a FileDiff (from working directory diff) to old/new content strings
  */
-function fileDiffToContents(diff: FileDiff): { oldContent: string; newContent: string } {
+function fileDiffToContents(diff: FileDiff): {
+  oldContent: string;
+  newContent: string;
+} {
   // Reconstruct the old and new content from the diff hunks
   // This is a simplification - for a proper implementation, we'd need
   // to fetch the actual file contents and apply the diff
@@ -55,10 +58,12 @@ export function DiffView({ className }: DiffViewProps) {
   const [workingDiff, setWorkingDiff] = useState<FileDiff | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(() => {
-    const saved = localStorage.getItem("diff-view-mode");
-    return saved === "unified" || saved === "split" ? saved : "split";
-  });
+  const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
+    () => {
+      const saved = localStorage.getItem("diff-view-mode");
+      return saved === "unified" || saved === "split" ? saved : "split";
+    }
+  );
 
   // Persist view mode preference
   useEffect(() => {
@@ -67,7 +72,12 @@ export function DiffView({ className }: DiffViewProps) {
 
   // Fetch diff for history mode (commit-based)
   useEffect(() => {
-    if (appViewMode !== "history" || !selectedRepo || !selectedCommitId || !selectedFilePath) {
+    if (
+      appViewMode !== "history" ||
+      !selectedRepo ||
+      !selectedCommitId ||
+      !selectedFilePath
+    ) {
       setFileContents(null);
       return;
     }
@@ -80,7 +90,7 @@ export function DiffView({ className }: DiffViewProps) {
 
       try {
         const result = await invoke<FileContents>("get_file_contents", {
-          repoPath: selectedRepo!.path,
+          repoPath: selectedRepo?.path,
           commitId: selectedCommitId,
           filePath: selectedFilePath,
         });
@@ -122,7 +132,7 @@ export function DiffView({ className }: DiffViewProps) {
 
       try {
         const result = await invoke<FileDiff>("get_working_file_diff", {
-          repoPath: selectedRepo!.path,
+          repoPath: selectedRepo?.path,
           filePath: selectedFilePath,
         });
 
@@ -165,7 +175,8 @@ export function DiffView({ className }: DiffViewProps) {
   }
 
   const hasChanges = oldValue !== newValue;
-  const hasData = appViewMode === "history" ? fileContents !== null : workingDiff !== null;
+  const hasData =
+    appViewMode === "history" ? fileContents !== null : workingDiff !== null;
 
   // Custom styles for the diff viewer
   const diffStyles = {
@@ -208,39 +219,41 @@ export function DiffView({ className }: DiffViewProps) {
   };
 
   return (
-    <div className={cn("h-full flex flex-col", "bg-panel-bg", className)}>
+    <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
         className={cn(
-          "h-10 flex items-center px-3 justify-between",
-          "border-b border-panel-border",
+          "flex h-10 items-center justify-between px-3",
+          "border-panel-border border-b",
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="text-sm font-semibold text-text-primary truncate">
+        <h2 className="truncate font-semibold text-sm text-text-primary">
           {selectedFilePath ?? "Diff"}
         </h2>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={() => setDiffDisplayMode("split")}
             className={cn(
-              "px-2 py-0.5 rounded text-xs",
+              "rounded px-2 py-0.5 text-xs",
               "border border-border-primary",
               diffDisplayMode === "split"
                 ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary hover:bg-bg-hover text-text-secondary"
+                : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
             )}
+            onClick={() => setDiffDisplayMode("split")}
+            type="button"
           >
             Split
           </button>
           <button
-            onClick={() => setDiffDisplayMode("unified")}
             className={cn(
-              "px-2 py-0.5 rounded text-xs",
+              "rounded px-2 py-0.5 text-xs",
               "border border-border-primary",
               diffDisplayMode === "unified"
                 ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary hover:bg-bg-hover text-text-secondary"
+                : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
             )}
+            onClick={() => setDiffDisplayMode("unified")}
+            type="button"
           >
             Unified
           </button>
@@ -249,44 +262,49 @@ export function DiffView({ className }: DiffViewProps) {
 
       <div className="flex-1 overflow-auto">
         {!selectedFilePath && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Select a file to view diff
           </div>
         )}
 
         {selectedFilePath && isLoading && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Loading diff...
           </div>
         )}
 
         {selectedFilePath && error && (
-          <div className="text-sm text-red-500 text-center py-8">
+          <div className="py-8 text-center text-red-500 text-sm">
             Error: {error}
           </div>
         )}
 
         {selectedFilePath && !isLoading && !error && isBinary && (
-          <div className="text-sm text-text-secondary text-center py-8">
+          <div className="py-8 text-center text-sm text-text-secondary">
             Binary file cannot be displayed
           </div>
         )}
 
-        {selectedFilePath && !isLoading && !error && hasData && !isBinary && !hasChanges && (
-          <div className="text-sm text-text-secondary text-center py-8">
-            No changes
-          </div>
-        )}
+        {selectedFilePath &&
+          !isLoading &&
+          !error &&
+          hasData &&
+          !isBinary &&
+          !hasChanges && (
+            <div className="py-8 text-center text-sm text-text-secondary">
+              No changes
+            </div>
+          )}
 
-        {!isLoading && !error && hasData && !isBinary && hasChanges && (
+        {!(isLoading || error) && hasData && !isBinary && hasChanges && (
           <ReactDiffViewer
-            oldValue={oldValue}
-            newValue={newValue}
-            splitView={diffDisplayMode === "split"}
-            useDarkTheme={document.documentElement.classList.contains("dark")}
             compareMethod={DiffMethod.WORDS}
-            styles={diffStyles}
             hideLineNumbers={false}
+            newValue={newValue}
+            oldValue={oldValue}
+            splitView={diffDisplayMode === "split"}
+            styles={diffStyles}
+            useDarkTheme={document.documentElement.classList.contains("dark")}
           />
         )}
       </div>

@@ -1,10 +1,15 @@
-import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import {
+  Group,
+  Panel,
+  Separator,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import { cn } from "../../lib/utils";
-import { Toolbar } from "./Toolbar";
-import { Sidebar } from "./Sidebar";
-import { FileList } from "./FileList";
-import { DiffView } from "./DiffView";
 import { useViewMode } from "../../store/appStore";
+import { DiffView } from "./DiffView";
+import { FileList } from "./FileList";
+import { Sidebar } from "./Sidebar";
+import { Toolbar } from "./Toolbar";
 
 const PANEL_IDS = ["sidebar", "file-list", "diff-view"] as const;
 const LAYOUT_ID = "main-layout";
@@ -33,7 +38,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   return (
     <div
       className={cn(
-        "h-screen w-screen flex flex-col",
+        "flex h-screen w-screen flex-col",
         "bg-bg-primary text-text-primary",
         className
       )}
@@ -41,19 +46,19 @@ export function AppLayout({ className }: AppLayoutProps) {
       <Toolbar />
 
       <Group
-        orientation="horizontal"
         className="flex-1"
         defaultLayout={defaultLayout}
         onLayoutChanged={onLayoutChanged}
+        orientation="horizontal"
       >
         {/* Sidebar - Commits/Changes Panel */}
         <Panel
-          id="sidebar"
-          defaultSize="20%"
-          minSize="15%"
-          maxSize="35%"
-          collapsible
           collapsedSize="0px"
+          collapsible
+          defaultSize="20%"
+          id="sidebar"
+          maxSize="35%"
+          minSize="15%"
         >
           <Sidebar className="h-full" />
         </Panel>
@@ -70,12 +75,12 @@ export function AppLayout({ className }: AppLayoutProps) {
         {showFileList && (
           <>
             <Panel
-              id="file-list"
-              defaultSize="25%"
-              minSize="15%"
-              maxSize="40%"
-              collapsible
               collapsedSize="0px"
+              collapsible
+              defaultSize="25%"
+              id="file-list"
+              maxSize="40%"
+              minSize="15%"
             >
               <FileList className="h-full" />
             </Panel>
@@ -92,8 +97,8 @@ export function AppLayout({ className }: AppLayoutProps) {
 
         {/* Diff View Panel */}
         <Panel
-          id="diff-view"
           defaultSize={showFileList ? "55%" : "80%"}
+          id="diff-view"
           minSize="30%"
         >
           <DiffView className="h-full" />

@@ -7,7 +7,9 @@ const STORAGE_KEY = "theme-mode";
 
 // Get the system preference
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") {
+    return "light";
+  }
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
@@ -15,7 +17,9 @@ function getSystemTheme(): ResolvedTheme {
 
 // Get stored theme from localStorage
 function getStoredTheme(): ThemeMode {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") {
+    return "system";
+  }
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
@@ -33,7 +37,9 @@ function resolveTheme(mode: ThemeMode): ResolvedTheme {
 
 // Apply theme to DOM
 function applyTheme(theme: ResolvedTheme): void {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined") {
+    return;
+  }
   const root = document.documentElement;
   if (theme === "dark") {
     root.classList.add("dark");
@@ -43,10 +49,10 @@ function applyTheme(theme: ResolvedTheme): void {
 }
 
 // Store for managing theme state
-type ThemeState = {
+interface ThemeState {
   mode: ThemeMode;
   resolved: ResolvedTheme;
-};
+}
 
 let currentState: ThemeState = {
   mode: "system",
@@ -84,8 +90,10 @@ function setThemeMode(mode: ThemeMode): void {
 
 // Initialize theme on module load
 function initializeTheme(): void {
-  if (typeof window === "undefined") return;
-  
+  if (typeof window === "undefined") {
+    return;
+  }
+
   const mode = getStoredTheme();
   const resolved = resolveTheme(mode);
   applyTheme(resolved);
@@ -109,7 +117,9 @@ let initialized = false;
 
 // Initialize on first use (not module load to support SSR/testing)
 function ensureInitialized(): void {
-  if (initialized || typeof window === "undefined") return;
+  if (initialized || typeof window === "undefined") {
+    return;
+  }
   initialized = true;
   initializeTheme();
 }

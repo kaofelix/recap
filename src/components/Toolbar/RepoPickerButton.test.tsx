@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { act } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useAppStore } from "../../store/appStore";
 import { render, screen, userEvent } from "../../test/utils";
 import { RepoPickerButton } from "./RepoPickerButton";
-import { useAppStore } from "../../store/appStore";
-import { act } from "@testing-library/react";
 
 describe("RepoPickerButton", () => {
   beforeEach(() => {
@@ -25,7 +25,9 @@ describe("RepoPickerButton", () => {
 
     render(<RepoPickerButton />);
 
-    expect(screen.getByRole("button", { name: /select repository/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /select repository/i })
+    ).toBeInTheDocument();
   });
 
   it("should display the selected repo name", () => {
@@ -63,8 +65,12 @@ describe("RepoPickerButton", () => {
     await user.click(button);
 
     // Check that both repos appear in the dropdown
-    expect(screen.getByRole("menuitem", { name: /repo-one/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /repo-two/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /repo-one/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /repo-two/i })
+    ).toBeInTheDocument();
   });
 
   it("should switch repo when a different one is selected", async () => {
@@ -108,7 +114,7 @@ describe("RepoPickerButton", () => {
 
     // repo-two should have the checkmark (it was added last and auto-selected)
     const repoTwoItem = screen.getByRole("menuitem", { name: /repo-two/i });
-    
+
     // The checkmark is an SVG inside the menuitem
     // eslint-disable-next-line testing-library/no-node-access
     const checkmark = repoTwoItem.querySelector("svg");

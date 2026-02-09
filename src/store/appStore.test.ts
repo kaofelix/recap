@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   useAppStore,
   useRepos,
-  useSelectedRepoId,
-  useSelectedRepo,
   useSelectedCommitId,
   useSelectedFilePath,
+  useSelectedRepo,
+  useSelectedRepoId,
   useViewMode,
 } from "./appStore";
 
@@ -398,7 +398,9 @@ describe("appStore", () => {
 
     it("useSelectedRepoId should return selected id", () => {
       const { result: storeResult } = renderHook(() => useAppStore());
-      const { result: selectedIdResult } = renderHook(() => useSelectedRepoId());
+      const { result: selectedIdResult } = renderHook(() =>
+        useSelectedRepoId()
+      );
 
       act(() => {
         storeResult.current.addRepo("/path/to/repo");
@@ -413,7 +415,9 @@ describe("appStore", () => {
 
     it("useSelectedRepo should return selected repo object", () => {
       const { result: storeResult } = renderHook(() => useAppStore());
-      const { result: selectedRepoResult } = renderHook(() => useSelectedRepo());
+      const { result: selectedRepoResult } = renderHook(() =>
+        useSelectedRepo()
+      );
 
       act(() => {
         storeResult.current.addRepo("/path/to/repo");
@@ -435,7 +439,9 @@ describe("appStore", () => {
 
     it("useSelectedCommitId should return selected commit id", () => {
       const { result: storeResult } = renderHook(() => useAppStore());
-      const { result: selectedCommitResult } = renderHook(() => useSelectedCommitId());
+      const { result: selectedCommitResult } = renderHook(() =>
+        useSelectedCommitId()
+      );
 
       act(() => {
         storeResult.current.selectCommit("abc123def456");
@@ -446,7 +452,9 @@ describe("appStore", () => {
 
     it("useSelectedFilePath should return selected file path", () => {
       const { result: storeResult } = renderHook(() => useAppStore());
-      const { result: selectedFileResult } = renderHook(() => useSelectedFilePath());
+      const { result: selectedFileResult } = renderHook(() =>
+        useSelectedFilePath()
+      );
 
       act(() => {
         storeResult.current.selectFile("src/components/Button.tsx");

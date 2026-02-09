@@ -14,14 +14,14 @@ export function Toolbar({ className }: ToolbarProps) {
   return (
     <header
       className={cn(
-        "h-12 flex items-center px-4 gap-4",
-        "bg-panel-header-bg border-b border-panel-border",
+        "flex h-12 items-center gap-4 px-4",
+        "border-panel-border border-b bg-panel-header-bg",
         "shrink-0",
         className
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="text-text-secondary text-sm font-medium">
+        <span className="font-medium text-sm text-text-secondary">
           Repository:
         </span>
         <RepoPickerButton />
@@ -29,14 +29,15 @@ export function Toolbar({ className }: ToolbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-text-secondary text-sm font-medium">Branch:</span>
+        <span className="font-medium text-sm text-text-secondary">Branch:</span>
         <button
           className={cn(
-            "px-3 py-1 rounded text-sm",
+            "rounded px-3 py-1 text-sm",
             "bg-bg-secondary hover:bg-bg-hover",
             "border border-border-primary",
             "text-text-primary"
           )}
+          type="button"
         >
           main
         </button>
@@ -45,10 +46,11 @@ export function Toolbar({ className }: ToolbarProps) {
       <div className="ml-auto flex items-center gap-2">
         <button
           className={cn(
-            "px-3 py-1 rounded text-sm",
+            "rounded px-3 py-1 text-sm",
             "bg-accent-primary hover:bg-accent-hover",
-            "text-white font-medium"
+            "font-medium text-white"
           )}
+          type="button"
         >
           Refresh
         </button>

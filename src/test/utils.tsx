@@ -1,5 +1,5 @@
-import { render, RenderOptions } from "@testing-library/react";
-import { ReactElement, ReactNode } from "react";
+import { type RenderOptions, render } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 
 // Add providers here as needed (e.g., router, state management)
 interface ProvidersProps {

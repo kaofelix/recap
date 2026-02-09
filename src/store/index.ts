@@ -1,9 +1,9 @@
 export {
+  type AppState,
   useAppStore,
   useRepos,
-  useSelectedRepoId,
   useSelectedRepo,
+  useSelectedRepoId,
   useViewMode,
-  type AppState,
   type ViewMode,
 } from "./appStore";

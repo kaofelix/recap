@@ -1,6 +1,6 @@
 export { AppLayout } from "./AppLayout";
-export { Toolbar } from "./Toolbar";
-export { Sidebar } from "./Sidebar";
+export { DiffView } from "./DiffView";
 export { FileList } from "./FileList";
 export { FileListItem } from "./FileListItem";
-export { DiffView } from "./DiffView";
+export { Sidebar } from "./Sidebar";
+export { Toolbar } from "./Toolbar";

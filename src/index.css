@@ -9,24 +9,24 @@
   --color-bg-overlay: #ffffff;
   --color-bg-hover: #f3f4f6;
   --color-bg-active: #e5e7eb;
-  
+
   /* Text colors */
   --color-text-primary: #24292f;
   --color-text-secondary: #57606a;
   --color-text-tertiary: #6e7781;
   --color-text-placeholder: #8c959f;
   --color-text-disabled: #8c959f;
-  
+
   /* Border colors */
   --color-border-primary: #d0d7de;
   --color-border-secondary: #e5e7eb;
   --color-border-muted: #d8dee4;
-  
+
   /* Accent colors */
   --color-accent-primary: #0969da;
   --color-accent-hover: #0860c7;
   --color-accent-muted: #ddf4ff;
-  
+
   /* Diff colors */
   --color-diff-add-bg: #dafbe1;
   --color-diff-add-highlight: #aceebb;
@@ -39,17 +39,17 @@
   --color-diff-delete-word-bg: #ffc1bb;
   --color-diff-delete-gutter-bg: #ffd7d5;
   --color-diff-hunk-bg: #f6f8fa;
-  
+
   /* Status colors */
   --color-success: #1a7f37;
   --color-warning: #9a6700;
   --color-danger: #cf222e;
-  
+
   /* Panel colors */
   --color-panel-bg: #ffffff;
   --color-panel-header-bg: #f6f8fa;
   --color-panel-border: #d0d7de;
-  
+
   /* Scrollbar */
   --color-scrollbar-thumb: #8c959f;
   --color-scrollbar-track: transparent;
@@ -63,24 +63,24 @@
   --color-bg-overlay: #1c2128;
   --color-bg-hover: #21262d;
   --color-bg-active: #30363d;
-  
+
   /* Text colors */
   --color-text-primary: #e6edf3;
   --color-text-secondary: #8b949e;
   --color-text-tertiary: #6e7681;
   --color-text-placeholder: #6e7681;
   --color-text-disabled: #484f58;
-  
+
   /* Border colors */
   --color-border-primary: #30363d;
   --color-border-secondary: #21262d;
   --color-border-muted: #30363d;
-  
+
   /* Accent colors */
   --color-accent-primary: #58a6ff;
   --color-accent-hover: #79b8ff;
   --color-accent-muted: #1f3a5f;
-  
+
   /* Diff colors */
   --color-diff-add-bg: #12261e;
   --color-diff-add-highlight: #1f4a33;
@@ -93,17 +93,17 @@
   --color-diff-delete-word-bg: #5c2429;
   --color-diff-delete-gutter-bg: #4b1f24;
   --color-diff-hunk-bg: #161b22;
-  
+
   /* Status colors */
   --color-success: #3fb950;
   --color-warning: #d29922;
   --color-danger: #f85149;
-  
+
   /* Panel colors */
   --color-panel-bg: #0d1117;
   --color-panel-header-bg: #161b22;
   --color-panel-border: #30363d;
-  
+
   /* Scrollbar */
   --color-scrollbar-thumb: #484f58;
   --color-scrollbar-track: transparent;
@@ -118,24 +118,24 @@
   --color-bg-overlay: var(--color-bg-overlay);
   --color-bg-hover: var(--color-bg-hover);
   --color-bg-active: var(--color-bg-active);
-  
+
   /* Text colors */
   --color-text-primary: var(--color-text-primary);
   --color-text-secondary: var(--color-text-secondary);
   --color-text-tertiary: var(--color-text-tertiary);
   --color-text-placeholder: var(--color-text-placeholder);
   --color-text-disabled: var(--color-text-disabled);
-  
+
   /* Border colors */
   --color-border-primary: var(--color-border-primary);
   --color-border-secondary: var(--color-border-secondary);
   --color-border-muted: var(--color-border-muted);
-  
+
   /* Accent colors */
   --color-accent-primary: var(--color-accent-primary);
   --color-accent-hover: var(--color-accent-hover);
   --color-accent-muted: var(--color-accent-muted);
-  
+
   /* Diff colors */
   --color-diff-add-bg: var(--color-diff-add-bg);
   --color-diff-add-highlight: var(--color-diff-add-highlight);
@@ -144,12 +144,12 @@
   --color-diff-delete-highlight: var(--color-diff-delete-highlight);
   --color-diff-delete-text: var(--color-diff-delete-text);
   --color-diff-hunk-bg: var(--color-diff-hunk-bg);
-  
+
   /* Status colors */
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-danger: var(--color-danger);
-  
+
   /* Panel colors */
   --color-panel-bg: var(--color-panel-bg);
   --color-panel-header-bg: var(--color-panel-header-bg);

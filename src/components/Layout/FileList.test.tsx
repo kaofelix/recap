@@ -1,13 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { FileList } from "./FileList";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
+import { FileList } from "./FileList";
 
 // Mock Tauri invoke
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
+
+// Regex patterns for error matching
+const COMMIT_FILES_ERROR = /Error:.*Failed to get commit files/;
 
 describe("FileList", () => {
   beforeEach(() => {
@@ -35,15 +38,22 @@ describe("FileList", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows loading state while fetching files", async () => {
+  it("shows loading state while fetching files", () => {
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
 
     // Make invoke hang indefinitely
-    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    mockInvoke.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* never resolves - simulates loading state */
+        })
+    );
 
     render(<FileList />);
 
@@ -71,7 +81,9 @@ describe("FileList", () => {
     mockInvoke.mockResolvedValue(mockFiles);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
@@ -89,15 +101,35 @@ describe("FileList", () => {
 
   it("shows file status indicators", async () => {
     const mockFiles = [
-      { path: "added.ts", status: "Added", additions: 10, deletions: 0, old_path: null },
-      { path: "modified.ts", status: "Modified", additions: 5, deletions: 3, old_path: null },
-      { path: "deleted.ts", status: "Deleted", additions: 0, deletions: 20, old_path: null },
+      {
+        path: "added.ts",
+        status: "Added",
+        additions: 10,
+        deletions: 0,
+        old_path: null,
+      },
+      {
+        path: "modified.ts",
+        status: "Modified",
+        additions: 5,
+        deletions: 3,
+        old_path: null,
+      },
+      {
+        path: "deleted.ts",
+        status: "Deleted",
+        additions: 0,
+        deletions: 20,
+        old_path: null,
+      },
     ];
 
     mockInvoke.mockResolvedValue(mockFiles);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
@@ -114,13 +146,21 @@ describe("FileList", () => {
 
   it("shows line counts", async () => {
     const mockFiles = [
-      { path: "file.ts", status: "Modified", additions: 15, deletions: 8, old_path: null },
+      {
+        path: "file.ts",
+        status: "Modified",
+        additions: 15,
+        deletions: 8,
+        old_path: null,
+      },
     ];
 
     mockInvoke.mockResolvedValue(mockFiles);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
@@ -138,7 +178,9 @@ describe("FileList", () => {
     mockInvoke.mockRejectedValue(new Error("Failed to get commit files"));
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
@@ -146,9 +188,7 @@ describe("FileList", () => {
     render(<FileList />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Error:.*Failed to get commit files/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(COMMIT_FILES_ERROR)).toBeInTheDocument();
     });
   });
 
@@ -156,7 +196,9 @@ describe("FileList", () => {
     mockInvoke.mockResolvedValue([]);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "abc123",
     });
@@ -172,7 +214,14 @@ describe("FileList", () => {
     mockInvoke.mockResolvedValue([]);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/my-repo", name: "my-repo", addedAt: Date.now() }],
+      repos: [
+        {
+          id: "1",
+          path: "/test/my-repo",
+          name: "my-repo",
+          addedAt: Date.now(),
+        },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "def456abc",
     });
@@ -191,7 +240,9 @@ describe("FileList", () => {
     mockInvoke.mockResolvedValue([]);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
       selectedCommitId: "commit1",
     });

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { Sidebar } from "./Sidebar";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
+import { Sidebar } from "./Sidebar";
 
 // Mock Tauri invoke
 const mockInvoke = vi.fn();
@@ -12,22 +12,32 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAppStore.setState({ repos: [], selectedRepoId: null, viewMode: "history" });
+    useAppStore.setState({
+      repos: [],
+      selectedRepoId: null,
+      viewMode: "history",
+    });
   });
 
   afterEach(() => {
-    useAppStore.setState({ repos: [], selectedRepoId: null, viewMode: "history" });
+    useAppStore.setState({
+      repos: [],
+      selectedRepoId: null,
+      viewMode: "history",
+    });
   });
 
   it("shows prompt when no repo is selected", () => {
     render(<Sidebar />);
-    
-    expect(screen.getByText("Select a repository to view commits")).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Select a repository to view commits")
+    ).toBeInTheDocument();
   });
 
   it("shows view mode toggle buttons", () => {
     render(<Sidebar />);
-    
+
     expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Changes" })).toBeInTheDocument();
   });
@@ -35,12 +45,19 @@ describe("Sidebar", () => {
   it("shows loading state while fetching commits", async () => {
     // Setup a repo and select it
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
     });
 
     // Make invoke hang indefinitely
-    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    mockInvoke.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* never resolves */
+        })
+    );
 
     render(<Sidebar />);
 
@@ -68,7 +85,9 @@ describe("Sidebar", () => {
     mockInvoke.mockResolvedValue(mockCommits);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
     });
 
@@ -86,14 +105,18 @@ describe("Sidebar", () => {
     mockInvoke.mockRejectedValue(new Error("Failed to open repository"));
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/invalid/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/invalid/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
     });
 
     render(<Sidebar />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Error:.*Failed to open repository/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Error:.*Failed to open repository/)
+      ).toBeInTheDocument();
     });
   });
 
@@ -101,7 +124,9 @@ describe("Sidebar", () => {
     mockInvoke.mockResolvedValue([]);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
       selectedRepoId: "1",
     });
 
@@ -116,7 +141,14 @@ describe("Sidebar", () => {
     mockInvoke.mockResolvedValue([]);
 
     useAppStore.setState({
-      repos: [{ id: "1", path: "/test/my-repo", name: "my-repo", addedAt: Date.now() }],
+      repos: [
+        {
+          id: "1",
+          path: "/test/my-repo",
+          name: "my-repo",
+          addedAt: Date.now(),
+        },
+      ],
       selectedRepoId: "1",
     });
 
@@ -167,7 +199,9 @@ describe("Sidebar", () => {
       mockInvoke.mockResolvedValue([]);
 
       useAppStore.setState({
-        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
         selectedRepoId: "1",
       });
 
@@ -186,15 +220,19 @@ describe("Sidebar", () => {
       useAppStore.setState({ viewMode: "changes" });
 
       render(<Sidebar />);
-      
-      expect(screen.getByText("Select a repository to view changes")).toBeInTheDocument();
+
+      expect(
+        screen.getByText("Select a repository to view changes")
+      ).toBeInTheDocument();
     });
 
     it("shows empty state when no working changes", async () => {
       mockInvoke.mockResolvedValue([]);
 
       useAppStore.setState({
-        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
         selectedRepoId: "1",
         viewMode: "changes",
       });
@@ -208,14 +246,28 @@ describe("Sidebar", () => {
 
     it("displays working changes when loaded successfully", async () => {
       const mockChanges = [
-        { path: "src/App.tsx", status: "Modified", additions: 10, deletions: 5, old_path: null },
-        { path: "src/new-file.ts", status: "Untracked", additions: 20, deletions: 0, old_path: null },
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 10,
+          deletions: 5,
+          old_path: null,
+        },
+        {
+          path: "src/new-file.ts",
+          status: "Untracked",
+          additions: 20,
+          deletions: 0,
+          old_path: null,
+        },
       ];
 
       mockInvoke.mockResolvedValue(mockChanges);
 
       useAppStore.setState({
-        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
         selectedRepoId: "1",
         viewMode: "changes",
       });
@@ -234,13 +286,21 @@ describe("Sidebar", () => {
 
     it("shows addition and deletion counts for changed files", async () => {
       const mockChanges = [
-        { path: "src/App.tsx", status: "Modified", additions: 10, deletions: 5, old_path: null },
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 10,
+          deletions: 5,
+          old_path: null,
+        },
       ];
 
       mockInvoke.mockResolvedValue(mockChanges);
 
       useAppStore.setState({
-        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
         selectedRepoId: "1",
         viewMode: "changes",
       });

@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { FileListItem } from "./FileListItem";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { ChangedFile } from "../../types/file";
+import { FileListItem } from "./FileListItem";
+
+const noop = () => {
+  /* noop for testing */
+};
 
 describe("FileListItem", () => {
   const mockFile: ChangedFile = {
@@ -13,41 +17,36 @@ describe("FileListItem", () => {
   };
 
   it("renders directory in muted color and filename in primary color", () => {
-    render(
-      <FileListItem file={mockFile} isSelected={false} onClick={() => {}} />
-    );
+    render(<FileListItem file={mockFile} isSelected={false} onClick={noop} />);
 
     expect(screen.getByText("src/")).toBeInTheDocument();
     expect(screen.getByText("App.tsx")).toBeInTheDocument();
-    
+
     // Directory should have muted color
     expect(screen.getByText("src/")).toHaveClass("text-text-secondary");
     // Filename should have primary color and be bold
-    expect(screen.getByText("App.tsx")).toHaveClass("text-text-primary", "font-medium");
+    expect(screen.getByText("App.tsx")).toHaveClass(
+      "text-text-primary",
+      "font-medium"
+    );
   });
 
   it("renders only filename when no directory", () => {
     const rootFile: ChangedFile = { ...mockFile, path: "README.md" };
-    render(
-      <FileListItem file={rootFile} isSelected={false} onClick={() => {}} />
-    );
+    render(<FileListItem file={rootFile} isSelected={false} onClick={noop} />);
 
     expect(screen.getByText("README.md")).toBeInTheDocument();
     expect(screen.queryByText("/")).not.toBeInTheDocument();
   });
 
   it("renders status badge with correct letter", () => {
-    render(
-      <FileListItem file={mockFile} isSelected={false} onClick={() => {}} />
-    );
+    render(<FileListItem file={mockFile} isSelected={false} onClick={noop} />);
 
     expect(screen.getByText("M")).toBeInTheDocument();
   });
 
   it("renders additions and deletions", () => {
-    render(
-      <FileListItem file={mockFile} isSelected={false} onClick={() => {}} />
-    );
+    render(<FileListItem file={mockFile} isSelected={false} onClick={noop} />);
 
     expect(screen.getByText("+10")).toBeInTheDocument();
     expect(screen.getByText("-5")).toBeInTheDocument();
@@ -66,7 +65,7 @@ describe("FileListItem", () => {
 
   it("applies selected styles when isSelected is true", () => {
     const { container } = render(
-      <FileListItem file={mockFile} isSelected={true} onClick={() => {}} />
+      <FileListItem file={mockFile} isSelected={true} onClick={noop} />
     );
 
     const item = container.firstChild;
@@ -75,7 +74,7 @@ describe("FileListItem", () => {
 
   it("does not apply selected styles when isSelected is false", () => {
     const { container } = render(
-      <FileListItem file={mockFile} isSelected={false} onClick={() => {}} />
+      <FileListItem file={mockFile} isSelected={false} onClick={noop} />
     );
 
     const item = container.firstChild;
@@ -84,9 +83,7 @@ describe("FileListItem", () => {
 
   it("renders correct status letter for Added files", () => {
     const addedFile: ChangedFile = { ...mockFile, status: "Added" };
-    render(
-      <FileListItem file={addedFile} isSelected={false} onClick={() => {}} />
-    );
+    render(<FileListItem file={addedFile} isSelected={false} onClick={noop} />);
 
     expect(screen.getByText("A")).toBeInTheDocument();
   });
@@ -94,7 +91,7 @@ describe("FileListItem", () => {
   it("renders correct status letter for Deleted files", () => {
     const deletedFile: ChangedFile = { ...mockFile, status: "Deleted" };
     render(
-      <FileListItem file={deletedFile} isSelected={false} onClick={() => {}} />
+      <FileListItem file={deletedFile} isSelected={false} onClick={noop} />
     );
 
     expect(screen.getByText("D")).toBeInTheDocument();
@@ -103,16 +100,20 @@ describe("FileListItem", () => {
   it("renders correct status letter for Untracked files", () => {
     const untrackedFile: ChangedFile = { ...mockFile, status: "Untracked" };
     render(
-      <FileListItem file={untrackedFile} isSelected={false} onClick={() => {}} />
+      <FileListItem file={untrackedFile} isSelected={false} onClick={noop} />
     );
 
     expect(screen.getByText("?")).toBeInTheDocument();
   });
 
   it("does not render stats when both are zero", () => {
-    const noStatsFile: ChangedFile = { ...mockFile, additions: 0, deletions: 0 };
+    const noStatsFile: ChangedFile = {
+      ...mockFile,
+      additions: 0,
+      deletions: 0,
+    };
     render(
-      <FileListItem file={noStatsFile} isSelected={false} onClick={() => {}} />
+      <FileListItem file={noStatsFile} isSelected={false} onClick={noop} />
     );
 
     expect(screen.queryByText("+0")).not.toBeInTheDocument();
@@ -120,9 +121,13 @@ describe("FileListItem", () => {
   });
 
   it("only renders additions when deletions is zero", () => {
-    const addOnlyFile: ChangedFile = { ...mockFile, additions: 5, deletions: 0 };
+    const addOnlyFile: ChangedFile = {
+      ...mockFile,
+      additions: 5,
+      deletions: 0,
+    };
     render(
-      <FileListItem file={addOnlyFile} isSelected={false} onClick={() => {}} />
+      <FileListItem file={addOnlyFile} isSelected={false} onClick={noop} />
     );
 
     expect(screen.getByText("+5")).toBeInTheDocument();

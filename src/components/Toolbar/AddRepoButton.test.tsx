@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "../../test/utils";
-import { tauriMocks } from "../../test/setup";
-import { AddRepoButton } from "./AddRepoButton";
-import { useAppStore } from "../../store/appStore";
 import { act } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "../../store/appStore";
+import { tauriMocks } from "../../test/setup";
+import { render, screen, waitFor } from "../../test/utils";
+import { AddRepoButton } from "./AddRepoButton";
+
+// Regex pattern for button name matching
+const ADD_REPO_BUTTON = /add repo/i;
 
 describe("AddRepoButton", () => {
   beforeEach(() => {
@@ -18,13 +21,18 @@ describe("AddRepoButton", () => {
   it("should render the button", () => {
     render(<AddRepoButton />);
 
-    expect(screen.getByRole("button", { name: /add repo/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: ADD_REPO_BUTTON })
+    ).toBeInTheDocument();
   });
 
   it("should have correct aria-label", () => {
     render(<AddRepoButton />);
 
-    expect(screen.getByRole("button")).toHaveAttribute("aria-label", "Add repository");
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "aria-label",
+      "Add repository"
+    );
   });
 
   it("should open folder picker when clicked", async () => {
@@ -32,7 +40,7 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
@@ -49,7 +57,7 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
@@ -71,13 +79,15 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
 
     await waitFor(() => {
-      expect(tauriMocks.invoke).toHaveBeenCalledWith("validate_repo", { path: mockPath });
+      expect(tauriMocks.invoke).toHaveBeenCalledWith("validate_repo", {
+        path: mockPath,
+      });
     });
 
     const repos = useAppStore.getState().repos;
@@ -98,7 +108,7 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
@@ -106,7 +116,9 @@ describe("AddRepoButton", () => {
     await waitFor(() => {
       const state = useAppStore.getState();
       expect(state.selectedRepoId).not.toBeNull();
-      expect(state.repos.find((r) => r.id === state.selectedRepoId)?.path).toBe(mockPath);
+      expect(state.repos.find((r) => r.id === state.selectedRepoId)?.path).toBe(
+        mockPath
+      );
     });
   });
 
@@ -120,7 +132,7 @@ describe("AddRepoButton", () => {
     const onError = vi.fn();
     render(<AddRepoButton onError={onError} />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
@@ -142,7 +154,7 @@ describe("AddRepoButton", () => {
     const onError = vi.fn();
     render(<AddRepoButton onError={onError} />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
@@ -162,8 +174,8 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
-    
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
+
     // Click and check loading state
     act(() => {
       button.click();
@@ -176,7 +188,7 @@ describe("AddRepoButton", () => {
 
     // Resolve and check it goes back to normal
     await act(async () => {
-      resolveDialog!(null);
+      resolveDialog?.(null);
     });
 
     await waitFor(() => {
@@ -199,13 +211,15 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
       button.click();
     });
 
     await waitFor(() => {
-      expect(tauriMocks.invoke).toHaveBeenCalledWith("validate_repo", { path: mockPath });
+      expect(tauriMocks.invoke).toHaveBeenCalledWith("validate_repo", {
+        path: mockPath,
+      });
     });
   });
 
@@ -228,13 +242,13 @@ describe("AddRepoButton", () => {
 
     render(<AddRepoButton />);
 
-    const button = screen.getByRole("button", { name: /add repo/i });
-    
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
+
     // Click twice
     await act(async () => {
       button.click();
     });
-    
+
     await waitFor(() => {
       expect(useAppStore.getState().repos).toHaveLength(1);
     });
