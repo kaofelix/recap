@@ -1,3 +1,4 @@
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { cn } from "../../lib/utils";
 import type { ChangedFile, FileStatus } from "../../types/file";
 
@@ -86,14 +87,34 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
       >
         {getStatusLetter(file.status)}
       </span>
-      <span className="text-sm flex-1 min-w-0 flex" title={file.path}>
-        {dir && (
-          <span className="text-text-secondary truncate shrink">
-            {dir}
-          </span>
-        )}
-        <span className="text-text-primary font-medium shrink-0">{filename}</span>
-      </span>
+      <Tooltip.Provider delayDuration={300}>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <span className="text-sm flex-1 min-w-0 flex">
+              {dir && (
+                <span className="text-text-secondary truncate shrink">
+                  {dir}
+                </span>
+              )}
+              <span className="text-text-primary font-medium shrink-0">{filename}</span>
+            </span>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              className={cn(
+                "px-2 py-1 rounded text-xs",
+                "bg-bg-tertiary text-text-primary",
+                "border border-panel-border shadow-lg",
+                "animate-in fade-in-0 zoom-in-95 duration-100"
+              )}
+              sideOffset={5}
+            >
+              {file.path}
+              <Tooltip.Arrow className="fill-bg-tertiary" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
       {(file.additions > 0 || file.deletions > 0) && (
         <span className="text-xs shrink-0 flex gap-1">
           {file.additions > 0 && (
