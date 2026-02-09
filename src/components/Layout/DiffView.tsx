@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
@@ -17,6 +18,46 @@ export interface DiffViewProps {
 
 type DiffDisplayMode = "split" | "unified";
 
+/** Custom styles for the diff viewer using CSS variables */
+const diffStyles = {
+  variables: {
+    light: {
+      diffViewerBackground: "var(--color-panel-bg)",
+      diffViewerColor: "var(--color-text-primary)",
+      addedBackground: "var(--color-diff-add-bg)",
+      addedColor: "var(--color-diff-add-text)",
+      removedBackground: "var(--color-diff-delete-bg)",
+      removedColor: "var(--color-diff-delete-text)",
+      wordAddedBackground: "var(--color-diff-add-word-bg)",
+      wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+      addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+      removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+      gutterBackground: "var(--color-panel-header-bg)",
+      gutterColor: "var(--color-text-tertiary)",
+      codeFoldBackground: "var(--color-bg-secondary)",
+      codeFoldGutterBackground: "var(--color-bg-secondary)",
+      emptyLineBackground: "var(--color-bg-secondary)",
+    },
+    dark: {
+      diffViewerBackground: "var(--color-panel-bg)",
+      diffViewerColor: "var(--color-text-primary)",
+      addedBackground: "var(--color-diff-add-bg)",
+      addedColor: "var(--color-diff-add-text)",
+      removedBackground: "var(--color-diff-delete-bg)",
+      removedColor: "var(--color-diff-delete-text)",
+      wordAddedBackground: "var(--color-diff-add-word-bg)",
+      wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+      addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+      removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+      gutterBackground: "var(--color-panel-header-bg)",
+      gutterColor: "var(--color-text-tertiary)",
+      codeFoldBackground: "var(--color-bg-secondary)",
+      codeFoldGutterBackground: "var(--color-bg-secondary)",
+      emptyLineBackground: "var(--color-bg-secondary)",
+    },
+  },
+};
+
 /**
  * Convert a FileDiff (from working directory diff) to old/new content strings
  */
@@ -24,9 +65,6 @@ function fileDiffToContents(diff: FileDiff): {
   oldContent: string;
   newContent: string;
 } {
-  // Reconstruct the old and new content from the diff hunks
-  // This is a simplification - for a proper implementation, we'd need
-  // to fetch the actual file contents and apply the diff
   const oldLines: string[] = [];
   const newLines: string[] = [];
 
@@ -47,6 +85,82 @@ function fileDiffToContents(diff: FileDiff): {
     oldContent: oldLines.join(""),
     newContent: newLines.join(""),
   };
+}
+
+/** Placeholder message component */
+function DiffPlaceholder({ message }: { message: string }) {
+  return (
+    <div className="py-8 text-center text-sm text-text-secondary">
+      {message}
+    </div>
+  );
+}
+
+/** Error message component */
+function DiffError({ message }: { message: string }) {
+  return (
+    <div className="py-8 text-center text-red-500 text-sm">
+      Error: {message}
+    </div>
+  );
+}
+
+interface DiffContentProps {
+  hasFile: boolean;
+  isLoading: boolean;
+  error: string | null;
+  isBinary: boolean;
+  hasChanges: boolean;
+  hasData: boolean;
+  oldValue: string;
+  newValue: string;
+  splitView: boolean;
+  renderContent: (source: string) => ReactElement;
+}
+
+function DiffContent({
+  hasFile,
+  isLoading,
+  error,
+  isBinary,
+  hasChanges,
+  hasData,
+  oldValue,
+  newValue,
+  splitView,
+  renderContent,
+}: DiffContentProps) {
+  if (!hasFile) {
+    return <DiffPlaceholder message="Select a file to view diff" />;
+  }
+  if (isLoading) {
+    return <DiffPlaceholder message="Loading diff..." />;
+  }
+  if (error) {
+    return <DiffError message={error} />;
+  }
+  if (isBinary) {
+    return <DiffPlaceholder message="Binary file cannot be displayed" />;
+  }
+  if (hasData && !hasChanges) {
+    return <DiffPlaceholder message="No changes" />;
+  }
+  if (!hasData) {
+    return null;
+  }
+
+  return (
+    <ReactDiffViewer
+      compareMethod={DiffMethod.WORDS}
+      hideLineNumbers={false}
+      newValue={newValue}
+      oldValue={oldValue}
+      renderContent={renderContent}
+      splitView={splitView}
+      styles={diffStyles}
+      useDarkTheme={document.documentElement.classList.contains("dark")}
+    />
+  );
 }
 
 export function DiffView({ className }: DiffViewProps) {
@@ -84,34 +198,30 @@ export function DiffView({ className }: DiffViewProps) {
     }
 
     let cancelled = false;
+    setIsLoading(true);
+    setError(null);
 
-    async function fetchFileContents() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const result = await invoke<FileContents>("get_file_contents", {
-          repoPath: selectedRepo?.path,
-          commitId: selectedCommitId,
-          filePath: selectedFilePath,
-        });
-
+    invoke<FileContents>("get_file_contents", {
+      repoPath: selectedRepo.path,
+      commitId: selectedCommitId,
+      filePath: selectedFilePath,
+    })
+      .then((result) => {
         if (!cancelled) {
           setFileContents(result);
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
           setFileContents(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setIsLoading(false);
         }
-      }
-    }
-
-    fetchFileContents();
+      });
 
     return () => {
       cancelled = true;
@@ -126,33 +236,29 @@ export function DiffView({ className }: DiffViewProps) {
     }
 
     let cancelled = false;
+    setIsLoading(true);
+    setError(null);
 
-    async function fetchWorkingDiff() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const result = await invoke<FileDiff>("get_working_file_diff", {
-          repoPath: selectedRepo?.path,
-          filePath: selectedFilePath,
-        });
-
+    invoke<FileDiff>("get_working_file_diff", {
+      repoPath: selectedRepo.path,
+      filePath: selectedFilePath,
+    })
+      .then((result) => {
         if (!cancelled) {
           setWorkingDiff(result);
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
           setWorkingDiff(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setIsLoading(false);
         }
-      }
-    }
-
-    fetchWorkingDiff();
+      });
 
     return () => {
       cancelled = true;
@@ -179,6 +285,13 @@ export function DiffView({ className }: DiffViewProps) {
   const hasData =
     appViewMode === "history" ? fileContents !== null : workingDiff !== null;
 
+  // Detect if file is added or deleted (one side is empty)
+  const isOneSided =
+    hasData && (oldValue === "" || newValue === "") && hasChanges;
+
+  // Force unified view for added/deleted files (split view wastes space)
+  const effectiveDisplayMode = isOneSided ? "unified" : diffDisplayMode;
+
   // Memoize the syntax highlighting render function
   const renderContent = useMemo(() => {
     const language = selectedFilePath
@@ -192,46 +305,6 @@ export function DiffView({ className }: DiffViewProps) {
       />
     );
   }, [selectedFilePath]);
-
-  // Custom styles for the diff viewer
-  const diffStyles = {
-    variables: {
-      light: {
-        diffViewerBackground: "var(--color-panel-bg)",
-        diffViewerColor: "var(--color-text-primary)",
-        addedBackground: "var(--color-diff-add-bg)",
-        addedColor: "var(--color-diff-add-text)",
-        removedBackground: "var(--color-diff-delete-bg)",
-        removedColor: "var(--color-diff-delete-text)",
-        wordAddedBackground: "var(--color-diff-add-word-bg)",
-        wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-        addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-        removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-        gutterBackground: "var(--color-panel-header-bg)",
-        gutterColor: "var(--color-text-tertiary)",
-        codeFoldBackground: "var(--color-bg-secondary)",
-        codeFoldGutterBackground: "var(--color-bg-secondary)",
-        emptyLineBackground: "var(--color-bg-secondary)",
-      },
-      dark: {
-        diffViewerBackground: "var(--color-panel-bg)",
-        diffViewerColor: "var(--color-text-primary)",
-        addedBackground: "var(--color-diff-add-bg)",
-        addedColor: "var(--color-diff-add-text)",
-        removedBackground: "var(--color-diff-delete-bg)",
-        removedColor: "var(--color-diff-delete-text)",
-        wordAddedBackground: "var(--color-diff-add-word-bg)",
-        wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-        addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-        removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-        gutterBackground: "var(--color-panel-header-bg)",
-        gutterColor: "var(--color-text-tertiary)",
-        codeFoldBackground: "var(--color-bg-secondary)",
-        codeFoldGutterBackground: "var(--color-bg-secondary)",
-        emptyLineBackground: "var(--color-bg-secondary)",
-      },
-    },
-  };
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -250,10 +323,13 @@ export function DiffView({ className }: DiffViewProps) {
             className={cn(
               "rounded px-2 py-0.5 text-xs",
               "border border-border-primary",
-              diffDisplayMode === "split"
+              effectiveDisplayMode === "split"
                 ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
+                : "bg-bg-secondary text-text-secondary",
+              !isOneSided && "hover:bg-bg-hover",
+              isOneSided && "cursor-not-allowed opacity-50"
             )}
+            disabled={isOneSided}
             onClick={() => setDiffDisplayMode("split")}
             type="button"
           >
@@ -263,10 +339,13 @@ export function DiffView({ className }: DiffViewProps) {
             className={cn(
               "rounded px-2 py-0.5 text-xs",
               "border border-border-primary",
-              diffDisplayMode === "unified"
+              effectiveDisplayMode === "unified"
                 ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
+                : "bg-bg-secondary text-text-secondary",
+              !isOneSided && "hover:bg-bg-hover",
+              isOneSided && "cursor-not-allowed opacity-50"
             )}
+            disabled={isOneSided}
             onClick={() => setDiffDisplayMode("unified")}
             type="button"
           >
@@ -276,53 +355,18 @@ export function DiffView({ className }: DiffViewProps) {
       </div>
 
       <div className="flex-1 overflow-auto">
-        {!selectedFilePath && (
-          <div className="py-8 text-center text-sm text-text-secondary">
-            Select a file to view diff
-          </div>
-        )}
-
-        {selectedFilePath && isLoading && (
-          <div className="py-8 text-center text-sm text-text-secondary">
-            Loading diff...
-          </div>
-        )}
-
-        {selectedFilePath && error && (
-          <div className="py-8 text-center text-red-500 text-sm">
-            Error: {error}
-          </div>
-        )}
-
-        {selectedFilePath && !isLoading && !error && isBinary && (
-          <div className="py-8 text-center text-sm text-text-secondary">
-            Binary file cannot be displayed
-          </div>
-        )}
-
-        {selectedFilePath &&
-          !isLoading &&
-          !error &&
-          hasData &&
-          !isBinary &&
-          !hasChanges && (
-            <div className="py-8 text-center text-sm text-text-secondary">
-              No changes
-            </div>
-          )}
-
-        {!(isLoading || error) && hasData && !isBinary && hasChanges && (
-          <ReactDiffViewer
-            compareMethod={DiffMethod.WORDS}
-            hideLineNumbers={false}
-            newValue={newValue}
-            oldValue={oldValue}
-            renderContent={renderContent}
-            splitView={diffDisplayMode === "split"}
-            styles={diffStyles}
-            useDarkTheme={document.documentElement.classList.contains("dark")}
-          />
-        )}
+        <DiffContent
+          error={error}
+          hasChanges={hasChanges}
+          hasData={hasData}
+          hasFile={!!selectedFilePath}
+          isBinary={isBinary}
+          isLoading={isLoading}
+          newValue={newValue}
+          oldValue={oldValue}
+          renderContent={renderContent}
+          splitView={effectiveDisplayMode === "split"}
+        />
       </div>
     </div>
   );

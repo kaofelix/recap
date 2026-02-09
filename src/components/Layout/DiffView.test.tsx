@@ -383,4 +383,156 @@ describe("DiffView", () => {
     const diffViewer = screen.getByTestId("diff-viewer");
     expect(diffViewer.innerHTML).not.toContain('class="token');
   });
+
+  it("forces unified view for added files", async () => {
+    // Set user preference to split
+    localStorage.setItem("diff-view-mode", "split");
+
+    const mockContents = {
+      old_content: null,
+      new_content: "new file content",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "new-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    // Should be unified despite user preference for split
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+      "data-split-view",
+      "false"
+    );
+  });
+
+  it("forces unified view for deleted files", async () => {
+    // Set user preference to split
+    localStorage.setItem("diff-view-mode", "split");
+
+    const mockContents = {
+      old_content: "deleted file content",
+      new_content: null,
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "deleted-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    // Should be unified despite user preference for split
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+      "data-split-view",
+      "false"
+    );
+  });
+
+  it("disables view mode toggle for added files", async () => {
+    const mockContents = {
+      old_content: null,
+      new_content: "new file content",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "new-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Split")).toBeDisabled();
+    expect(screen.getByText("Unified")).toBeDisabled();
+  });
+
+  it("disables view mode toggle for deleted files", async () => {
+    const mockContents = {
+      old_content: "deleted content",
+      new_content: null,
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "deleted-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Split")).toBeDisabled();
+    expect(screen.getByText("Unified")).toBeDisabled();
+  });
+
+  it("enables view mode toggle for modified files", async () => {
+    const mockContents = {
+      old_content: "old content",
+      new_content: "new content",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "modified-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Split")).toBeEnabled();
+    expect(screen.getByText("Unified")).toBeEnabled();
+  });
 });
