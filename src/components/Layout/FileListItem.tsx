@@ -86,9 +86,13 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
       >
         {getStatusLetter(file.status)}
       </span>
-      <span className="text-sm truncate flex-1 min-w-0">
-        {dir && <span className="text-text-secondary">{dir}</span>}
-        <span className="text-text-primary font-medium">{filename}</span>
+      <span className="text-sm flex-1 min-w-0 flex" title={file.path}>
+        {dir && (
+          <span className="text-text-secondary truncate shrink">
+            {dir}
+          </span>
+        )}
+        <span className="text-text-primary font-medium shrink-0">{filename}</span>
       </span>
       {(file.additions > 0 || file.deletions > 0) && (
         <span className="text-xs shrink-0 flex gap-1">
