@@ -211,3 +211,129 @@ td[class*="empty-line"] {
 tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
   background-color: var(--color-bg-secondary) !important;
 }
+
+/* Prism.js syntax highlighting - GitHub-inspired theme */
+:root {
+  --color-syntax-comment: #6a737d;
+  --color-syntax-keyword: #d73a49;
+  --color-syntax-function: #6f42c1;
+  --color-syntax-string: #032f62;
+  --color-syntax-number: #005cc5;
+  --color-syntax-operator: #d73a49;
+  --color-syntax-class: #6f42c1;
+  --color-syntax-variable: #e36209;
+  --color-syntax-constant: #005cc5;
+  --color-syntax-property: #005cc5;
+  --color-syntax-punctuation: #24292f;
+  --color-syntax-tag: #22863a;
+  --color-syntax-attr-name: #6f42c1;
+  --color-syntax-attr-value: #032f62;
+}
+
+.dark {
+  --color-syntax-comment: #8b949e;
+  --color-syntax-keyword: #ff7b72;
+  --color-syntax-function: #d2a8ff;
+  --color-syntax-string: #a5d6ff;
+  --color-syntax-number: #79c0ff;
+  --color-syntax-operator: #ff7b72;
+  --color-syntax-class: #d2a8ff;
+  --color-syntax-variable: #ffa657;
+  --color-syntax-constant: #79c0ff;
+  --color-syntax-property: #79c0ff;
+  --color-syntax-punctuation: #e6edf3;
+  --color-syntax-tag: #7ee787;
+  --color-syntax-attr-name: #d2a8ff;
+  --color-syntax-attr-value: #a5d6ff;
+}
+
+/* Prism token styles */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--color-syntax-comment);
+  font-style: italic;
+}
+
+.token.keyword,
+.token.control,
+.token.directive,
+.token.unit {
+  color: var(--color-syntax-keyword);
+}
+
+.token.function,
+.token.function-variable {
+  color: var(--color-syntax-function);
+}
+
+.token.string,
+.token.char,
+.token.regex,
+.token.template-string {
+  color: var(--color-syntax-string);
+}
+
+.token.number,
+.token.boolean {
+  color: var(--color-syntax-number);
+}
+
+.token.operator,
+.token.arrow {
+  color: var(--color-syntax-operator);
+}
+
+.token.class-name,
+.token.maybe-class-name,
+.token.builtin {
+  color: var(--color-syntax-class);
+}
+
+.token.variable {
+  color: var(--color-syntax-variable);
+}
+
+.token.constant,
+.token.symbol {
+  color: var(--color-syntax-constant);
+}
+
+.token.property,
+.token.property-access {
+  color: var(--color-syntax-property);
+}
+
+.token.punctuation {
+  color: var(--color-syntax-punctuation);
+}
+
+.token.tag {
+  color: var(--color-syntax-tag);
+}
+
+.token.attr-name {
+  color: var(--color-syntax-attr-name);
+}
+
+.token.attr-value {
+  color: var(--color-syntax-attr-value);
+}
+
+.token.namespace {
+  opacity: 0.7;
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
