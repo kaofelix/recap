@@ -47,6 +47,16 @@ fn validate_repo(path: String) -> Result<git::RepoInfo, String> {
     git::validate_repo(&path)
 }
 
+#[tauri::command]
+fn get_working_changes(repo_path: String) -> Result<Vec<git::ChangedFile>, String> {
+    git::get_working_changes(&repo_path)
+}
+
+#[tauri::command]
+fn get_working_file_diff(repo_path: String, file_path: String) -> Result<git::FileDiff, String> {
+    git::get_working_file_diff(&repo_path, &file_path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -59,7 +69,9 @@ pub fn run() {
             get_file_diff,
             get_file_contents,
             get_current_branch,
-            validate_repo
+            validate_repo,
+            get_working_changes,
+            get_working_file_diff
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,16 +2,20 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Repository } from "../types/repository";
 
+export type ViewMode = "history" | "changes";
+
 export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
   selectedCommitId: string | null;
   selectedFilePath: string | null;
+  viewMode: ViewMode;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
   selectCommit: (id: string | null) => void;
   selectFile: (path: string | null) => void;
+  setViewMode: (mode: ViewMode) => void;
   clearRepos: () => void;
 }
 
@@ -39,6 +43,7 @@ export const useAppStore = create<AppState>()(
       selectedRepoId: null,
       selectedCommitId: null,
       selectedFilePath: null,
+      viewMode: "history" as ViewMode,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -88,6 +93,11 @@ export const useAppStore = create<AppState>()(
         set({ selectedFilePath: path });
       },
 
+      setViewMode: (mode: ViewMode) => {
+        // Clear file selection when switching modes
+        set({ viewMode: mode, selectedFilePath: null });
+      },
+
       clearRepos: () => {
         set({ repos: [], selectedRepoId: null, selectedCommitId: null, selectedFilePath: null });
       },
@@ -107,3 +117,4 @@ export const useSelectedRepo = () =>
   );
 export const useSelectedCommitId = () => useAppStore((state) => state.selectedCommitId);
 export const useSelectedFilePath = () => useAppStore((state) => state.selectedFilePath);
+export const useViewMode = () => useAppStore((state) => state.viewMode);

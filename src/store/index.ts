@@ -3,5 +3,7 @@ export {
   useRepos,
   useSelectedRepoId,
   useSelectedRepo,
+  useViewMode,
   type AppState,
+  type ViewMode,
 } from "./appStore";

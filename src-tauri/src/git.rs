@@ -1,7 +1,7 @@
 use git2::{Delta, DiffOptions, Repository};
 use serde::Serialize;
 
-/// Status of a file in a commit
+/// Status of a file in a commit or working directory
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum FileStatus {
     Added,
@@ -10,6 +10,7 @@ pub enum FileStatus {
     Renamed,
     Copied,
     Unmodified,
+    Untracked,
 }
 
 impl From<Delta> for FileStatus {
@@ -566,6 +567,206 @@ pub fn validate_repo(path: &str) -> Result<RepoInfo, String> {
     })
 }
 
+/// Gets the list of files changed in the working directory (uncommitted changes)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// A vector of ChangedFile structs representing working directory changes
+pub fn get_working_changes(repo_path: &str) -> Result<Vec<ChangedFile>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let statuses = repo
+        .statuses(None)
+        .map_err(|e| format!("Failed to get statuses: {}", e))?;
+
+    let mut files: Vec<ChangedFile> = Vec::new();
+
+    for entry in statuses.iter() {
+        let status = entry.status();
+
+        // Skip files that are unchanged
+        if status.is_empty() {
+            continue;
+        }
+
+        let path = entry
+            .path()
+            .map(|p| p.to_string())
+            .unwrap_or_default();
+
+        // Determine the file status
+        // We combine index (staged) and worktree (unstaged) status since we're showing all changes
+        let file_status = if status.is_wt_new() || status.is_index_new() {
+            if status.is_wt_new() && !status.is_index_new() {
+                FileStatus::Untracked
+            } else {
+                FileStatus::Added
+            }
+        } else if status.is_wt_deleted() || status.is_index_deleted() {
+            FileStatus::Deleted
+        } else if status.is_wt_modified() || status.is_index_modified() {
+            FileStatus::Modified
+        } else if status.is_wt_renamed() || status.is_index_renamed() {
+            FileStatus::Renamed
+        } else {
+            continue; // Skip other statuses (ignored, etc.)
+        };
+
+        // Get line stats by creating a diff
+        let mut additions = 0u32;
+        let mut deletions = 0u32;
+
+        // Try to get line stats from diff to HEAD
+        if let Ok(head) = repo.head() {
+            if let Ok(head_commit) = head.peel_to_commit() {
+                if let Ok(head_tree) = head_commit.tree() {
+                    let mut diff_opts = DiffOptions::new();
+                    diff_opts.pathspec(&path);
+                    diff_opts.include_untracked(true);
+
+                    if let Ok(diff) = repo.diff_tree_to_workdir_with_index(
+                        Some(&head_tree),
+                        Some(&mut diff_opts),
+                    ) {
+                        if let Ok(stats) = diff.stats() {
+                            additions = stats.insertions() as u32;
+                            deletions = stats.deletions() as u32;
+                        }
+                    }
+                }
+            }
+        }
+
+        files.push(ChangedFile {
+            path,
+            status: file_status,
+            additions,
+            deletions,
+            old_path: None, // TODO: Handle renames if needed
+        });
+    }
+
+    Ok(files)
+}
+
+/// Gets the diff for a specific file in the working directory (vs HEAD)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get diff for
+///
+/// # Returns
+/// A FileDiff struct or an error message
+pub fn get_working_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get HEAD tree (if it exists)
+    let head_tree = match repo.head() {
+        Ok(head) => Some(
+            head.peel_to_tree()
+                .map_err(|e| format!("Failed to get HEAD tree: {}", e))?,
+        ),
+        Err(_) => None, // No commits yet
+    };
+
+    let mut diff_opts = DiffOptions::new();
+    diff_opts.pathspec(file_path);
+    diff_opts.include_untracked(true);
+
+    let diff = repo
+        .diff_tree_to_workdir_with_index(head_tree.as_ref(), Some(&mut diff_opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    // Check if file exists in diff
+    if diff.deltas().len() == 0 {
+        return Err(format!("File '{}' has no changes", file_path));
+    }
+
+    let delta = diff.get_delta(0).expect("Delta should exist");
+
+    let new_file = delta.new_file();
+    let old_file = delta.old_file();
+
+    let new_path = new_file
+        .path()
+        .or_else(|| old_file.path())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let old_path = if delta.status() == Delta::Renamed || delta.status() == Delta::Copied {
+        old_file.path().map(|p| p.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    // Check if binary
+    let is_binary = new_file.is_binary() || old_file.is_binary();
+
+    if is_binary {
+        return Ok(FileDiff {
+            old_path,
+            new_path,
+            hunks: Vec::new(),
+            is_binary: true,
+        });
+    }
+
+    // Get patch for detailed diff
+    let patch = git2::Patch::from_diff(&diff, 0)
+        .map_err(|e| format!("Failed to create patch: {}", e))?
+        .ok_or_else(|| "Failed to create patch for file".to_string())?;
+
+    let mut hunks = Vec::new();
+
+    for hunk_idx in 0..patch.num_hunks() {
+        let (hunk, _) = patch
+            .hunk(hunk_idx)
+            .map_err(|e| format!("Failed to get hunk: {}", e))?;
+
+        let mut lines = Vec::new();
+
+        for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+            let line = patch
+                .line_in_hunk(hunk_idx, line_idx)
+                .map_err(|e| format!("Failed to get line: {}", e))?;
+
+            let line_type = match line.origin() {
+                '+' => LineType::Addition,
+                '-' => LineType::Deletion,
+                _ => LineType::Context,
+            };
+
+            let content = String::from_utf8_lossy(line.content()).to_string();
+
+            lines.push(DiffLine {
+                content,
+                line_type,
+                old_line_no: line.old_lineno(),
+                new_line_no: line.new_lineno(),
+            });
+        }
+
+        hunks.push(DiffHunk {
+            old_start: hunk.old_start(),
+            old_lines: hunk.old_lines(),
+            new_start: hunk.new_start(),
+            new_lines: hunk.new_lines(),
+            lines,
+        });
+    }
+
+    Ok(FileDiff {
+        old_path,
+        new_path,
+        hunks,
+        is_binary: false,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1101,5 +1302,167 @@ mod tests {
         let result = get_file_contents(path, &commits[0].id, "nonexistent.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found in commit"));
+    }
+
+    // Tests for get_working_changes
+
+    #[test]
+    fn test_get_working_changes_no_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let changes = get_working_changes(path).expect("Should return changes");
+
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_get_working_changes_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file without committing
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "file.txt");
+        assert_eq!(changes[0].status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn test_get_working_changes_untracked_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create new file without adding
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "newfile.txt");
+        assert_eq!(changes[0].status, FileStatus::Untracked);
+    }
+
+    #[test]
+    fn test_get_working_changes_staged_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and stage new file
+        std::fs::write(path.join("staged.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "staged.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "staged.txt");
+        assert_eq!(changes[0].status, FileStatus::Added);
+    }
+
+    #[test]
+    fn test_get_working_changes_deleted_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Delete tracked file
+        std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "file.txt");
+        assert_eq!(changes[0].status, FileStatus::Deleted);
+    }
+
+    #[test]
+    fn test_get_working_changes_multiple_files() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create multiple changes
+        std::fs::write(path.join("file.txt"), "modified").expect("Failed to write");
+        std::fs::write(path.join("new.txt"), "new").expect("Failed to write");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 2);
+    }
+
+    // Tests for get_working_file_diff
+
+    #[test]
+    fn test_get_working_file_diff_modified() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file
+        std::fs::write(path.join("file.txt"), "line1\nline2\nnew line").expect("Failed to write");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_working_file_diff(path_str, "file.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+        assert!(!diff.hunks.is_empty());
+
+        // Should have additions
+        let has_addition = diff
+            .hunks
+            .iter()
+            .any(|h| h.lines.iter().any(|l| l.line_type == LineType::Addition));
+        assert!(has_addition);
+    }
+
+    #[test]
+    fn test_get_working_file_diff_untracked() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create untracked file
+        std::fs::write(path.join("untracked.txt"), "new file content").expect("Failed to write");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_working_file_diff(path_str, "untracked.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "untracked.txt");
+        assert!(!diff.is_binary);
+
+        // All lines should be additions
+        for hunk in &diff.hunks {
+            for line in &hunk.lines {
+                assert_eq!(line.line_type, LineType::Addition);
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_working_file_diff_no_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_working_file_diff(path, "file.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no changes"));
+    }
+
+    #[test]
+    fn test_get_working_file_diff_nonexistent() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_working_file_diff(path, "nonexistent.txt");
+        assert!(result.is_err());
     }
 }

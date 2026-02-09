@@ -7,6 +7,7 @@ import {
   useSelectedRepo,
   useSelectedCommitId,
   useSelectedFilePath,
+  useViewMode,
 } from "./appStore";
 
 describe("appStore", () => {
@@ -14,6 +15,7 @@ describe("appStore", () => {
     // Reset store state before each test
     act(() => {
       useAppStore.getState().clearRepos();
+      useAppStore.getState().setViewMode("history");
     });
   });
 
@@ -423,6 +425,67 @@ describe("appStore", () => {
       });
 
       expect(selectedFileResult.current).toBe("src/components/Button.tsx");
+    });
+
+    it("useViewMode should return current view mode", () => {
+      const { result: storeResult } = renderHook(() => useAppStore());
+      const { result: viewModeResult } = renderHook(() => useViewMode());
+
+      expect(viewModeResult.current).toBe("history");
+
+      act(() => {
+        storeResult.current.setViewMode("changes");
+      });
+
+      expect(viewModeResult.current).toBe("changes");
+    });
+  });
+
+  describe("setViewMode", () => {
+    it("should set view mode to changes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.viewMode).toBe("changes");
+    });
+
+    it("should set view mode to history", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setViewMode("changes");
+      });
+
+      act(() => {
+        result.current.setViewMode("history");
+      });
+
+      expect(result.current.viewMode).toBe("history");
+    });
+
+    it("should clear file selection when switching modes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectFile("src/App.tsx");
+      });
+
+      expect(result.current.selectedFilePath).toBe("src/App.tsx");
+
+      act(() => {
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.selectedFilePath).toBeNull();
+    });
+
+    it("should default to history mode", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      expect(result.current.viewMode).toBe("history");
     });
   });
 });

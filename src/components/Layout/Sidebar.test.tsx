@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { Sidebar } from "./Sidebar";
 import { useAppStore } from "../../store/appStore";
 
@@ -12,17 +12,24 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAppStore.setState({ repos: [], selectedRepoId: null });
+    useAppStore.setState({ repos: [], selectedRepoId: null, viewMode: "history" });
   });
 
   afterEach(() => {
-    useAppStore.setState({ repos: [], selectedRepoId: null });
+    useAppStore.setState({ repos: [], selectedRepoId: null, viewMode: "history" });
   });
 
   it("shows prompt when no repo is selected", () => {
     render(<Sidebar />);
     
     expect(screen.getByText("Select a repository to view commits")).toBeInTheDocument();
+  });
+
+  it("shows view mode toggle buttons", () => {
+    render(<Sidebar />);
+    
+    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Changes" })).toBeInTheDocument();
   });
 
   it("shows loading state while fetching commits", async () => {
@@ -151,6 +158,97 @@ describe("Sidebar", () => {
       expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
         repoPath: "/test/repo2",
         limit: 50,
+      });
+    });
+  });
+
+  describe("Changes view", () => {
+    it("switches to changes view when Changes button is clicked", async () => {
+      mockInvoke.mockResolvedValue([]);
+
+      useAppStore.setState({
+        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        selectedRepoId: "1",
+      });
+
+      render(<Sidebar />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_working_changes", {
+          repoPath: "/test/repo",
+        });
+      });
+    });
+
+    it("shows changes prompt when no repo is selected in changes view", () => {
+      useAppStore.setState({ viewMode: "changes" });
+
+      render(<Sidebar />);
+      
+      expect(screen.getByText("Select a repository to view changes")).toBeInTheDocument();
+    });
+
+    it("shows empty state when no working changes", async () => {
+      mockInvoke.mockResolvedValue([]);
+
+      useAppStore.setState({
+        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("No changes here... ✓")).toBeInTheDocument();
+      });
+    });
+
+    it("displays working changes when loaded successfully", async () => {
+      const mockChanges = [
+        { path: "src/App.tsx", status: "Modified", additions: 10, deletions: 5, old_path: null },
+        { path: "src/new-file.ts", status: "Untracked", additions: 20, deletions: 0, old_path: null },
+      ];
+
+      mockInvoke.mockResolvedValue(mockChanges);
+
+      useAppStore.setState({
+        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText("src/new-file.ts")).toBeInTheDocument();
+      expect(screen.getByText("M")).toBeInTheDocument(); // Modified indicator
+      expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
+    });
+
+    it("shows addition and deletion counts for changed files", async () => {
+      const mockChanges = [
+        { path: "src/App.tsx", status: "Modified", additions: 10, deletions: 5, old_path: null },
+      ];
+
+      mockInvoke.mockResolvedValue(mockChanges);
+
+      useAppStore.setState({
+        repos: [{ id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() }],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("+10")).toBeInTheDocument();
+        expect(screen.getByText("-5")).toBeInTheDocument();
       });
     });
   });

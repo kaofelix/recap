@@ -1,5 +1,5 @@
 /**
- * Status of a file in a commit.
+ * Status of a file in a commit or working directory.
  * Mirrors the Rust FileStatus enum from the backend.
  */
 export type FileStatus =
@@ -8,7 +8,8 @@ export type FileStatus =
   | "Deleted"
   | "Renamed"
   | "Copied"
-  | "Unmodified";
+  | "Unmodified"
+  | "Untracked";
 
 /**
  * Represents a changed file in a commit.

@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AppLayout } from "./AppLayout";
+import { useAppStore } from "../../store/appStore";
 
 describe("AppLayout", () => {
   beforeEach(() => {
     // Clear any stored panel layout
     localStorage.clear();
+    // Reset store state
+    useAppStore.setState({ viewMode: "history" });
   });
 
   it("renders the toolbar", () => {
@@ -16,10 +19,11 @@ describe("AppLayout", () => {
     expect(screen.getByText("Refresh")).toBeInTheDocument();
   });
 
-  it("renders the sidebar with commits header", () => {
+  it("renders the sidebar with view mode toggle", () => {
     render(<AppLayout />);
     
-    expect(screen.getByText("Commits")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Changes" })).toBeInTheDocument();
   });
 
   it("renders the file list panel", () => {
