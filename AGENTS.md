@@ -60,3 +60,5 @@ Use `dex` to track tasks:
 - Prefer functional components with hooks
 - Use Tailwind for styling (no CSS modules)
 - Rust: follow standard formatting (`cargo fmt`)
+
+**Note:** Don't run formatting checks explicitly—they run automatically via the pre-commit git hook (lefthook + Biome).
