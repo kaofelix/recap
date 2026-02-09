@@ -1,4 +1,4 @@
-# Code Review
+# Recap
 
 A lightweight desktop app for reviewing Git commits and changes.
 

@@ -113,7 +113,7 @@ export const useAppStore = create<AppState>()(
       },
     }),
     {
-      name: "code-review-storage",
+      name: "recap-storage",
     }
   )
 );
