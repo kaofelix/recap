@@ -81,16 +81,28 @@ vi.mock("react-diff-viewer-continued", () => ({
     oldValue,
     newValue,
     splitView,
+    renderContent,
   }: {
     oldValue: string;
     newValue: string;
     splitView: boolean;
-  }) => (
-    <div data-split-view={splitView} data-testid="diff-viewer">
-      <div data-testid="diff-old">{oldValue}</div>
-      <div data-testid="diff-new">{newValue}</div>
-    </div>
-  ),
+    renderContent?: (source: string) => React.ReactElement;
+  }) => {
+    // If renderContent is provided, use it to render the content
+    const renderValue = (value: string) => {
+      if (renderContent) {
+        return renderContent(value);
+      }
+      return value;
+    };
+
+    return (
+      <div data-split-view={splitView} data-testid="diff-viewer">
+        <div data-testid="diff-old">{renderValue(oldValue)}</div>
+        <div data-testid="diff-new">{renderValue(newValue)}</div>
+      </div>
+    );
+  },
   DiffMethod: {
     CHARS: "CHARS",
     WORDS: "WORDS",

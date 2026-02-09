@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
+import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
   useSelectedCommitId,
@@ -178,6 +179,20 @@ export function DiffView({ className }: DiffViewProps) {
   const hasData =
     appViewMode === "history" ? fileContents !== null : workingDiff !== null;
 
+  // Memoize the syntax highlighting render function
+  const renderContent = useMemo(() => {
+    const language = selectedFilePath
+      ? getLanguageFromPath(selectedFilePath)
+      : null;
+
+    return (source: string) => (
+      <span
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Prism output is safe
+        dangerouslySetInnerHTML={{ __html: highlightCode(source, language) }}
+      />
+    );
+  }, [selectedFilePath]);
+
   // Custom styles for the diff viewer
   const diffStyles = {
     variables: {
@@ -302,6 +317,7 @@ export function DiffView({ className }: DiffViewProps) {
             hideLineNumbers={false}
             newValue={newValue}
             oldValue={oldValue}
+            renderContent={renderContent}
             splitView={diffDisplayMode === "split"}
             styles={diffStyles}
             useDarkTheme={document.documentElement.classList.contains("dark")}

@@ -324,4 +324,63 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
   });
+
+  it("applies syntax highlighting to TypeScript files", async () => {
+    const mockContents = {
+      old_content: "const x = 1;",
+      new_content: "const x = 2;",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/app.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    // Check that syntax highlighting tokens are present
+    // Prism adds spans with class "token" for highlighted code
+    const diffViewer = screen.getByTestId("diff-viewer");
+    expect(diffViewer.innerHTML).toContain('class="token');
+  });
+
+  it("renders plain text for unknown file types", async () => {
+    const mockContents = {
+      old_content: "some text",
+      new_content: "some other text",
+      is_binary: false,
+    };
+
+    mockInvoke.mockResolvedValue(mockContents);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "file.unknown",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    // Should not have syntax highlighting tokens
+    const diffViewer = screen.getByTestId("diff-viewer");
+    expect(diffViewer.innerHTML).not.toContain('class="token');
+  });
 });
