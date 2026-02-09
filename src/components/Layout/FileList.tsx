@@ -2,49 +2,11 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
 import { useAppStore, useSelectedRepo, useSelectedCommitId, useSelectedFilePath } from "../../store/appStore";
-import type { ChangedFile, FileStatus } from "../../types/file";
+import { FileListItem } from "./FileListItem";
+import type { ChangedFile } from "../../types/file";
 
 export interface FileListProps {
   className?: string;
-}
-
-/**
- * Get the display color for a file status
- */
-function getStatusColor(status: FileStatus): string {
-  switch (status) {
-    case "Added":
-      return "bg-success";
-    case "Modified":
-      return "bg-warning";
-    case "Deleted":
-      return "bg-danger";
-    case "Renamed":
-    case "Copied":
-      return "bg-info";
-    default:
-      return "bg-text-secondary";
-  }
-}
-
-/**
- * Get the status letter indicator
- */
-function getStatusLetter(status: FileStatus): string {
-  switch (status) {
-    case "Added":
-      return "A";
-    case "Modified":
-      return "M";
-    case "Deleted":
-      return "D";
-    case "Renamed":
-      return "R";
-    case "Copied":
-      return "C";
-    default:
-      return "?";
-  }
 }
 
 export function FileList({ className }: FileListProps) {
@@ -150,42 +112,12 @@ export function FileList({ className }: FileListProps) {
         {!isLoading && !error && files.length > 0 && (
           <div className="space-y-0.5">
             {files.map((file) => (
-              <div
+              <FileListItem
                 key={file.path}
+                file={file}
+                isSelected={selectedFilePath === file.path}
                 onClick={() => selectFile(file.path)}
-                className={cn(
-                  "px-2 py-1.5 rounded cursor-pointer flex items-center gap-2",
-                  "hover:bg-bg-hover",
-                  selectedFilePath === file.path && "bg-accent-muted"
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-5 h-5 rounded text-xs font-medium flex items-center justify-center shrink-0",
-                    file.status === "Added" && "bg-success/20 text-success",
-                    file.status === "Modified" && "bg-warning/20 text-warning",
-                    file.status === "Deleted" && "bg-danger/20 text-danger",
-                    file.status === "Renamed" && "bg-info/20 text-info",
-                    file.status === "Copied" && "bg-info/20 text-info"
-                  )}
-                  title={file.status}
-                >
-                  {getStatusLetter(file.status)}
-                </span>
-                <span className="text-sm text-text-primary truncate flex-1">
-                  {file.path}
-                </span>
-                {(file.additions > 0 || file.deletions > 0) && (
-                  <span className="text-xs shrink-0 flex gap-1">
-                    {file.additions > 0 && (
-                      <span className="text-success">+{file.additions}</span>
-                    )}
-                    {file.deletions > 0 && (
-                      <span className="text-danger">-{file.deletions}</span>
-                    )}
-                  </span>
-                )}
-              </div>
+              />
             ))}
           </div>
         )}

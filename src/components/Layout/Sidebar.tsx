@@ -9,6 +9,7 @@ import {
   useViewMode,
   useSelectedFilePath,
 } from "../../store/appStore";
+import { FileListItem } from "./FileListItem";
 import type { Commit } from "../../types/commit";
 import type { ChangedFile } from "../../types/file";
 
@@ -30,47 +31,7 @@ function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }
 
-/**
- * Get a short status indicator for a file
- */
-function getStatusIndicator(status: ChangedFile["status"]): string {
-  switch (status) {
-    case "Added":
-      return "A";
-    case "Modified":
-      return "M";
-    case "Deleted":
-      return "D";
-    case "Renamed":
-      return "R";
-    case "Copied":
-      return "C";
-    case "Untracked":
-      return "?";
-    default:
-      return "";
-  }
-}
 
-/**
- * Get the color class for a file status
- */
-function getStatusColor(status: ChangedFile["status"]): string {
-  switch (status) {
-    case "Added":
-    case "Untracked":
-      return "text-green-500";
-    case "Modified":
-      return "text-yellow-500";
-    case "Deleted":
-      return "text-red-500";
-    case "Renamed":
-    case "Copied":
-      return "text-blue-500";
-    default:
-      return "text-text-secondary";
-  }
-}
 
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
@@ -277,33 +238,14 @@ export function Sidebar({ className }: SidebarProps) {
         )}
 
         {viewMode === "changes" && !isLoading && !error && changes.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {changes.map((file) => (
-              <div
+              <FileListItem
                 key={file.path}
+                file={file}
+                isSelected={selectedFilePath === file.path}
                 onClick={() => selectFile(file.path)}
-                className={cn(
-                  "p-2 rounded cursor-pointer",
-                  "hover:bg-bg-hover",
-                  selectedFilePath === file.path && "bg-accent-muted"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={cn("text-xs font-mono font-bold", getStatusColor(file.status))}>
-                    {getStatusIndicator(file.status)}
-                  </span>
-                  <span className="text-sm text-text-primary truncate flex-1">
-                    {file.path}
-                  </span>
-                </div>
-                {(file.additions > 0 || file.deletions > 0) && (
-                  <div className="text-xs text-text-secondary mt-0.5 ml-5">
-                    <span className="text-green-500">+{file.additions}</span>
-                    {" "}
-                    <span className="text-red-500">-{file.deletions}</span>
-                  </div>
-                )}
-              </div>
+              />
             ))}
           </div>
         )}
