@@ -267,4 +267,61 @@ describe("FileList", () => {
       });
     });
   });
+
+  it("auto-selects first file when files are loaded", async () => {
+    const mockFiles = [
+      {
+        path: "src/first.ts",
+        status: "Modified",
+        additions: 5,
+        deletions: 2,
+        old_path: null,
+      },
+      {
+        path: "src/second.ts",
+        status: "Added",
+        additions: 10,
+        deletions: 0,
+        old_path: null,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockFiles);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: null,
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().selectedFilePath).toBe("src/first.ts");
+    });
+  });
+
+  it("does not auto-select when commit has no files", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: null,
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No files changed")).toBeInTheDocument();
+    });
+
+    expect(useAppStore.getState().selectedFilePath).toBeNull();
+  });
 });
