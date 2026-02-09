@@ -1,6 +1,6 @@
 # Recap
 
-A lightweight desktop app for reviewing Git commits and changes.
+A desktop app for reviewing Git commits and changes.
 
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-blue)
 ![React](https://img.shields.io/badge/React-19-blue)

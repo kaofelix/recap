@@ -1,7 +1,7 @@
 [package]
 name = "recap"
 version = "0.1.0"
-description = "A lightweight desktop app for reviewing Git commits and changes"
+description = "A desktop app for reviewing Git commits and changes"
 authors = ["you"]
 edition = "2021"
 
