@@ -42,27 +42,35 @@ export function useWorkingChanges(
   const [error, setError] = useState<string | null>(null);
   const selectFile = useAppStore((state) => state.selectFile);
 
-  const fetchChanges = useCallback(async () => {
-    if (!selectedRepo) {
-      return;
-    }
+  const fetchChanges = useCallback(
+    async (isInitialLoad: boolean) => {
+      if (!selectedRepo) {
+        return;
+      }
 
-    setIsLoading(true);
-    setError(null);
+      // Only show loading state on initial load, not during background refreshes
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
+      setError(null);
 
-    try {
-      const result = await invoke<ChangedFile[]>("get_working_changes", {
-        repoPath: selectedRepo.path,
-      });
-      setChanges(result);
-      clearStaleSelection(result, selectFile);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setChanges([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectFile, selectedRepo]);
+      try {
+        const result = await invoke<ChangedFile[]>("get_working_changes", {
+          repoPath: selectedRepo.path,
+        });
+        setChanges(result);
+        clearStaleSelection(result, selectFile);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setChanges([]);
+      } finally {
+        if (isInitialLoad) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [selectFile, selectedRepo]
+  );
 
   useEffect(() => {
     if (!(selectedRepo && isActive)) {
@@ -71,9 +79,9 @@ export function useWorkingChanges(
       return;
     }
 
-    fetchChanges();
+    fetchChanges(true);
 
-    const intervalId = setInterval(fetchChanges, POLL_INTERVAL_MS);
+    const intervalId = setInterval(() => fetchChanges(false), POLL_INTERVAL_MS);
 
     return () => {
       clearInterval(intervalId);
