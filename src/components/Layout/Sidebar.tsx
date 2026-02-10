@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useState } from "react";
+import { useCommits } from "../../hooks/useCommits";
+import { useWorkingChanges } from "../../hooks/useWorkingChanges";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -9,8 +9,6 @@ import {
   useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
-import type { Commit } from "../../types/commit";
-import type { ChangedFile } from "../../types/file";
 import { FileListItem } from "./FileListItem";
 
 export interface SidebarProps {
@@ -40,103 +38,17 @@ export function Sidebar({ className }: SidebarProps) {
   const selectFile = useAppStore((state) => state.selectFile);
   const setViewMode = useAppStore((state) => state.setViewMode);
 
-  // History mode state
-  const [commits, setCommits] = useState<Commit[]>([]);
-  const [isLoadingCommits, setIsLoadingCommits] = useState(false);
-  const [commitsError, setCommitsError] = useState<string | null>(null);
+  const {
+    commits,
+    isLoading: isLoadingCommits,
+    error: commitsError,
+  } = useCommits(selectedRepo, viewMode === "history");
 
-  // Changes mode state
-  const [changes, setChanges] = useState<ChangedFile[]>([]);
-  const [isLoadingChanges, setIsLoadingChanges] = useState(false);
-  const [changesError, setChangesError] = useState<string | null>(null);
-
-  // Fetch commits for history mode
-  useEffect(() => {
-    if (!selectedRepo || viewMode !== "history") {
-      setCommits([]);
-      setCommitsError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchCommits() {
-      setIsLoadingCommits(true);
-      setCommitsError(null);
-
-      try {
-        const result = await invoke<Commit[]>("list_commits", {
-          repoPath: selectedRepo?.path,
-          limit: 50,
-        });
-
-        if (!cancelled) {
-          setCommits(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setCommitsError(err instanceof Error ? err.message : String(err));
-          setCommits([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingCommits(false);
-        }
-      }
-    }
-
-    fetchCommits();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRepo, viewMode]);
-
-  // Fetch changes for changes mode with polling
-  useEffect(() => {
-    if (!selectedRepo || viewMode !== "changes") {
-      setChanges([]);
-      setChangesError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchChanges() {
-      setIsLoadingChanges(true);
-      setChangesError(null);
-
-      try {
-        const result = await invoke<ChangedFile[]>("get_working_changes", {
-          repoPath: selectedRepo?.path,
-        });
-
-        if (!cancelled) {
-          setChanges(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setChangesError(err instanceof Error ? err.message : String(err));
-          setChanges([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingChanges(false);
-        }
-      }
-    }
-
-    // Initial fetch
-    fetchChanges();
-
-    // Poll every 2 seconds
-    const intervalId = setInterval(fetchChanges, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(intervalId);
-    };
-  }, [selectedRepo, viewMode]);
+  const {
+    changes,
+    isLoading: isLoadingChanges,
+    error: changesError,
+  } = useWorkingChanges(selectedRepo, viewMode === "changes");
 
   const isLoading =
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;

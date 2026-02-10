@@ -504,6 +504,68 @@ describe("Sidebar", () => {
         expect(screen.getByText("App.tsx")).toBeInTheDocument();
         expect(screen.getByText("NewFile.tsx")).toBeInTheDocument();
       });
+
+      it("clears file selection when selected file disappears from changes", async () => {
+        const initialChanges = [
+          {
+            path: "src/App.tsx",
+            status: "Modified",
+            additions: 5,
+            deletions: 2,
+            old_path: null,
+          },
+          {
+            path: "src/Other.tsx",
+            status: "Modified",
+            additions: 3,
+            deletions: 1,
+            old_path: null,
+          },
+        ];
+
+        // After poll, App.tsx is no longer in the list (user reverted changes)
+        const updatedChanges = [
+          {
+            path: "src/Other.tsx",
+            status: "Modified",
+            additions: 3,
+            deletions: 1,
+            old_path: null,
+          },
+        ];
+
+        mockInvoke
+          .mockResolvedValueOnce(initialChanges)
+          .mockResolvedValueOnce(updatedChanges);
+
+        useAppStore.setState({
+          repos: [
+            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+          ],
+          selectedRepoId: "1",
+          selectedFilePath: "src/App.tsx", // File is selected
+          viewMode: "changes",
+        });
+
+        render(<Sidebar />);
+
+        // Initial fetch
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // App.tsx should be selected
+        expect(useAppStore.getState().selectedFilePath).toBe("src/App.tsx");
+
+        // Advance time to trigger poll - App.tsx disappears
+        await act(async () => {
+          vi.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+
+        // Selection should be cleared since the file no longer exists
+        expect(useAppStore.getState().selectedFilePath).toBeNull();
+      });
     });
   });
 });
