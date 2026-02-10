@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
+import { useFileContents } from "../../hooks/useFileContents";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
@@ -10,7 +10,6 @@ import {
   useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
-import type { FileContents } from "../../types/diff";
 
 export interface DiffViewProps {
   className?: string;
@@ -138,14 +137,17 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedFilePath = useSelectedFilePath();
-  const appViewMode = useViewMode();
+  const viewMode = useViewMode();
 
-  const [fileContents, setFileContents] = useState<FileContents | null>(null);
-  const [workingContents, setWorkingContents] = useState<FileContents | null>(
-    null
+  // In history mode, use the selected commit. In changes mode, use null (working directory).
+  const commitId = viewMode === "history" ? selectedCommitId : null;
+
+  const { contents, isLoading, error } = useFileContents(
+    selectedRepo,
+    selectedFilePath,
+    commitId
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
   const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
     () => {
       const saved = localStorage.getItem("diff-view-mode");
@@ -158,106 +160,13 @@ export function DiffView({ className }: DiffViewProps) {
     localStorage.setItem("diff-view-mode", diffDisplayMode);
   }, [diffDisplayMode]);
 
-  // Fetch diff for history mode (commit-based)
-  useEffect(() => {
-    if (
-      appViewMode !== "history" ||
-      !selectedRepo ||
-      !selectedCommitId ||
-      !selectedFilePath
-    ) {
-      setFileContents(null);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    invoke<FileContents>("get_file_contents", {
-      repoPath: selectedRepo.path,
-      commitId: selectedCommitId,
-      filePath: selectedFilePath,
-    })
-      .then((result) => {
-        if (!cancelled) {
-          setFileContents(result);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setFileContents(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [appViewMode, selectedRepo, selectedCommitId, selectedFilePath]);
-
-  // Fetch file contents for changes mode (working directory)
-  useEffect(() => {
-    if (appViewMode !== "changes" || !selectedRepo || !selectedFilePath) {
-      setWorkingContents(null);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    invoke<FileContents>("get_working_file_contents", {
-      repoPath: selectedRepo.path,
-      filePath: selectedFilePath,
-    })
-      .then((result) => {
-        if (!cancelled) {
-          setWorkingContents(result);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setWorkingContents(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [appViewMode, selectedRepo, selectedFilePath]);
-
-  // Determine old/new values based on view mode
-  let oldValue = "";
-  let newValue = "";
-  let isBinary = false;
-
-  if (appViewMode === "history" && fileContents) {
-    oldValue = fileContents.old_content ?? "";
-    newValue = fileContents.new_content ?? "";
-    isBinary = fileContents.is_binary;
-  } else if (appViewMode === "changes" && workingContents) {
-    oldValue = workingContents.old_content ?? "";
-    newValue = workingContents.new_content ?? "";
-    isBinary = workingContents.is_binary;
-  }
+  // Determine old/new values from contents
+  const oldValue = contents?.old_content ?? "";
+  const newValue = contents?.new_content ?? "";
+  const isBinary = contents?.is_binary ?? false;
 
   const hasChanges = oldValue !== newValue;
-  const hasData =
-    appViewMode === "history"
-      ? fileContents !== null
-      : workingContents !== null;
+  const hasData = contents !== null;
 
   // Detect if file is added or deleted (one side is empty)
   const isOneSided =
