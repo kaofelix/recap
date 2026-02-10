@@ -43,6 +43,16 @@ fn get_current_branch(repo_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn list_branches(repo_path: String) -> Result<Vec<git::Branch>, String> {
+    git::list_branches(&repo_path)
+}
+
+#[tauri::command]
+fn checkout_branch(repo_path: String, branch_name: String) -> Result<(), String> {
+    git::checkout_branch(&repo_path, &branch_name)
+}
+
+#[tauri::command]
 fn validate_repo(path: String) -> Result<git::RepoInfo, String> {
     git::validate_repo(&path)
 }
@@ -69,6 +79,8 @@ pub fn run() {
             get_file_diff,
             get_file_contents,
             get_current_branch,
+            list_branches,
+            checkout_branch,
             validate_repo,
             get_working_changes,
             get_working_file_diff

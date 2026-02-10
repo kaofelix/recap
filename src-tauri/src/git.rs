@@ -1,4 +1,4 @@
-use git2::{Delta, DiffOptions, Repository};
+use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, Repository};
 use serde::Serialize;
 
 /// Status of a file in a commit or working directory
@@ -110,6 +110,19 @@ pub struct RepoInfo {
     pub name: String,
     /// Current branch name
     pub branch: String,
+}
+
+/// Represents a git branch
+#[derive(Debug, Clone, Serialize)]
+pub struct Branch {
+    /// Name of the branch
+    pub name: String,
+    /// Whether this is the currently checked out branch
+    pub is_current: bool,
+    /// Whether this is a remote tracking branch
+    pub is_remote: bool,
+    /// SHA of the tip commit
+    pub commit_id: String,
 }
 
 /// Represents a git commit with essential metadata
@@ -531,6 +544,160 @@ pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
             .map(|oid| oid.to_string())
             .ok_or_else(|| "HEAD has no target".to_string())
     }
+}
+
+/// Lists all branches in the repository
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// A vector of Branch structs or an error message
+pub fn list_branches(repo_path: &str) -> Result<Vec<Branch>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get current branch name for comparison
+    let current_branch = get_current_branch(repo_path).ok();
+
+    let mut branches = Vec::new();
+
+    // Get local branches
+    let local_branches = repo
+        .branches(Some(BranchType::Local))
+        .map_err(|e| format!("Failed to list branches: {}", e))?;
+
+    for branch_result in local_branches {
+        let (branch, _branch_type) =
+            branch_result.map_err(|e| format!("Failed to get branch: {}", e))?;
+
+        let name = branch
+            .name()
+            .map_err(|e| format!("Failed to get branch name: {}", e))?
+            .ok_or_else(|| "Branch name is not valid UTF-8".to_string())?
+            .to_string();
+
+        let is_current = current_branch.as_ref() == Some(&name);
+
+        // Get the tip commit SHA
+        let commit_id = branch
+            .get()
+            .peel_to_commit()
+            .map(|c| c.id().to_string())
+            .unwrap_or_default();
+
+        branches.push(Branch {
+            name,
+            is_current,
+            is_remote: false,
+            commit_id,
+        });
+    }
+
+    // Get remote branches
+    let remote_branches = repo
+        .branches(Some(BranchType::Remote))
+        .map_err(|e| format!("Failed to list remote branches: {}", e))?;
+
+    for branch_result in remote_branches {
+        let (branch, _branch_type) =
+            branch_result.map_err(|e| format!("Failed to get branch: {}", e))?;
+
+        let name = branch
+            .name()
+            .map_err(|e| format!("Failed to get branch name: {}", e))?
+            .ok_or_else(|| "Branch name is not valid UTF-8".to_string())?
+            .to_string();
+
+        // Get the tip commit SHA
+        let commit_id = branch
+            .get()
+            .peel_to_commit()
+            .map(|c| c.id().to_string())
+            .unwrap_or_default();
+
+        branches.push(Branch {
+            name,
+            is_current: false, // Remote branches can't be current
+            is_remote: true,
+            commit_id,
+        });
+    }
+
+    // Sort: current branch first, then local branches, then remote
+    branches.sort_by(|a, b| {
+        if a.is_current != b.is_current {
+            return b.is_current.cmp(&a.is_current); // current first
+        }
+        if a.is_remote != b.is_remote {
+            return a.is_remote.cmp(&b.is_remote); // local before remote
+        }
+        a.name.cmp(&b.name)
+    });
+
+    Ok(branches)
+}
+
+/// Checks out a branch
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `branch_name` - Name of the branch to checkout
+///
+/// # Returns
+/// Ok(()) on success, or an error message
+pub fn checkout_branch(repo_path: &str, branch_name: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Check for uncommitted changes that would be overwritten
+    let statuses = repo
+        .statuses(None)
+        .map_err(|e| format!("Failed to get status: {}", e))?;
+
+    let has_changes = statuses.iter().any(|entry| {
+        let status = entry.status();
+        // Check for modifications in index or workdir that could conflict
+        status.is_wt_modified()
+            || status.is_wt_deleted()
+            || status.is_index_modified()
+            || status.is_index_deleted()
+            || status.is_index_new()
+    });
+
+    if has_changes {
+        return Err(
+            "Cannot switch branches: you have uncommitted changes that would be overwritten"
+                .to_string(),
+        );
+    }
+
+    // Find the branch
+    let branch = repo
+        .find_branch(branch_name, BranchType::Local)
+        .map_err(|e| format!("Branch '{}' not found: {}", branch_name, e))?;
+
+    let reference = branch.into_reference();
+    let refname = reference
+        .name()
+        .ok_or_else(|| "Branch reference name is not valid UTF-8".to_string())?;
+
+    // Set HEAD to point to the branch
+    repo.set_head(refname)
+        .map_err(|e| format!("Failed to set HEAD: {}", e))?;
+
+    // Checkout the tree (update working directory)
+    let tree = reference
+        .peel_to_tree()
+        .map_err(|e| format!("Failed to get tree: {}", e))?;
+
+    let mut checkout_opts = CheckoutBuilder::new();
+    checkout_opts.force(); // Force checkout to update working directory
+
+    repo.checkout_tree(tree.as_object(), Some(&mut checkout_opts))
+        .map_err(|e| format!("Failed to checkout: {}", e))?;
+
+    Ok(())
 }
 
 /// Validates that a path is a git repository and returns info about it
@@ -1463,6 +1630,218 @@ mod tests {
         let path = temp_dir.path().to_str().unwrap();
 
         let result = get_working_file_diff(path, "nonexistent.txt");
+        assert!(result.is_err());
+    }
+
+    // Tests for list_branches
+
+    #[test]
+    fn test_list_branches_returns_current_branch() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let branches = list_branches(path).expect("Should return branches");
+
+        assert!(!branches.is_empty());
+        // Should have at least one branch marked as current
+        let current = branches.iter().find(|b| b.is_current);
+        assert!(current.is_some());
+        // Current branch should be master or main
+        let current_name = &current.unwrap().name;
+        assert!(current_name == "master" || current_name == "main");
+    }
+
+    #[test]
+    fn test_list_branches_multiple_branches() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create additional branches
+        Command::new("git")
+            .args(["branch", "feature-a"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+        Command::new("git")
+            .args(["branch", "feature-b"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        let path_str = path.to_str().unwrap();
+        let branches = list_branches(path_str).expect("Should return branches");
+
+        // Should have 3 local branches
+        let local_branches: Vec<_> = branches.iter().filter(|b| !b.is_remote).collect();
+        assert_eq!(local_branches.len(), 3);
+    }
+
+    #[test]
+    fn test_list_branches_current_first() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create another branch
+        Command::new("git")
+            .args(["branch", "zzz-last"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        let path_str = path.to_str().unwrap();
+        let branches = list_branches(path_str).expect("Should return branches");
+
+        // Current branch should be first
+        assert!(branches[0].is_current);
+    }
+
+    #[test]
+    fn test_list_branches_has_commit_id() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let branches = list_branches(path).expect("Should return branches");
+
+        // All branches should have a commit ID
+        for branch in &branches {
+            assert!(!branch.commit_id.is_empty());
+            assert_eq!(branch.commit_id.len(), 40);
+        }
+    }
+
+    #[test]
+    fn test_list_branches_invalid_path() {
+        let result = list_branches("/nonexistent/path");
+        assert!(result.is_err());
+    }
+
+    // Tests for checkout_branch
+
+    #[test]
+    fn test_checkout_branch_switches_branch() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create a new branch
+        Command::new("git")
+            .args(["branch", "feature"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        let path_str = path.to_str().unwrap();
+
+        // Checkout the new branch
+        checkout_branch(path_str, "feature").expect("Should checkout branch");
+
+        // Verify we're on the new branch
+        let current = get_current_branch(path_str).expect("Should get current branch");
+        assert_eq!(current, "feature");
+    }
+
+    #[test]
+    fn test_checkout_branch_nonexistent() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = checkout_branch(path, "nonexistent-branch");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_checkout_branch_with_uncommitted_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create a new branch
+        Command::new("git")
+            .args(["branch", "feature"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        // Make uncommitted changes
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let result = checkout_branch(path_str, "feature");
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("uncommitted changes"));
+    }
+
+    #[test]
+    fn test_checkout_branch_with_untracked_files_allowed() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create a new branch
+        Command::new("git")
+            .args(["branch", "feature"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        // Create untracked file (should not block checkout)
+        std::fs::write(path.join("untracked.txt"), "new file").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let result = checkout_branch(path_str, "feature");
+
+        // Untracked files should not block checkout
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_checkout_branch_updates_working_directory() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+        let path_str = path.to_str().unwrap();
+
+        // Get the current branch name (master or main)
+        let main_branch = get_current_branch(path_str).expect("Should get branch");
+
+        // Create a new branch and add a file
+        Command::new("git")
+            .args(["checkout", "-b", "feature"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create branch");
+
+        std::fs::write(path.join("feature-file.txt"), "feature content")
+            .expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Add feature file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        // Go back to main/master using git command
+        Command::new("git")
+            .args(["checkout", &main_branch])
+            .current_dir(path)
+            .output()
+            .expect("Failed to checkout main");
+
+        // File should not exist on main branch
+        assert!(!path.join("feature-file.txt").exists());
+
+        // Checkout feature branch using our function
+        checkout_branch(path_str, "feature").expect("Should checkout branch");
+
+        // File should now exist
+        assert!(path.join("feature-file.txt").exists());
+    }
+
+    #[test]
+    fn test_checkout_branch_invalid_path() {
+        let result = checkout_branch("/nonexistent/path", "main");
         assert!(result.is_err());
     }
 }
