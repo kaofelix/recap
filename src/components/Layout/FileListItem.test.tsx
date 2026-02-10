@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ChangedFile } from "../../types/file";
 import { FileListItem } from "./FileListItem";
@@ -132,5 +133,57 @@ describe("FileListItem", () => {
 
     expect(screen.getByText("+5")).toBeInTheDocument();
     expect(screen.queryByText("-0")).not.toBeInTheDocument();
+  });
+
+  it("includes diff stats in tooltip", async () => {
+    const user = userEvent.setup();
+    render(<FileListItem file={mockFile} isSelected={false} onClick={noop} />);
+
+    // Hover over the filename to trigger the tooltip
+    await user.hover(screen.getByText("App.tsx"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent(
+        /src\/App\.tsx\s+\+10 -5/
+      );
+    });
+  });
+
+  it("tooltip shows only path when no stats", async () => {
+    const user = userEvent.setup();
+    const noStatsFile: ChangedFile = {
+      ...mockFile,
+      additions: 0,
+      deletions: 0,
+    };
+    render(
+      <FileListItem file={noStatsFile} isSelected={false} onClick={noop} />
+    );
+
+    await user.hover(screen.getByText("App.tsx"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent("src/App.tsx");
+    });
+  });
+
+  it("has container query class for responsive stats hiding", () => {
+    const { container } = render(
+      <FileListItem file={mockFile} isSelected={false} onClick={noop} />
+    );
+
+    const button = container.firstChild as HTMLElement;
+    expect(button).toHaveClass("file-list-item");
+
+    const stats = container.querySelector(".file-list-item-stats");
+    expect(stats).toBeInTheDocument();
+  });
+
+  it("path container has overflow-hidden", () => {
+    render(<FileListItem file={mockFile} isSelected={false} onClick={noop} />);
+
+    const filename = screen.getByText("App.tsx");
+    const pathContainer = filename.parentElement;
+    expect(pathContainer).toHaveClass("overflow-hidden");
   });
 });

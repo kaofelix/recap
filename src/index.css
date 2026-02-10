@@ -195,6 +195,17 @@ body {
   color: var(--color-text-primary);
 }
 
+/* File list item: use container query to hide diff stats when too narrow */
+.file-list-item {
+  container-type: inline-size;
+}
+
+@container (max-width: 200px) {
+  .file-list-item-stats {
+    display: none;
+  }
+}
+
 /* Fix react-diff-viewer: blank content lines should have normal background
    The library applies emptyLine class when content is empty/falsy, treating 
    real blank lines the same as placeholders. We want only placeholders grey.
