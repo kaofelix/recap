@@ -10,7 +10,7 @@ import {
   useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
-import type { FileContents, FileDiff } from "../../types/diff";
+import type { FileContents } from "../../types/diff";
 
 export interface DiffViewProps {
   className?: string;
@@ -57,35 +57,6 @@ const diffStyles = {
     },
   },
 };
-
-/**
- * Convert a FileDiff (from working directory diff) to old/new content strings
- */
-function fileDiffToContents(diff: FileDiff): {
-  oldContent: string;
-  newContent: string;
-} {
-  const oldLines: string[] = [];
-  const newLines: string[] = [];
-
-  for (const hunk of diff.hunks) {
-    for (const line of hunk.lines) {
-      if (line.line_type === "Context") {
-        oldLines.push(line.content);
-        newLines.push(line.content);
-      } else if (line.line_type === "Deletion") {
-        oldLines.push(line.content);
-      } else if (line.line_type === "Addition") {
-        newLines.push(line.content);
-      }
-    }
-  }
-
-  return {
-    oldContent: oldLines.join(""),
-    newContent: newLines.join(""),
-  };
-}
 
 /** Placeholder message component */
 function DiffPlaceholder({ message }: { message: string }) {
@@ -170,7 +141,9 @@ export function DiffView({ className }: DiffViewProps) {
   const appViewMode = useViewMode();
 
   const [fileContents, setFileContents] = useState<FileContents | null>(null);
-  const [workingDiff, setWorkingDiff] = useState<FileDiff | null>(null);
+  const [workingContents, setWorkingContents] = useState<FileContents | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
@@ -228,10 +201,10 @@ export function DiffView({ className }: DiffViewProps) {
     };
   }, [appViewMode, selectedRepo, selectedCommitId, selectedFilePath]);
 
-  // Fetch diff for changes mode (working directory)
+  // Fetch file contents for changes mode (working directory)
   useEffect(() => {
     if (appViewMode !== "changes" || !selectedRepo || !selectedFilePath) {
-      setWorkingDiff(null);
+      setWorkingContents(null);
       return;
     }
 
@@ -239,19 +212,19 @@ export function DiffView({ className }: DiffViewProps) {
     setIsLoading(true);
     setError(null);
 
-    invoke<FileDiff>("get_working_file_diff", {
+    invoke<FileContents>("get_working_file_contents", {
       repoPath: selectedRepo.path,
       filePath: selectedFilePath,
     })
       .then((result) => {
         if (!cancelled) {
-          setWorkingDiff(result);
+          setWorkingContents(result);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
-          setWorkingDiff(null);
+          setWorkingContents(null);
         }
       })
       .finally(() => {
@@ -274,16 +247,17 @@ export function DiffView({ className }: DiffViewProps) {
     oldValue = fileContents.old_content ?? "";
     newValue = fileContents.new_content ?? "";
     isBinary = fileContents.is_binary;
-  } else if (appViewMode === "changes" && workingDiff) {
-    const contents = fileDiffToContents(workingDiff);
-    oldValue = contents.oldContent;
-    newValue = contents.newContent;
-    isBinary = workingDiff.is_binary;
+  } else if (appViewMode === "changes" && workingContents) {
+    oldValue = workingContents.old_content ?? "";
+    newValue = workingContents.new_content ?? "";
+    isBinary = workingContents.is_binary;
   }
 
   const hasChanges = oldValue !== newValue;
   const hasData =
-    appViewMode === "history" ? fileContents !== null : workingDiff !== null;
+    appViewMode === "history"
+      ? fileContents !== null
+      : workingContents !== null;
 
   // Detect if file is added or deleted (one side is empty)
   const isOneSided =

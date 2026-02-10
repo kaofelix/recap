@@ -934,6 +934,96 @@ pub fn get_working_file_diff(repo_path: &str, file_path: &str) -> Result<FileDif
     })
 }
 
+/// Gets the full file contents for a working directory change (vs HEAD)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get contents for
+///
+/// # Returns
+/// A FileContents struct with old (HEAD) and new (working dir) content
+pub fn get_working_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get old content from HEAD (if it exists)
+    let old_content = match repo.head() {
+        Ok(head) => {
+            let tree = head
+                .peel_to_tree()
+                .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+
+            match tree.get_path(std::path::Path::new(file_path)) {
+                Ok(entry) => {
+                    let object = entry
+                        .to_object(&repo)
+                        .map_err(|e| format!("Failed to get object: {}", e))?;
+
+                    if let Some(blob) = object.as_blob() {
+                        if blob.is_binary() {
+                            return Ok(FileContents {
+                                old_content: None,
+                                new_content: None,
+                                is_binary: true,
+                            });
+                        }
+                        match std::str::from_utf8(blob.content()) {
+                            Ok(s) => Some(s.to_string()),
+                            Err(_) => {
+                                return Err("File is not valid UTF-8".to_string());
+                            }
+                        }
+                    } else {
+                        return Err("Not a blob".to_string());
+                    }
+                }
+                Err(_) => None, // File doesn't exist in HEAD (new file)
+            }
+        }
+        Err(_) => None, // No HEAD (empty repo)
+    };
+
+    // Get new content from working directory
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory".to_string())?;
+
+    let file_full_path = workdir.join(file_path);
+
+    let new_content = if file_full_path.exists() {
+        let content = std::fs::read(&file_full_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+
+        // Check if binary (contains null bytes in first 8000 bytes)
+        let check_len = std::cmp::min(content.len(), 8000);
+        if content[..check_len].contains(&0) {
+            return Ok(FileContents {
+                old_content: None,
+                new_content: None,
+                is_binary: true,
+            });
+        }
+
+        match String::from_utf8(content) {
+            Ok(s) => Some(s),
+            Err(_) => return Err("File is not valid UTF-8".to_string()),
+        }
+    } else {
+        None // File was deleted
+    };
+
+    // Verify there's actually a change
+    if old_content.is_none() && new_content.is_none() {
+        return Err(format!("File '{}' not found", file_path));
+    }
+
+    Ok(FileContents {
+        old_content,
+        new_content,
+        is_binary: false,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1631,6 +1721,69 @@ mod tests {
 
         let result = get_working_file_diff(path, "nonexistent.txt");
         assert!(result.is_err());
+    }
+
+    // Tests for get_working_file_contents
+
+    #[test]
+    fn test_get_working_file_contents_modified() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write");
+
+        let path_str = path.to_str().unwrap();
+        let contents =
+            get_working_file_contents(path_str, "file.txt").expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert_eq!(contents.old_content, Some("content".to_string()));
+        assert_eq!(contents.new_content, Some("modified content".to_string()));
+    }
+
+    #[test]
+    fn test_get_working_file_contents_new_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create new file
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write");
+
+        let path_str = path.to_str().unwrap();
+        let contents =
+            get_working_file_contents(path_str, "newfile.txt").expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert!(contents.old_content.is_none()); // File didn't exist in HEAD
+        assert_eq!(contents.new_content, Some("new content".to_string()));
+    }
+
+    #[test]
+    fn test_get_working_file_contents_deleted_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Delete file
+        std::fs::remove_file(path.join("file.txt")).expect("Failed to delete");
+
+        let path_str = path.to_str().unwrap();
+        let contents =
+            get_working_file_contents(path_str, "file.txt").expect("Should return contents");
+
+        assert!(!contents.is_binary);
+        assert_eq!(contents.old_content, Some("content".to_string()));
+        assert!(contents.new_content.is_none()); // File was deleted
+    }
+
+    #[test]
+    fn test_get_working_file_contents_nonexistent() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_working_file_contents(path, "nonexistent.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
     }
 
     // Tests for list_branches

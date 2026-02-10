@@ -67,6 +67,14 @@ fn get_working_file_diff(repo_path: String, file_path: String) -> Result<git::Fi
     git::get_working_file_diff(&repo_path, &file_path)
 }
 
+#[tauri::command]
+fn get_working_file_contents(
+    repo_path: String,
+    file_path: String,
+) -> Result<git::FileContents, String> {
+    git::get_working_file_contents(&repo_path, &file_path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -83,7 +91,8 @@ pub fn run() {
             checkout_branch,
             validate_repo,
             get_working_changes,
-            get_working_file_diff
+            get_working_file_diff,
+            get_working_file_contents
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
