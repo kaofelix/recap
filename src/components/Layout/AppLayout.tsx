@@ -67,8 +67,10 @@ export function AppLayout({ className }: AppLayoutProps) {
           className={cn(
             "w-px bg-panel-border hover:bg-accent-primary/50",
             "transition-colors duration-150",
-            "data-[active]:bg-accent-primary"
+            "data-[active]:bg-accent-primary",
+            "focus:outline-none"
           )}
+          tabIndex={-1}
         />
 
         {/* File List Panel - only visible in history mode */}
@@ -89,8 +91,10 @@ export function AppLayout({ className }: AppLayoutProps) {
               className={cn(
                 "w-px bg-panel-border hover:bg-accent-primary/50",
                 "transition-colors duration-150",
-                "data-[active]:bg-accent-primary"
+                "data-[active]:bg-accent-primary",
+                "focus:outline-none"
               )}
+              tabIndex={-1}
             />
           </>
         )}
