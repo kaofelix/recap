@@ -1,5 +1,9 @@
 import { cn } from "../../lib/utils";
-import { AddRepoButton, RepoPickerButton } from "../Toolbar";
+import {
+  AddRepoButton,
+  BranchPickerButton,
+  RepoPickerButton,
+} from "../Toolbar";
 
 export interface ToolbarProps {
   className?: string;
@@ -30,17 +34,7 @@ export function Toolbar({ className }: ToolbarProps) {
 
       <div className="flex items-center gap-2">
         <span className="font-medium text-sm text-text-secondary">Branch:</span>
-        <button
-          className={cn(
-            "rounded px-3 py-1 text-sm",
-            "bg-bg-secondary hover:bg-bg-hover",
-            "border border-border-primary",
-            "text-text-primary"
-          )}
-          type="button"
-        >
-          main
-        </button>
+        <BranchPickerButton />
       </div>
 
       <div className="ml-auto flex items-center gap-2">
