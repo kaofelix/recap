@@ -126,7 +126,7 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
           <Portal>
             <Content
               className={cn(
-                "rounded px-2 py-1 text-xs",
+                "z-50 rounded px-2 py-1 text-xs",
                 "bg-bg-tertiary text-text-primary",
                 "border border-panel-border shadow-lg",
                 "fade-in-0 zoom-in-95 animate-in duration-100"
