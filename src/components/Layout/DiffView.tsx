@@ -198,18 +198,20 @@ export function DiffView({ className }: DiffViewProps) {
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="truncate font-semibold text-sm text-text-primary">
+        <h2 className="truncate font-mono text-text-secondary text-xs">
           {selectedFilePath ?? "Diff"}
         </h2>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 overflow-hidden rounded border border-border-primary">
           <button
             className={cn(
-              "rounded px-2 py-0.5 text-xs",
-              "border border-border-primary",
+              "px-2.5 py-0.5 font-medium text-xs",
+              "transition-colors",
               effectiveDisplayMode === "split"
-                ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary text-text-secondary",
-              !isOneSided && "hover:bg-bg-hover",
+                ? "bg-bg-tertiary text-text-primary"
+                : "bg-bg-secondary text-text-tertiary",
+              !isOneSided &&
+                effectiveDisplayMode !== "split" &&
+                "hover:bg-bg-hover hover:text-text-secondary",
               isOneSided && "cursor-not-allowed opacity-50"
             )}
             disabled={isOneSided}
@@ -220,12 +222,15 @@ export function DiffView({ className }: DiffViewProps) {
           </button>
           <button
             className={cn(
-              "rounded px-2 py-0.5 text-xs",
-              "border border-border-primary",
+              "px-2.5 py-0.5 font-medium text-xs",
+              "border-border-primary border-l",
+              "transition-colors",
               effectiveDisplayMode === "unified"
-                ? "bg-accent-muted text-text-primary"
-                : "bg-bg-secondary text-text-secondary",
-              !isOneSided && "hover:bg-bg-hover",
+                ? "bg-bg-tertiary text-text-primary"
+                : "bg-bg-secondary text-text-tertiary",
+              !isOneSided &&
+                effectiveDisplayMode !== "unified" &&
+                "hover:bg-bg-hover hover:text-text-secondary",
               isOneSided && "cursor-not-allowed opacity-50"
             )}
             disabled={isOneSided}

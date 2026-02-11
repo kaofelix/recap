@@ -43,8 +43,10 @@ export function Toolbar({ className }: ToolbarProps) {
         <button
           className={cn(
             "rounded px-3 py-1 text-sm",
-            "bg-accent-primary hover:bg-accent-hover",
-            "font-medium text-white"
+            "border border-border-primary",
+            "bg-bg-secondary hover:bg-bg-hover active:bg-bg-active",
+            "font-medium text-text-secondary hover:text-text-primary",
+            "transition-colors"
           )}
           type="button"
         >

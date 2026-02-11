@@ -224,9 +224,9 @@ describe("DiffView", () => {
 
     render(<DiffView />);
 
-    // Unified button should be active (has accent-muted class)
+    // Unified button should be active (has active background class)
     const unifiedButton = screen.getByText("Unified");
-    expect(unifiedButton.className).toContain("bg-accent-muted");
+    expect(unifiedButton.className).toContain("bg-bg-tertiary");
   });
 
   it("displays file path in header", () => {

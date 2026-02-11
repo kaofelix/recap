@@ -58,8 +58,9 @@ export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
       aria-label="Add repository"
       className={cn(
         "rounded px-3 py-1 text-sm",
-        "bg-accent-primary hover:bg-accent-hover",
-        "font-medium text-white",
+        "border border-border-primary",
+        "bg-bg-secondary hover:bg-bg-hover active:bg-bg-active",
+        "font-medium text-text-secondary hover:text-text-primary",
         "disabled:cursor-not-allowed disabled:opacity-50",
         "transition-colors",
         className
