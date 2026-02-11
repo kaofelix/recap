@@ -23,6 +23,9 @@ const diffStyles = {
     light: {
       diffViewerBackground: "var(--color-panel-bg)",
       diffViewerColor: "var(--color-text-primary)",
+      diffViewerTitleBackground: "var(--color-panel-header-bg)",
+      diffViewerTitleColor: "var(--color-text-primary)",
+      diffViewerTitleBorderColor: "var(--color-border-primary)",
       addedBackground: "var(--color-diff-add-bg)",
       addedColor: "var(--color-diff-add-text)",
       removedBackground: "var(--color-diff-delete-bg)",
@@ -40,6 +43,9 @@ const diffStyles = {
     dark: {
       diffViewerBackground: "var(--color-panel-bg)",
       diffViewerColor: "var(--color-text-primary)",
+      diffViewerTitleBackground: "var(--color-panel-header-bg)",
+      diffViewerTitleColor: "var(--color-text-primary)",
+      diffViewerTitleBorderColor: "var(--color-border-primary)",
       addedBackground: "var(--color-diff-add-bg)",
       addedColor: "var(--color-diff-add-text)",
       removedBackground: "var(--color-diff-delete-bg)",
