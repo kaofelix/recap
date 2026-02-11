@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+import { useEffect } from "react";
 import { useCommits } from "../../hooks/useCommits";
 import { useWorkingChanges } from "../../hooks/useWorkingChanges";
 import { cn } from "../../lib/utils";
@@ -53,6 +54,31 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoading =
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;
   const error = viewMode === "history" ? commitsError : changesError;
+
+  // Auto-select first commit when selected commit doesn't exist in the list
+  useEffect(() => {
+    if (viewMode !== "history" || isLoadingCommits || commitsError) {
+      return;
+    }
+    if (commits.length === 0) {
+      return;
+    }
+
+    const selectedCommitExists = commits.some(
+      (commit) => commit.id === selectedCommitId
+    );
+
+    if (!selectedCommitExists) {
+      selectCommit(commits[0].id);
+    }
+  }, [
+    commits,
+    selectedCommitId,
+    selectCommit,
+    viewMode,
+    isLoadingCommits,
+    commitsError,
+  ]);
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
