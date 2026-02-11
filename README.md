@@ -6,6 +6,8 @@ A desktop app for reviewing Git commits and changes.
 ![React](https://img.shields.io/badge/React-19-blue)
 ![Rust](https://img.shields.io/badge/Rust-git2-orange)
 
+![Recap Screenshot](assets/screenshot.png)
+
 ## Features
 
 - **Multi-repo support** — Add and switch between repositories
