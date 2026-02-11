@@ -198,7 +198,7 @@ export function DiffView({ className }: DiffViewProps) {
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="truncate font-mono text-text-secondary text-xs">
+        <h2 className="truncate font-mono text-sm text-text-primary">
           {selectedFilePath ?? "Diff"}
         </h2>
         <div className="flex shrink-0 overflow-hidden rounded border border-border-primary">
