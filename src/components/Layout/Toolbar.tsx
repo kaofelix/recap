@@ -3,6 +3,7 @@ import {
   AddRepoButton,
   BranchPickerButton,
   RepoPickerButton,
+  ThemeToggleButton,
 } from "../Toolbar";
 
 export interface ToolbarProps {
@@ -38,6 +39,7 @@ export function Toolbar({ className }: ToolbarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <ThemeToggleButton />
         <button
           className={cn(
             "rounded px-3 py-1 text-sm",

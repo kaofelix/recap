@@ -223,6 +223,22 @@ tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
   background-color: var(--color-bg-secondary) !important;
 }
 
+/* Theme toggle icon animation */
+@keyframes theme-icon-spin {
+  0% {
+    transform: scale(0.5) rotate(-90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-theme-icon {
+  animation: theme-icon-spin 200ms ease-out;
+}
+
 /* Prism.js syntax highlighting - GitHub-inspired theme */
 :root {
   --color-syntax-comment: #6a737d;
