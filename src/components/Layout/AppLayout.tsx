@@ -70,7 +70,6 @@ export function AppLayout({ className }: AppLayoutProps) {
             "data-[active]:bg-accent-primary",
             "focus:outline-none"
           )}
-          tabIndex={-1}
         />
 
         {/* File List Panel - only visible in history mode */}
@@ -94,7 +93,6 @@ export function AppLayout({ className }: AppLayoutProps) {
                 "data-[active]:bg-accent-primary",
                 "focus:outline-none"
               )}
-              tabIndex={-1}
             />
           </>
         )}

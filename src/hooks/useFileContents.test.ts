@@ -11,7 +11,13 @@ vi.mock("@tauri-apps/api/core", () => ({
 const mockInvoke = vi.mocked(invoke);
 
 describe("useFileContents", () => {
-  const mockRepo = { path: "/test/repo", name: "test-repo", branch: "main" };
+  const mockRepo = {
+    path: "/test/repo",
+    name: "test-repo",
+    branch: "main",
+    id: "test-repo-id",
+    addedAt: Date.now(),
+  };
   const mockFilePath = "src/file.ts";
   const mockCommitId = "abc123";
 

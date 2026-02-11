@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
+    "icon": "./scripts/build-icon.sh",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "prepare": "lefthook install"

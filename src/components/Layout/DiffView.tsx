@@ -78,12 +78,12 @@ function getDiffStyles(wordWrap: boolean) {
       diffContainer: {
         minWidth: "unset",
         width: "100%",
-        overflowX: "hidden",
-        tableLayout: "fixed",
+        overflowX: "hidden" as const,
+        tableLayout: "fixed" as const,
       },
       contentText: {
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
+        whiteSpace: "pre-wrap" as const,
+        wordBreak: "break-word" as const,
       },
     };
   }
@@ -93,11 +93,11 @@ function getDiffStyles(wordWrap: boolean) {
     variables: themeVariables,
     diffContainer: {
       minWidth: "max-content",
-      overflowX: "visible",
-      tableLayout: "auto",
+      overflowX: "visible" as const,
+      tableLayout: "auto" as const,
     },
     contentText: {
-      whiteSpace: "pre",
+      whiteSpace: "pre" as const,
     },
   };
 }

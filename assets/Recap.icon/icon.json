@@ -1,0 +1,201 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-gray:1.00000,1.00000"
+  },
+  "groups": [
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "image-name": "plus.png",
+          "name": "plus",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [-157.62438215860368, -42.6779276496552]
+          }
+        }
+      ],
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [0, 0]
+      },
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    },
+    {
+      "blur-material": 0.2,
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "diff-lines-added.png",
+          "name": "diff-lines-added",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [-156.12438215860368, -43.6779276496552]
+          }
+        },
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-gray:1.00000,1.00000",
+                  "display-p3:0.90000,0.90000,0.90000,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 1
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.3
+                  }
+                }
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": "automatic"
+            }
+          ],
+          "glass": true,
+          "image-name": "base sheet 4.png",
+          "name": "base sheet 4",
+          "opacity-specializations": [
+            {
+              "value": 0.7
+            },
+            {
+              "appearance": "dark",
+              "value": 0.5
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [-157.62438215860368, -42.6779276496552]
+          }
+        }
+      ],
+      "lighting": "combined",
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [0, 0]
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "minus.png",
+          "name": "minus",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [153.61830244671762, 42.3220723503448]
+          }
+        }
+      ],
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [0, 0]
+      },
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    },
+    {
+      "blur-material": 0.1,
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "diff-lines-removed.png",
+          "name": "diff-lines-removed",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [155.11830244671762, 40.8220723503448]
+          }
+        },
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-gray:1.00000,1.00000",
+                  "display-p3:0.90000,0.90000,0.90000,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.5,
+                    "y": 1
+                  },
+                  "stop": {
+                    "x": 0.5,
+                    "y": 0.3
+                  }
+                }
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": "automatic"
+            }
+          ],
+          "glass": true,
+          "image-name": "base sheet 4.png",
+          "name": "base sheet 4",
+          "opacity-specializations": [
+            {
+              "value": 0.7
+            },
+            {
+              "appearance": "dark",
+              "value": 0.5
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [153.61830244671762, 33.64147161334904]
+          }
+        }
+      ],
+      "lighting": "combined",
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [0, 0]
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": ["watchOS"],
+    "squares": "shared"
+  }
+}
