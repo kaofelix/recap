@@ -151,17 +151,17 @@ export function FileList({ className }: FileListProps) {
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
         className={cn(
-          "flex h-10 items-center px-3",
+          "flex h-10 items-center gap-2 px-3",
           "border-panel-border border-b",
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="font-semibold text-sm text-text-primary">
-          Changed Files
+        <h2 className="shrink-0 font-semibold text-sm text-text-primary">
+          Files
         </h2>
         {files.length > 0 && (
-          <span className="ml-2 text-text-secondary text-xs">
-            ({files.length} {files.length === 1 ? "file" : "files"})
+          <span className="shrink-0 text-text-secondary text-xs">
+            ({files.length})
           </span>
         )}
       </div>

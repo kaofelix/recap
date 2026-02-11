@@ -96,7 +96,7 @@ describe("FileList", () => {
     });
 
     expect(screen.getByText("Button.tsx")).toBeInTheDocument();
-    expect(screen.getByText("(2 files)")).toBeInTheDocument();
+    expect(screen.getByText("(2)")).toBeInTheDocument();
   });
 
   it("shows file status indicators", async () => {

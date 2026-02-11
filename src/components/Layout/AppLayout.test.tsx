@@ -28,7 +28,7 @@ describe("AppLayout", () => {
   it("renders the file list panel", () => {
     render(<AppLayout />);
 
-    expect(screen.getByText("Changed Files")).toBeInTheDocument();
+    expect(screen.getByText("Files")).toBeInTheDocument();
   });
 
   it("shows empty state when no commit is selected", () => {
