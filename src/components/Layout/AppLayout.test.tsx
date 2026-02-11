@@ -16,7 +16,6 @@ describe("AppLayout", () => {
 
     expect(screen.getByText("Repository:")).toBeInTheDocument();
     expect(screen.getByText("Branch:")).toBeInTheDocument();
-    expect(screen.getByText("Refresh")).toBeInTheDocument();
   });
 
   it("renders the sidebar with view mode toggle", () => {

@@ -17,51 +17,82 @@ export interface DiffViewProps {
 
 type DiffDisplayMode = "split" | "unified";
 
-/** Custom styles for the diff viewer using CSS variables */
-const diffStyles = {
-  variables: {
-    light: {
-      diffViewerBackground: "var(--color-panel-bg)",
-      diffViewerColor: "var(--color-text-primary)",
-      diffViewerTitleBackground: "var(--color-panel-header-bg)",
-      diffViewerTitleColor: "var(--color-text-primary)",
-      diffViewerTitleBorderColor: "var(--color-border-primary)",
-      addedBackground: "var(--color-diff-add-bg)",
-      addedColor: "var(--color-diff-add-text)",
-      removedBackground: "var(--color-diff-delete-bg)",
-      removedColor: "var(--color-diff-delete-text)",
-      wordAddedBackground: "var(--color-diff-add-word-bg)",
-      wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-      addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-      removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-      gutterBackground: "var(--color-panel-header-bg)",
-      gutterColor: "var(--color-text-tertiary)",
-      codeFoldBackground: "var(--color-bg-secondary)",
-      codeFoldGutterBackground: "var(--color-bg-secondary)",
-      emptyLineBackground: "var(--color-bg-secondary)",
-    },
-    dark: {
-      diffViewerBackground: "var(--color-panel-bg)",
-      diffViewerColor: "var(--color-text-primary)",
-      diffViewerTitleBackground: "var(--color-panel-header-bg)",
-      diffViewerTitleColor: "var(--color-text-primary)",
-      diffViewerTitleBorderColor: "var(--color-border-primary)",
-      addedBackground: "var(--color-diff-add-bg)",
-      addedColor: "var(--color-diff-add-text)",
-      removedBackground: "var(--color-diff-delete-bg)",
-      removedColor: "var(--color-diff-delete-text)",
-      wordAddedBackground: "var(--color-diff-add-word-bg)",
-      wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-      addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-      removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-      gutterBackground: "var(--color-panel-header-bg)",
-      gutterColor: "var(--color-text-tertiary)",
-      codeFoldBackground: "var(--color-bg-secondary)",
-      codeFoldGutterBackground: "var(--color-bg-secondary)",
-      emptyLineBackground: "var(--color-bg-secondary)",
-    },
+/** Theme variables for the diff viewer using CSS variables */
+const themeVariables = {
+  light: {
+    diffViewerBackground: "var(--color-panel-bg)",
+    diffViewerColor: "var(--color-text-primary)",
+    diffViewerTitleBackground: "var(--color-panel-header-bg)",
+    diffViewerTitleColor: "var(--color-text-primary)",
+    diffViewerTitleBorderColor: "var(--color-border-primary)",
+    addedBackground: "var(--color-diff-add-bg)",
+    addedColor: "var(--color-diff-add-text)",
+    removedBackground: "var(--color-diff-delete-bg)",
+    removedColor: "var(--color-diff-delete-text)",
+    wordAddedBackground: "var(--color-diff-add-word-bg)",
+    wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+    addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+    removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+    gutterBackground: "var(--color-panel-header-bg)",
+    gutterColor: "var(--color-text-tertiary)",
+    codeFoldBackground: "var(--color-bg-secondary)",
+    codeFoldGutterBackground: "var(--color-bg-secondary)",
+    emptyLineBackground: "var(--color-bg-secondary)",
+  },
+  dark: {
+    diffViewerBackground: "var(--color-panel-bg)",
+    diffViewerColor: "var(--color-text-primary)",
+    diffViewerTitleBackground: "var(--color-panel-header-bg)",
+    diffViewerTitleColor: "var(--color-text-primary)",
+    diffViewerTitleBorderColor: "var(--color-border-primary)",
+    addedBackground: "var(--color-diff-add-bg)",
+    addedColor: "var(--color-diff-add-text)",
+    removedBackground: "var(--color-diff-delete-bg)",
+    removedColor: "var(--color-diff-delete-text)",
+    wordAddedBackground: "var(--color-diff-add-word-bg)",
+    wordRemovedBackground: "var(--color-diff-delete-word-bg)",
+    addedGutterBackground: "var(--color-diff-add-gutter-bg)",
+    removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
+    gutterBackground: "var(--color-panel-header-bg)",
+    gutterColor: "var(--color-text-tertiary)",
+    codeFoldBackground: "var(--color-bg-secondary)",
+    codeFoldGutterBackground: "var(--color-bg-secondary)",
+    emptyLineBackground: "var(--color-bg-secondary)",
   },
 };
+
+/** Generate diff styles based on word wrap setting */
+function getDiffStyles(wordWrap: boolean) {
+  if (wordWrap) {
+    // Word wrap enabled: always fit, no horizontal scroll
+    return {
+      variables: themeVariables,
+      diffContainer: {
+        minWidth: "unset",
+        width: "100%",
+        overflowX: "hidden",
+        tableLayout: "fixed",
+      },
+      contentText: {
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      },
+    };
+  }
+
+  // Word wrap disabled: whole table scrolls horizontally together
+  return {
+    variables: themeVariables,
+    diffContainer: {
+      minWidth: "max-content",
+      overflowX: "visible",
+      tableLayout: "auto",
+    },
+    contentText: {
+      whiteSpace: "pre",
+    },
+  };
+}
 
 /** Placeholder message component */
 function DiffPlaceholder({ message }: { message: string }) {
@@ -91,6 +122,7 @@ interface DiffContentProps {
   oldValue: string;
   newValue: string;
   splitView: boolean;
+  wordWrap: boolean;
   renderContent: (source: string) => ReactElement;
 }
 
@@ -104,8 +136,11 @@ function DiffContent({
   oldValue,
   newValue,
   splitView,
+  wordWrap,
   renderContent,
 }: DiffContentProps) {
+  const diffStyles = useMemo(() => getDiffStyles(wordWrap), [wordWrap]);
+
   if (!hasFile) {
     return <DiffPlaceholder message="Select a file to view diff" />;
   }
@@ -161,10 +196,20 @@ export function DiffView({ className }: DiffViewProps) {
     }
   );
 
+  const [wordWrap, setWordWrap] = useState<boolean>(() => {
+    const saved = localStorage.getItem("diff-word-wrap");
+    return saved === null ? true : saved === "true";
+  });
+
   // Persist view mode preference
   useEffect(() => {
     localStorage.setItem("diff-view-mode", diffDisplayMode);
   }, [diffDisplayMode]);
+
+  // Persist word wrap preference
+  useEffect(() => {
+    localStorage.setItem("diff-word-wrap", String(wordWrap));
+  }, [wordWrap]);
 
   // Determine old/new values from contents
   const oldValue = contents?.old_content ?? "";
@@ -199,51 +244,66 @@ export function DiffView({ className }: DiffViewProps) {
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
         className={cn(
-          "flex h-10 items-center justify-between px-3",
+          "flex h-10 items-center justify-between gap-2 px-3",
           "border-panel-border border-b",
           "bg-panel-header-bg"
         )}
       >
-        <h2 className="truncate font-semibold text-sm text-text-primary">
+        <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
           {selectedFilePath ?? "Diff"}
         </h2>
-        <div className="flex shrink-0 overflow-hidden rounded border border-border-primary">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex overflow-hidden rounded border border-border-primary">
+            <button
+              className={cn(
+                "px-2.5 py-0.5 font-medium text-xs",
+                "transition-colors",
+                effectiveDisplayMode === "split"
+                  ? "bg-bg-tertiary text-text-primary"
+                  : "bg-bg-secondary text-text-tertiary",
+                !isOneSided &&
+                  effectiveDisplayMode !== "split" &&
+                  "hover:bg-bg-hover hover:text-text-secondary",
+                isOneSided && "cursor-not-allowed opacity-50"
+              )}
+              disabled={isOneSided}
+              onClick={() => setDiffDisplayMode("split")}
+              type="button"
+            >
+              Split
+            </button>
+            <button
+              className={cn(
+                "px-2.5 py-0.5 font-medium text-xs",
+                "border-border-primary border-l",
+                "transition-colors",
+                effectiveDisplayMode === "unified"
+                  ? "bg-bg-tertiary text-text-primary"
+                  : "bg-bg-secondary text-text-tertiary",
+                !isOneSided &&
+                  effectiveDisplayMode !== "unified" &&
+                  "hover:bg-bg-hover hover:text-text-secondary",
+                isOneSided && "cursor-not-allowed opacity-50"
+              )}
+              disabled={isOneSided}
+              onClick={() => setDiffDisplayMode("unified")}
+              type="button"
+            >
+              Unified
+            </button>
+          </div>
           <button
             className={cn(
-              "px-2.5 py-0.5 font-medium text-xs",
-              "transition-colors",
-              effectiveDisplayMode === "split"
-                ? "bg-bg-tertiary text-text-primary"
-                : "bg-bg-secondary text-text-tertiary",
-              !isOneSided &&
-                effectiveDisplayMode !== "split" &&
-                "hover:bg-bg-hover hover:text-text-secondary",
-              isOneSided && "cursor-not-allowed opacity-50"
+              "rounded px-2.5 py-0.5 font-medium text-xs",
+              "border transition-colors",
+              wordWrap
+                ? "border-border-primary bg-bg-tertiary text-text-primary"
+                : "border-border-primary bg-bg-secondary text-text-tertiary hover:bg-bg-hover hover:text-text-secondary"
             )}
-            disabled={isOneSided}
-            onClick={() => setDiffDisplayMode("split")}
+            onClick={() => setWordWrap(!wordWrap)}
             type="button"
           >
-            Split
-          </button>
-          <button
-            className={cn(
-              "px-2.5 py-0.5 font-medium text-xs",
-              "border-border-primary border-l",
-              "transition-colors",
-              effectiveDisplayMode === "unified"
-                ? "bg-bg-tertiary text-text-primary"
-                : "bg-bg-secondary text-text-tertiary",
-              !isOneSided &&
-                effectiveDisplayMode !== "unified" &&
-                "hover:bg-bg-hover hover:text-text-secondary",
-              isOneSided && "cursor-not-allowed opacity-50"
-            )}
-            disabled={isOneSided}
-            onClick={() => setDiffDisplayMode("unified")}
-            type="button"
-          >
-            Unified
+            Wrap
           </button>
         </div>
       </div>
@@ -260,6 +320,7 @@ export function DiffView({ className }: DiffViewProps) {
           oldValue={oldValue}
           renderContent={renderContent}
           splitView={effectiveDisplayMode === "split"}
+          wordWrap={wordWrap}
         />
       </div>
     </div>
