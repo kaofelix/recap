@@ -198,7 +198,7 @@ describe("DiffView", () => {
     );
 
     // Click unified
-    const unifiedButton = screen.getByText("Unified");
+    const unifiedButton = screen.getByRole("button", { name: "Unified view" });
     fireEvent.click(unifiedButton);
 
     // Check localStorage was updated
@@ -209,7 +209,7 @@ describe("DiffView", () => {
     );
 
     // Click split
-    const splitButton = screen.getByText("Split");
+    const splitButton = screen.getByRole("button", { name: "Split view" });
     fireEvent.click(splitButton);
 
     expect(localStorage.getItem("diff-view-mode")).toBe("split");
@@ -225,7 +225,7 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     // Unified button should be active (has active background class)
-    const unifiedButton = screen.getByText("Unified");
+    const unifiedButton = screen.getByRole("button", { name: "Unified view" });
     expect(unifiedButton.className).toContain("bg-bg-tertiary");
   });
 
@@ -476,8 +476,8 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Split")).toBeDisabled();
-    expect(screen.getByText("Unified")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Split view" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Unified view" })).toBeDisabled();
   });
 
   it("disables view mode toggle for deleted files", async () => {
@@ -504,8 +504,8 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Split")).toBeDisabled();
-    expect(screen.getByText("Unified")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Split view" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Unified view" })).toBeDisabled();
   });
 
   it("enables view mode toggle for modified files", async () => {
@@ -532,7 +532,7 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Split")).toBeEnabled();
-    expect(screen.getByText("Unified")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Split view" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Unified view" })).toBeEnabled();
   });
 });

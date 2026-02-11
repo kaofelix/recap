@@ -43,8 +43,12 @@ describe("AppLayout", () => {
     render(<AppLayout />);
 
     expect(screen.getByText("Diff")).toBeInTheDocument();
-    expect(screen.getByText("Split")).toBeInTheDocument();
-    expect(screen.getByText("Unified")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Split view" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Unified view" })
+    ).toBeInTheDocument();
   });
 
   it("shows empty state when no file is selected", () => {

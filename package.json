@@ -16,7 +16,6 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@heroicons/react": "^2.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -29,6 +28,7 @@
     "autoprefixer": "^10.4.24",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "lucide-react": "^0.563.0",
     "postcss": "^8.5.6",
     "prismjs": "^1.30.0",
     "react": "^19.1.0",

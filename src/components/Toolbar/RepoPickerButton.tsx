@@ -1,9 +1,4 @@
 import {
-  CheckIcon,
-  ChevronDownIcon,
-  TrashIcon,
-} from "@heroicons/react/20/solid";
-import {
   Action as AlertDialogAction,
   Cancel as AlertDialogCancel,
   Content as AlertDialogContent,
@@ -20,6 +15,7 @@ import {
   Root,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore, useRepos, useSelectedRepo } from "../../store";
@@ -58,7 +54,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
             type="button"
           >
             <span>{selectedRepo?.name ?? "Select repo"}</span>
-            <ChevronDownIcon className="h-4 w-4 text-text-secondary" />
+            <ChevronDown className="h-4 w-4 text-text-secondary" />
           </button>
         </Trigger>
 
@@ -87,7 +83,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
               >
                 <span className="flex h-4 w-4 items-center justify-center">
                   {repo.id === selectedRepo?.id && (
-                    <CheckIcon className="h-4 w-4 text-accent-primary" />
+                    <Check className="h-4 w-4 text-accent-primary" />
                   )}
                 </span>
                 <span className="flex-1">{repo.name}</span>
@@ -111,7 +107,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
                   }}
                   type="button"
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </Item>
             ))}

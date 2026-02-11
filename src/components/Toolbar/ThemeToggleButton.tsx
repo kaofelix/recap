@@ -1,8 +1,5 @@
-import {
-  ComputerDesktopIcon,
-  MoonIcon,
-  SunIcon,
-} from "@heroicons/react/20/solid";
+import type { LucideIcon } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type ThemeMode, useTheme } from "../../hooks/useTheme";
 import { cn } from "../../lib/utils";
@@ -20,10 +17,10 @@ const LABELS: Record<ThemeMode, string> = {
   system: "Theme: system",
 };
 
-const ICONS: Record<ThemeMode, typeof SunIcon> = {
-  light: SunIcon,
-  dark: MoonIcon,
-  system: ComputerDesktopIcon,
+const ICONS: Record<ThemeMode, LucideIcon> = {
+  light: Sun,
+  dark: Moon,
+  system: Monitor,
 };
 
 export interface ThemeToggleButtonProps {

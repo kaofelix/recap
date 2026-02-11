@@ -1,3 +1,11 @@
+import {
+  Content,
+  Portal,
+  Provider,
+  Root,
+  Trigger,
+} from "@radix-ui/react-tooltip";
+import { Rows3, SquareSplitHorizontal, WrapText } from "lucide-react";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
@@ -252,60 +260,116 @@ export function DiffView({ className }: DiffViewProps) {
         <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
           {selectedFilePath ?? "Diff"}
         </h2>
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="flex overflow-hidden rounded border border-border-primary">
-            <button
-              className={cn(
-                "px-2.5 py-0.5 font-medium text-xs",
-                "transition-colors",
-                effectiveDisplayMode === "split"
-                  ? "bg-bg-tertiary text-text-primary"
-                  : "bg-bg-secondary text-text-tertiary",
-                !isOneSided &&
-                  effectiveDisplayMode !== "split" &&
-                  "hover:bg-bg-hover hover:text-text-secondary",
-                isOneSided && "cursor-not-allowed opacity-50"
-              )}
-              disabled={isOneSided}
-              onClick={() => setDiffDisplayMode("split")}
-              type="button"
-            >
-              Split
-            </button>
-            <button
-              className={cn(
-                "px-2.5 py-0.5 font-medium text-xs",
-                "border-border-primary border-l",
-                "transition-colors",
-                effectiveDisplayMode === "unified"
-                  ? "bg-bg-tertiary text-text-primary"
-                  : "bg-bg-secondary text-text-tertiary",
-                !isOneSided &&
-                  effectiveDisplayMode !== "unified" &&
-                  "hover:bg-bg-hover hover:text-text-secondary",
-                isOneSided && "cursor-not-allowed opacity-50"
-              )}
-              disabled={isOneSided}
-              onClick={() => setDiffDisplayMode("unified")}
-              type="button"
-            >
-              Unified
-            </button>
+        <Provider delayDuration={300}>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex overflow-hidden rounded border border-border-primary">
+              <Root>
+                <Trigger asChild>
+                  <button
+                    aria-label="Split view"
+                    className={cn(
+                      "flex items-center justify-center p-1.5",
+                      "transition-colors",
+                      effectiveDisplayMode === "split"
+                        ? "bg-bg-tertiary text-text-primary"
+                        : "bg-bg-secondary text-text-tertiary",
+                      !isOneSided &&
+                        effectiveDisplayMode !== "split" &&
+                        "hover:bg-bg-hover hover:text-text-secondary",
+                      isOneSided && "cursor-not-allowed opacity-50"
+                    )}
+                    disabled={isOneSided}
+                    onClick={() => setDiffDisplayMode("split")}
+                    type="button"
+                  >
+                    <SquareSplitHorizontal className="h-4 w-4" />
+                  </button>
+                </Trigger>
+                <Portal>
+                  <Content
+                    className={cn(
+                      "z-50 rounded px-2 py-1 text-xs",
+                      "bg-bg-tertiary text-text-primary",
+                      "border border-panel-border shadow-lg",
+                      "fade-in-0 zoom-in-95 animate-in duration-100"
+                    )}
+                    sideOffset={5}
+                  >
+                    Split view
+                  </Content>
+                </Portal>
+              </Root>
+              <Root>
+                <Trigger asChild>
+                  <button
+                    aria-label="Unified view"
+                    className={cn(
+                      "flex items-center justify-center p-1.5",
+                      "border-border-primary border-l",
+                      "transition-colors",
+                      effectiveDisplayMode === "unified"
+                        ? "bg-bg-tertiary text-text-primary"
+                        : "bg-bg-secondary text-text-tertiary",
+                      !isOneSided &&
+                        effectiveDisplayMode !== "unified" &&
+                        "hover:bg-bg-hover hover:text-text-secondary",
+                      isOneSided && "cursor-not-allowed opacity-50"
+                    )}
+                    disabled={isOneSided}
+                    onClick={() => setDiffDisplayMode("unified")}
+                    type="button"
+                  >
+                    <Rows3 className="h-4 w-4" />
+                  </button>
+                </Trigger>
+                <Portal>
+                  <Content
+                    className={cn(
+                      "z-50 rounded px-2 py-1 text-xs",
+                      "bg-bg-tertiary text-text-primary",
+                      "border border-panel-border shadow-lg",
+                      "fade-in-0 zoom-in-95 animate-in duration-100"
+                    )}
+                    sideOffset={5}
+                  >
+                    Unified view
+                  </Content>
+                </Portal>
+              </Root>
+            </div>
+            <Root>
+              <Trigger asChild>
+                <button
+                  aria-label="Toggle word wrap"
+                  className={cn(
+                    "flex items-center justify-center rounded p-1.5",
+                    "border transition-colors",
+                    wordWrap
+                      ? "border-border-primary bg-bg-tertiary text-text-primary"
+                      : "border-border-primary bg-bg-secondary text-text-tertiary hover:bg-bg-hover hover:text-text-secondary"
+                  )}
+                  onClick={() => setWordWrap(!wordWrap)}
+                  type="button"
+                >
+                  <WrapText className="h-4 w-4" />
+                </button>
+              </Trigger>
+              <Portal>
+                <Content
+                  className={cn(
+                    "z-50 rounded px-2 py-1 text-xs",
+                    "bg-bg-tertiary text-text-primary",
+                    "border border-panel-border shadow-lg",
+                    "fade-in-0 zoom-in-95 animate-in duration-100"
+                  )}
+                  sideOffset={5}
+                >
+                  {wordWrap ? "Word wrap on" : "Word wrap off"}
+                </Content>
+              </Portal>
+            </Root>
           </div>
-          <button
-            className={cn(
-              "rounded px-2.5 py-0.5 font-medium text-xs",
-              "border transition-colors",
-              wordWrap
-                ? "border-border-primary bg-bg-tertiary text-text-primary"
-                : "border-border-primary bg-bg-secondary text-text-tertiary hover:bg-bg-hover hover:text-text-secondary"
-            )}
-            onClick={() => setWordWrap(!wordWrap)}
-            type="button"
-          >
-            Wrap
-          </button>
-        </div>
+        </Provider>
       </div>
 
       <div className="flex-1 overflow-auto">

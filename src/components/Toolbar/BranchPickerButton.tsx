@@ -1,4 +1,3 @@
-import { CheckIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import {
   Content,
   Item,
@@ -7,6 +6,7 @@ import {
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
 import { invoke } from "@tauri-apps/api/core";
+import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore, useSelectedRepo } from "../../store";
@@ -111,7 +111,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
           type="button"
         >
           <span>{currentBranch?.name ?? "Select branch"}</span>
-          <ChevronDownIcon className="h-4 w-4 text-text-secondary" />
+          <ChevronDown className="h-4 w-4 text-text-secondary" />
         </button>
       </Trigger>
 
@@ -158,7 +158,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
             >
               <span className="flex h-4 w-4 items-center justify-center">
                 {branch.is_current && (
-                  <CheckIcon className="h-4 w-4 text-accent-primary" />
+                  <Check className="h-4 w-4 text-accent-primary" />
                 )}
               </span>
               <span className="flex-1 truncate">{branch.name}</span>
