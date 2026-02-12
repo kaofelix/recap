@@ -1,5 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { useIsFocused } from "../../context/FocusContext";
+import { useCommand } from "../../hooks/useCommand";
 import { useCommits } from "../../hooks/useCommits";
 import { useWorkingChanges } from "../../hooks/useWorkingChanges";
 import { cn } from "../../lib/utils";
@@ -55,6 +57,8 @@ export function Sidebar({ className }: SidebarProps) {
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;
   const error = viewMode === "history" ? commitsError : changesError;
 
+  const isFocused = useIsFocused();
+
   // Auto-select first commit when selected commit doesn't exist in the list
   useEffect(() => {
     if (viewMode !== "history" || isLoadingCommits || commitsError) {
@@ -80,6 +84,69 @@ export function Sidebar({ className }: SidebarProps) {
     commitsError,
   ]);
 
+  // Keyboard navigation handlers
+  const handleSelectNext = useCallback(() => {
+    if (viewMode === "history") {
+      const currentIndex = commits.findIndex((c) => c.id === selectedCommitId);
+      if (currentIndex < commits.length - 1) {
+        selectCommit(commits[currentIndex + 1].id);
+      }
+    } else {
+      const currentIndex = changes.findIndex(
+        (f) => f.path === selectedFilePath
+      );
+      const nextIndex =
+        currentIndex < changes.length - 1 ? currentIndex + 1 : 0;
+      if (changes[nextIndex]) {
+        selectFile(changes[nextIndex].path);
+      }
+    }
+  }, [
+    viewMode,
+    commits,
+    selectedCommitId,
+    selectCommit,
+    changes,
+    selectedFilePath,
+    selectFile,
+  ]);
+
+  const handleSelectPrev = useCallback(() => {
+    if (viewMode === "history") {
+      const currentIndex = commits.findIndex((c) => c.id === selectedCommitId);
+      if (currentIndex > 0) {
+        selectCommit(commits[currentIndex - 1].id);
+      }
+    } else {
+      const currentIndex = changes.findIndex(
+        (f) => f.path === selectedFilePath
+      );
+      const prevIndex =
+        currentIndex > 0 ? currentIndex - 1 : changes.length - 1;
+      if (changes[prevIndex]) {
+        selectFile(changes[prevIndex].path);
+      }
+    }
+  }, [
+    viewMode,
+    commits,
+    selectedCommitId,
+    selectCommit,
+    changes,
+    selectedFilePath,
+    selectFile,
+  ]);
+
+  const handleActivate = useCallback(() => {
+    // In history mode, selecting a commit already shows its files
+    // In changes mode, selecting a file already shows its diff
+    // This is a no-op for now but could trigger additional actions
+  }, []);
+
+  useCommand("navigation.selectNext", handleSelectNext);
+  useCommand("navigation.selectPrev", handleSelectPrev);
+  useCommand("navigation.activate", handleActivate);
+
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       {/* Header with view mode toggle */}
@@ -87,7 +154,8 @@ export function Sidebar({ className }: SidebarProps) {
         className={cn(
           "flex h-10 items-center px-2",
           "border-panel-border border-b",
-          "bg-panel-header-bg"
+          "bg-panel-header-bg",
+          isFocused && "border-l-2 border-l-accent-primary"
         )}
       >
         <div className="flex gap-1">

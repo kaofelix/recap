@@ -9,6 +9,7 @@ import { Rows3, SquareSplitHorizontal, WrapText } from "lucide-react";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
+import { useIsFocused } from "../../context/FocusContext";
 import { useFileContents } from "../../hooks/useFileContents";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
@@ -187,6 +188,7 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedCommitId = useSelectedCommitId();
   const selectedFilePath = useSelectedFilePath();
   const viewMode = useViewMode();
+  const isFocused = useIsFocused();
 
   // In history mode, use the selected commit. In changes mode, use null (working directory).
   const commitId = viewMode === "history" ? selectedCommitId : null;
@@ -254,7 +256,8 @@ export function DiffView({ className }: DiffViewProps) {
         className={cn(
           "flex h-10 items-center justify-between gap-2 px-3",
           "border-panel-border border-b",
-          "bg-panel-header-bg"
+          "bg-panel-header-bg",
+          isFocused && "border-l-2 border-l-accent-primary"
         )}
       >
         <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">

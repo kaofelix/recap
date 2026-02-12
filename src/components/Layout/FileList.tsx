@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useIsFocused } from "../../context/FocusContext";
+import { useCommand } from "../../hooks/useCommand";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -146,6 +148,30 @@ export function FileList({ className }: FileListProps) {
   const selectedFilePath = useSelectedFilePath();
   const selectFile = useAppStore((state) => state.selectFile);
   const { files, isLoading, error } = useCommitFiles();
+  const isFocused = useIsFocused();
+
+  // Keyboard navigation handlers
+  const handleSelectNext = useCallback(() => {
+    const currentIndex = files.findIndex((f) => f.path === selectedFilePath);
+    if (currentIndex < files.length - 1) {
+      selectFile(files[currentIndex + 1].path);
+    }
+  }, [files, selectedFilePath, selectFile]);
+
+  const handleSelectPrev = useCallback(() => {
+    const currentIndex = files.findIndex((f) => f.path === selectedFilePath);
+    if (currentIndex > 0) {
+      selectFile(files[currentIndex - 1].path);
+    }
+  }, [files, selectedFilePath, selectFile]);
+
+  const handleActivate = useCallback(() => {
+    // File is already selected, nothing extra to do
+  }, []);
+
+  useCommand("navigation.selectNext", handleSelectNext);
+  useCommand("navigation.selectPrev", handleSelectPrev);
+  useCommand("navigation.activate", handleActivate);
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -153,7 +179,8 @@ export function FileList({ className }: FileListProps) {
         className={cn(
           "flex h-10 items-center gap-2 px-3",
           "border-panel-border border-b",
-          "bg-panel-header-bg"
+          "bg-panel-header-bg",
+          isFocused && "border-l-2 border-l-accent-primary"
         )}
       >
         <h2 className="shrink-0 font-semibold text-sm text-text-primary">

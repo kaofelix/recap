@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { FocusRegion } from "../types/focus";
 import type { Repository } from "../types/repository";
 
 export type ViewMode = "history" | "changes";
@@ -10,12 +11,14 @@ export interface AppState {
   selectedCommitId: string | null;
   selectedFilePath: string | null;
   viewMode: ViewMode;
+  focusedRegion: FocusRegion | null;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
   selectCommit: (id: string | null) => void;
   selectFile: (path: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
+  setFocusedRegion: (region: FocusRegion | null) => void;
   clearRepos: () => void;
 }
 
@@ -44,6 +47,7 @@ export const useAppStore = create<AppState>()(
       selectedCommitId: null,
       selectedFilePath: null,
       viewMode: "history" as ViewMode,
+      focusedRegion: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -113,6 +117,10 @@ export const useAppStore = create<AppState>()(
         set({ viewMode: mode, selectedFilePath: null });
       },
 
+      setFocusedRegion: (region: FocusRegion | null) => {
+        set({ focusedRegion: region });
+      },
+
       clearRepos: () => {
         set({
           repos: [],
@@ -141,3 +149,5 @@ export const useSelectedCommitId = () =>
 export const useSelectedFilePath = () =>
   useAppStore((state) => state.selectedFilePath);
 export const useViewMode = () => useAppStore((state) => state.viewMode);
+export const useFocusedRegion = () =>
+  useAppStore((state) => state.focusedRegion);

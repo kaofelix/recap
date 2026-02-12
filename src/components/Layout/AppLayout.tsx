@@ -4,8 +4,17 @@ import {
   Separator,
   useDefaultLayout,
 } from "react-resizable-panels";
+import { FocusProvider } from "../../context/FocusContext";
+import { useGlobalCommand } from "../../hooks/useGlobalCommand";
+import { useKeyboardHandler } from "../../hooks/useKeyboardHandler";
+import { defaultKeymap } from "../../keymaps/defaults";
 import { cn } from "../../lib/utils";
-import { useViewMode } from "../../store/appStore";
+import {
+  useAppStore,
+  useFocusedRegion,
+  useViewMode,
+} from "../../store/appStore";
+import type { FocusRegion } from "../../types/focus";
 import { DiffView } from "./DiffView";
 import { FileList } from "./FileList";
 import { Sidebar } from "./Sidebar";
@@ -24,8 +33,21 @@ export interface AppLayoutProps {
   className?: string;
 }
 
+/**
+ * Get the list of visible panels based on view mode.
+ */
+function getVisiblePanels(viewMode: "history" | "changes"): FocusRegion[] {
+  if (viewMode === "history") {
+    return ["sidebar", "files", "diff"];
+  }
+  return ["sidebar", "diff"];
+}
+
 export function AppLayout({ className }: AppLayoutProps) {
   const viewMode = useViewMode();
+  const focusedRegion = useFocusedRegion();
+  const setFocusedRegion = useAppStore((s) => s.setFocusedRegion);
+
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
     panelIds: [...PANEL_IDS],
@@ -34,6 +56,29 @@ export function AppLayout({ className }: AppLayoutProps) {
 
   // In changes mode, we hide the file list panel since the sidebar shows files directly
   const showFileList = viewMode === "history";
+
+  // Set up keyboard handler
+  useKeyboardHandler(defaultKeymap);
+
+  // Panel navigation commands
+  const visiblePanels = getVisiblePanels(viewMode);
+
+  useGlobalCommand("navigation.focusNextPanel", () => {
+    const currentIndex = focusedRegion
+      ? visiblePanels.indexOf(focusedRegion)
+      : -1;
+    const nextIndex = (currentIndex + 1) % visiblePanels.length;
+    setFocusedRegion(visiblePanels[nextIndex]);
+  });
+
+  useGlobalCommand("navigation.focusPrevPanel", () => {
+    const currentIndex = focusedRegion
+      ? visiblePanels.indexOf(focusedRegion)
+      : 0;
+    const prevIndex =
+      (currentIndex - 1 + visiblePanels.length) % visiblePanels.length;
+    setFocusedRegion(visiblePanels[prevIndex]);
+  });
 
   return (
     <div
@@ -60,7 +105,9 @@ export function AppLayout({ className }: AppLayoutProps) {
           maxSize="35%"
           minSize="15%"
         >
-          <Sidebar className="h-full" />
+          <FocusProvider region="sidebar">
+            <Sidebar className="h-full" />
+          </FocusProvider>
         </Panel>
 
         <Separator
@@ -83,7 +130,9 @@ export function AppLayout({ className }: AppLayoutProps) {
               maxSize="40%"
               minSize="15%"
             >
-              <FileList className="h-full" />
+              <FocusProvider region="files">
+                <FileList className="h-full" />
+              </FocusProvider>
             </Panel>
 
             <Separator
@@ -103,7 +152,9 @@ export function AppLayout({ className }: AppLayoutProps) {
           id="diff-view"
           minSize="30%"
         >
-          <DiffView className="h-full" />
+          <FocusProvider region="diff">
+            <DiffView className="h-full" />
+          </FocusProvider>
         </Panel>
       </Group>
     </div>
