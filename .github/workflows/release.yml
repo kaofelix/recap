@@ -20,6 +20,7 @@ jobs:
             args: --target x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
+    environment: Default
 
     steps:
       - name: Checkout repository

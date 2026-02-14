@@ -96,7 +96,11 @@ describe("useKeyboardHandler", () => {
     );
 
     const input = document.querySelector("input");
-    input?.focus();
+    expect(input).not.toBeNull();
+    if (!input) {
+      throw new Error("Expected input to exist");
+    }
+    input.focus();
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
 
@@ -116,7 +120,11 @@ describe("useKeyboardHandler", () => {
     );
 
     const textarea = document.querySelector("textarea");
-    textarea?.focus();
+    expect(textarea).not.toBeNull();
+    if (!textarea) {
+      throw new Error("Expected textarea to exist");
+    }
+    textarea.focus();
 
     fireEvent.keyDown(textarea, { key: "ArrowDown" });
 
