@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
+import { commandEmitter } from "../../commands";
 import { useAppStore } from "../../store/appStore";
 import { AppLayout } from "./AppLayout";
 
@@ -81,6 +82,18 @@ describe("AppLayout", () => {
     // With our mock, separators have data-testid="panel-separator"
     const separators = screen.getAllByTestId("panel-separator");
     expect(separators.length).toBe(2);
+  });
+
+  it("advances to the next panel on consecutive navigation commands", () => {
+    useAppStore.setState({ focusedRegion: null, viewMode: "history" });
+    render(<AppLayout />);
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+
+    expect(useAppStore.getState().focusedRegion).toBe("files");
   });
 
   it("applies custom className", () => {

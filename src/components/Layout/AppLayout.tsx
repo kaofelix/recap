@@ -9,12 +9,7 @@ import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useKeyboardHandler } from "../../hooks/useKeyboardHandler";
 import { defaultKeymap } from "../../keymaps/defaults";
 import { cn } from "../../lib/utils";
-import {
-  useAppStore,
-  useFocusedRegion,
-  useViewMode,
-} from "../../store/appStore";
-import type { FocusRegion } from "../../types/focus";
+import { useAppStore, useViewMode } from "../../store/appStore";
 import { DiffView } from "./DiffView";
 import { FileList } from "./FileList";
 import { Sidebar } from "./Sidebar";
@@ -33,20 +28,10 @@ export interface AppLayoutProps {
   className?: string;
 }
 
-/**
- * Get the list of visible panels based on view mode.
- */
-function getVisiblePanels(viewMode: "history" | "changes"): FocusRegion[] {
-  if (viewMode === "history") {
-    return ["sidebar", "files", "diff"];
-  }
-  return ["sidebar", "diff"];
-}
-
 export function AppLayout({ className }: AppLayoutProps) {
   const viewMode = useViewMode();
-  const focusedRegion = useFocusedRegion();
-  const setFocusedRegion = useAppStore((s) => s.setFocusedRegion);
+  const focusNextPanel = useAppStore((s) => s.focusNextPanel);
+  const focusPrevPanel = useAppStore((s) => s.focusPrevPanel);
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
@@ -61,24 +46,8 @@ export function AppLayout({ className }: AppLayoutProps) {
   useKeyboardHandler(defaultKeymap);
 
   // Panel navigation commands
-  const visiblePanels = getVisiblePanels(viewMode);
-
-  useGlobalCommand("navigation.focusNextPanel", () => {
-    const currentIndex = focusedRegion
-      ? visiblePanels.indexOf(focusedRegion)
-      : -1;
-    const nextIndex = (currentIndex + 1) % visiblePanels.length;
-    setFocusedRegion(visiblePanels[nextIndex]);
-  });
-
-  useGlobalCommand("navigation.focusPrevPanel", () => {
-    const currentIndex = focusedRegion
-      ? visiblePanels.indexOf(focusedRegion)
-      : 0;
-    const prevIndex =
-      (currentIndex - 1 + visiblePanels.length) % visiblePanels.length;
-    setFocusedRegion(visiblePanels[prevIndex]);
-  });
+  useGlobalCommand("navigation.focusNextPanel", focusNextPanel);
+  useGlobalCommand("navigation.focusPrevPanel", focusPrevPanel);
 
   return (
     <div

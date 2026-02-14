@@ -19,6 +19,8 @@ export interface AppState {
   selectFile: (path: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
+  focusNextPanel: () => void;
+  focusPrevPanel: () => void;
   clearRepos: () => void;
 }
 
@@ -37,6 +39,14 @@ function extractRepoName(path: string): string {
  */
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function getVisiblePanels(viewMode: ViewMode): FocusRegion[] {
+  if (viewMode === "history") {
+    return ["sidebar", "files", "diff"];
+  }
+
+  return ["sidebar", "diff"];
 }
 
 export const useAppStore = create<AppState>()(
@@ -113,12 +123,51 @@ export const useAppStore = create<AppState>()(
       },
 
       setViewMode: (mode: ViewMode) => {
-        // Clear file selection when switching modes
-        set({ viewMode: mode, selectedFilePath: null });
+        set((state) => {
+          const visiblePanels = getVisiblePanels(mode);
+          const focusedRegion =
+            state.focusedRegion === null ||
+            visiblePanels.includes(state.focusedRegion)
+              ? state.focusedRegion
+              : visiblePanels[0];
+
+          return {
+            viewMode: mode,
+            selectedFilePath: null,
+            focusedRegion,
+          };
+        });
       },
 
       setFocusedRegion: (region: FocusRegion | null) => {
         set({ focusedRegion: region });
+      },
+
+      focusNextPanel: () => {
+        set((state) => {
+          const visiblePanels = getVisiblePanels(state.viewMode);
+          const rawIndex = state.focusedRegion
+            ? visiblePanels.indexOf(state.focusedRegion)
+            : -1;
+          const currentIndex = rawIndex >= 0 ? rawIndex : -1;
+          const nextIndex = (currentIndex + 1) % visiblePanels.length;
+
+          return { focusedRegion: visiblePanels[nextIndex] };
+        });
+      },
+
+      focusPrevPanel: () => {
+        set((state) => {
+          const visiblePanels = getVisiblePanels(state.viewMode);
+          const rawIndex = state.focusedRegion
+            ? visiblePanels.indexOf(state.focusedRegion)
+            : 0;
+          const currentIndex = rawIndex >= 0 ? rawIndex : 0;
+          const prevIndex =
+            (currentIndex - 1 + visiblePanels.length) % visiblePanels.length;
+
+          return { focusedRegion: visiblePanels[prevIndex] };
+        });
       },
 
       clearRepos: () => {

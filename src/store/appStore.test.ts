@@ -16,6 +16,7 @@ describe("appStore", () => {
     act(() => {
       useAppStore.getState().clearRepos();
       useAppStore.getState().setViewMode("history");
+      useAppStore.getState().setFocusedRegion(null);
     });
   });
 
@@ -493,6 +494,68 @@ describe("appStore", () => {
     });
   });
 
+  describe("panel focus navigation", () => {
+    const setFocusState = (
+      viewMode: "history" | "changes",
+      focusedRegion: "sidebar" | "files" | "diff" | null = null
+    ) => {
+      act(() => {
+        const store = useAppStore.getState();
+        store.setViewMode(viewMode);
+        store.setFocusedRegion(focusedRegion);
+      });
+    };
+
+    const focusNext = (times = 1) => {
+      act(() => {
+        const store = useAppStore.getState();
+        for (let i = 0; i < times; i++) {
+          store.focusNextPanel();
+        }
+      });
+    };
+
+    const focusPrev = () => {
+      act(() => {
+        useAppStore.getState().focusPrevPanel();
+      });
+    };
+
+    it("focusNextPanel should cycle visible panels in history mode", () => {
+      setFocusState("history");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("files");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("diff");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+    });
+
+    it("focusPrevPanel should wrap to last visible panel when no focus", () => {
+      setFocusState("history");
+
+      focusPrev();
+
+      expect(useAppStore.getState().focusedRegion).toBe("diff");
+    });
+
+    it("focusNextPanel should skip files panel in changes mode", () => {
+      setFocusState("changes");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("diff");
+    });
+  });
+
   describe("setViewMode", () => {
     it("should set view mode to changes", () => {
       const { result } = renderHook(() => useAppStore());
@@ -532,6 +595,29 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedFilePath).toBeNull();
+    });
+
+    it("should normalize focused region if current panel is hidden in next mode", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setViewMode("history");
+        result.current.setFocusedRegion("files");
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.focusedRegion).toBe("sidebar");
+    });
+
+    it("should preserve focused region if still visible in next mode", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setFocusedRegion("diff");
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.focusedRegion).toBe("diff");
     });
 
     it("should default to history mode", () => {
