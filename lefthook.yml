@@ -10,3 +10,7 @@ pre-commit:
         - "**/*.jsonc"
         - "**/*.css"
       stage_fixed: true
+
+pre-push:
+  jobs:
+    - run: ./scripts/check-release-version.sh
