@@ -39,6 +39,11 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
+      - name: Validate release versions
+        run: bun run check:release-version
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
       - name: Build, sign, notarize and release
         uses: tauri-apps/tauri-action@v0
         env:

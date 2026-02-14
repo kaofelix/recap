@@ -1,7 +1,7 @@
 {
   "name": "recap",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
     "icon": "./scripts/build-icon.sh",
+    "check:release-version": "bun scripts/check-release-version.ts",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "prepare": "lefthook install"
