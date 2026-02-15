@@ -40,6 +40,7 @@ export function useKeyboardHandler(keymap: KeyBinding[]): void {
       const command = keymapLookup.get(keyString);
 
       if (command) {
+        event.preventDefault();
         commandEmitter.emit(command);
       }
     };

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useIsFocused } from "../../context/FocusContext";
-import { useCommand } from "../../hooks/useCommand";
+import { useNavigableList } from "../../hooks/useNavigableList";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -65,7 +65,6 @@ function useCommitFiles(): UseCommitFilesResult {
           return;
         }
         setError(err instanceof Error ? err.message : String(err));
-        setFiles([]);
       })
       .finally(() => {
         if (cancelled) {
@@ -88,14 +87,17 @@ function FileListContent({
   error,
   files,
   selectedFilePath,
-  onSelectFile,
+  getItemProps,
 }: {
   hasCommit: boolean;
   isLoading: boolean;
   error: string | null;
   files: ChangedFile[];
   selectedFilePath: string | null;
-  onSelectFile: (path: string) => void;
+  getItemProps: (id: string) => {
+    "data-item-id": string;
+    onClick: () => void;
+  };
 }) {
   if (!hasCommit) {
     return (
@@ -105,7 +107,7 @@ function FileListContent({
     );
   }
 
-  if (isLoading) {
+  if (isLoading && files.length === 0) {
     return (
       <div className="py-8 text-center text-sm text-text-secondary">
         Loading files...
@@ -113,7 +115,7 @@ function FileListContent({
     );
   }
 
-  if (error) {
+  if (error && files.length === 0) {
     return (
       <div className="py-8 text-center text-red-500 text-sm">
         Error: {error}
@@ -131,14 +133,19 @@ function FileListContent({
 
   return (
     <div className="space-y-0.5">
-      {files.map((file) => (
-        <FileListItem
-          file={file}
-          isSelected={selectedFilePath === file.path}
-          key={file.path}
-          onClick={() => onSelectFile(file.path)}
-        />
-      ))}
+      {files.map((file) => {
+        const itemProps = getItemProps(file.path);
+
+        return (
+          <FileListItem
+            file={file}
+            isSelected={selectedFilePath === file.path}
+            itemId={itemProps["data-item-id"]}
+            key={file.path}
+            onClick={itemProps.onClick}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -150,28 +157,14 @@ export function FileList({ className }: FileListProps) {
   const { files, isLoading, error } = useCommitFiles();
   const isFocused = useIsFocused();
 
-  // Keyboard navigation handlers
-  const handleSelectNext = useCallback(() => {
-    const currentIndex = files.findIndex((f) => f.path === selectedFilePath);
-    if (currentIndex < files.length - 1) {
-      selectFile(files[currentIndex + 1].path);
-    }
-  }, [files, selectedFilePath, selectFile]);
+  const itemIds = files.map((file) => file.path);
+  const effectiveSelectedFilePath = selectedFilePath ?? files[0]?.path ?? null;
 
-  const handleSelectPrev = useCallback(() => {
-    const currentIndex = files.findIndex((f) => f.path === selectedFilePath);
-    if (currentIndex > 0) {
-      selectFile(files[currentIndex - 1].path);
-    }
-  }, [files, selectedFilePath, selectFile]);
-
-  const handleActivate = useCallback(() => {
-    // File is already selected, nothing extra to do
-  }, []);
-
-  useCommand("navigation.selectNext", handleSelectNext);
-  useCommand("navigation.selectPrev", handleSelectPrev);
-  useCommand("navigation.activate", handleActivate);
+  const { containerProps, getItemProps } = useNavigableList({
+    itemIds,
+    onSelect: selectFile,
+    selectedId: effectiveSelectedFilePath,
+  });
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -193,14 +186,14 @@ export function FileList({ className }: FileListProps) {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto p-2">
+      <div {...containerProps} className="flex-1 overflow-auto p-2">
         <FileListContent
           error={error}
           files={files}
+          getItemProps={getItemProps}
           hasCommit={!!selectedCommitId}
           isLoading={isLoading}
-          onSelectFile={selectFile}
-          selectedFilePath={selectedFilePath}
+          selectedFilePath={effectiveSelectedFilePath}
         />
       </div>
     </div>

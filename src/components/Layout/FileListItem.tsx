@@ -12,6 +12,7 @@ export interface FileListItemProps {
   file: ChangedFile;
   isSelected: boolean;
   onClick: () => void;
+  itemId?: string;
 }
 
 /**
@@ -86,7 +87,12 @@ function formatStatsTooltip(additions: number, deletions: number): string {
   return parts.length > 0 ? `  ${parts.join(" ")}` : "";
 }
 
-export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
+export function FileListItem({
+  file,
+  isSelected,
+  onClick,
+  itemId,
+}: FileListItemProps) {
   const { dir, filename } = splitPath(file.path);
   const tooltipText = `${file.path}${formatStatsTooltip(file.additions, file.deletions)}`;
 
@@ -97,6 +103,7 @@ export function FileListItem({ file, isSelected, onClick }: FileListItemProps) {
         "hover:bg-bg-hover",
         isSelected && "bg-accent-muted"
       )}
+      data-item-id={itemId}
       onClick={onClick}
       type="button"
     >

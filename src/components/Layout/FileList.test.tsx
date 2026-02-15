@@ -268,6 +268,61 @@ describe("FileList", () => {
     });
   });
 
+  it("keeps previous file list visible while loading next commit files", async () => {
+    let resolveSecond: ((value: unknown) => void) | null = null;
+
+    mockInvoke
+      .mockResolvedValueOnce([
+        {
+          path: "src/first.ts",
+          status: "Modified",
+          additions: 5,
+          deletions: 2,
+          old_path: null,
+        },
+      ])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          })
+      );
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit1",
+    });
+
+    const { rerender } = render(<FileList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("first.ts")).toBeInTheDocument();
+    });
+
+    useAppStore.setState({ selectedCommitId: "commit2" });
+    rerender(<FileList />);
+
+    expect(screen.getByText("first.ts")).toBeInTheDocument();
+    expect(screen.queryByText("Loading files...")).not.toBeInTheDocument();
+
+    resolveSecond?.([
+      {
+        path: "src/second.ts",
+        status: "Added",
+        additions: 10,
+        deletions: 0,
+        old_path: null,
+      },
+    ]);
+
+    await waitFor(() => {
+      expect(screen.getByText("second.ts")).toBeInTheDocument();
+    });
+  });
+
   it("auto-selects first file when files are loaded", async () => {
     const mockFiles = [
       {

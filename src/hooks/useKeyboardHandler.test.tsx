@@ -33,6 +33,25 @@ describe("useKeyboardHandler", () => {
     expect(emitSpy).toHaveBeenCalledWith("navigation.selectNext");
   });
 
+  it("prevents default browser behavior when matching key is pressed", () => {
+    const keymap: KeyBinding[] = [
+      { key: "ArrowDown", command: "navigation.selectNext" },
+    ];
+
+    render(<KeyboardHandlerTest keymap={keymap} />);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+    document.dispatchEvent(event);
+
+    expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("emits command for key with modifier", () => {
     const keymap: KeyBinding[] = [
       { key: "ctrl+n", command: "navigation.selectNext" },
@@ -55,6 +74,25 @@ describe("useKeyboardHandler", () => {
     fireEvent.keyDown(document, { key: "ArrowUp" });
 
     expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not prevent default for non-matching keys", () => {
+    const keymap: KeyBinding[] = [
+      { key: "ArrowDown", command: "navigation.selectNext" },
+    ];
+
+    render(<KeyboardHandlerTest keymap={keymap} />);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowUp",
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+    document.dispatchEvent(event);
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
   });
 
   it("handles multiple keybindings", () => {

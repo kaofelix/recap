@@ -161,20 +161,20 @@ function DiffContent({
   if (!hasFile) {
     return <DiffPlaceholder message="Select a file to view diff" />;
   }
-  if (isLoading) {
+  if (!hasData && isLoading) {
     return <DiffPlaceholder message="Loading diff..." />;
   }
-  if (error) {
+  if (!hasData && error) {
     return <DiffError message={error} />;
+  }
+  if (!hasData) {
+    return null;
   }
   if (isBinary) {
     return <DiffPlaceholder message="Binary file cannot be displayed" />;
   }
-  if (hasData && !hasChanges) {
+  if (!hasChanges) {
     return <DiffPlaceholder message="No changes" />;
-  }
-  if (!hasData) {
-    return null;
   }
 
   return (

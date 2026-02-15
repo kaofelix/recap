@@ -199,6 +199,58 @@ describe("DiffView", () => {
     });
   });
 
+  it("keeps previous diff visible while loading next file", async () => {
+    let resolveSecond: ((value: unknown) => void) | null = null;
+
+    mockInvoke
+      .mockResolvedValueOnce({
+        old_content: "const a = 1;",
+        new_content: "const a = 2;",
+        is_binary: false,
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          })
+      );
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/first.ts",
+    });
+
+    const { rerender } = render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    useAppStore.setState({ selectedFilePath: "src/second.ts" });
+    rerender(<DiffView />);
+
+    expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    expect(screen.queryByText("Loading diff...")).not.toBeInTheDocument();
+
+    resolveSecond?.({
+      old_content: "const b = 1;",
+      new_content: "const b = 2;",
+      is_binary: false,
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_file_contents", {
+        repoPath: "/test/repo",
+        commitId: "abc123",
+        filePath: "src/second.ts",
+      });
+    });
+  });
+
   it("toggles between split and unified view", async () => {
     const mockContents = {
       old_content: "old content",

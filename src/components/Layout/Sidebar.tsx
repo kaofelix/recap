@@ -1,8 +1,8 @@
 import { formatDistanceToNow } from "date-fns";
 import { useCallback, useEffect } from "react";
 import { useIsFocused } from "../../context/FocusContext";
-import { useCommand } from "../../hooks/useCommand";
 import { useCommits } from "../../hooks/useCommits";
+import { useNavigableList } from "../../hooks/useNavigableList";
 import { useWorkingChanges } from "../../hooks/useWorkingChanges";
 import { cn } from "../../lib/utils";
 import {
@@ -84,68 +84,35 @@ export function Sidebar({ className }: SidebarProps) {
     commitsError,
   ]);
 
-  // Keyboard navigation handlers
-  const handleSelectNext = useCallback(() => {
-    if (viewMode === "history") {
-      const currentIndex = commits.findIndex((c) => c.id === selectedCommitId);
-      if (currentIndex < commits.length - 1) {
-        selectCommit(commits[currentIndex + 1].id);
+  const handleSelectItem = useCallback(
+    (id: string) => {
+      if (viewMode === "history") {
+        selectCommit(id);
+      } else {
+        selectFile(id);
       }
-    } else {
-      const currentIndex = changes.findIndex(
-        (f) => f.path === selectedFilePath
-      );
-      const nextIndex =
-        currentIndex < changes.length - 1 ? currentIndex + 1 : 0;
-      if (changes[nextIndex]) {
-        selectFile(changes[nextIndex].path);
-      }
-    }
-  }, [
-    viewMode,
-    commits,
-    selectedCommitId,
-    selectCommit,
-    changes,
-    selectedFilePath,
-    selectFile,
-  ]);
+    },
+    [viewMode, selectCommit, selectFile]
+  );
 
-  const handleSelectPrev = useCallback(() => {
-    if (viewMode === "history") {
-      const currentIndex = commits.findIndex((c) => c.id === selectedCommitId);
-      if (currentIndex > 0) {
-        selectCommit(commits[currentIndex - 1].id);
-      }
-    } else {
-      const currentIndex = changes.findIndex(
-        (f) => f.path === selectedFilePath
-      );
-      const prevIndex =
-        currentIndex > 0 ? currentIndex - 1 : changes.length - 1;
-      if (changes[prevIndex]) {
-        selectFile(changes[prevIndex].path);
-      }
-    }
-  }, [
-    viewMode,
-    commits,
-    selectedCommitId,
-    selectCommit,
-    changes,
-    selectedFilePath,
-    selectFile,
-  ]);
+  const itemIds =
+    viewMode === "history"
+      ? commits.map((commit) => commit.id)
+      : changes.map((file) => file.path);
 
-  const handleActivate = useCallback(() => {
-    // In history mode, selecting a commit already shows its files
-    // In changes mode, selecting a file already shows its diff
-    // This is a no-op for now but could trigger additional actions
-  }, []);
+  const effectiveSelectedCommitId = selectedCommitId ?? commits[0]?.id ?? null;
+  const effectiveSelectedFilePath =
+    selectedFilePath ?? changes[0]?.path ?? null;
+  const selectedId =
+    viewMode === "history"
+      ? effectiveSelectedCommitId
+      : effectiveSelectedFilePath;
 
-  useCommand("navigation.selectNext", handleSelectNext);
-  useCommand("navigation.selectPrev", handleSelectPrev);
-  useCommand("navigation.activate", handleActivate);
+  const { containerProps, getItemProps } = useNavigableList({
+    itemIds,
+    onSelect: handleSelectItem,
+    selectedId,
+  });
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -187,7 +154,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-auto p-2">
+      <div {...containerProps} className="flex-1 overflow-auto p-2">
         {!selectedRepo && (
           <div className="py-8 text-center text-sm text-text-secondary">
             Select a repository to view{" "}
@@ -228,11 +195,11 @@ export function Sidebar({ className }: SidebarProps) {
                   className={cn(
                     "w-full cursor-pointer rounded p-2 text-left",
                     "hover:bg-bg-hover",
-                    selectedCommitId === commit.id && "bg-accent-muted"
+                    effectiveSelectedCommitId === commit.id && "bg-accent-muted"
                   )}
                   key={commit.id}
-                  onClick={() => selectCommit(commit.id)}
                   type="button"
+                  {...getItemProps(commit.id)}
                 >
                   <div className="truncate font-medium text-sm text-text-primary">
                     {commit.message}
@@ -262,14 +229,19 @@ export function Sidebar({ className }: SidebarProps) {
           !error &&
           changes.length > 0 && (
             <div className="space-y-0.5">
-              {changes.map((file) => (
-                <FileListItem
-                  file={file}
-                  isSelected={selectedFilePath === file.path}
-                  key={file.path}
-                  onClick={() => selectFile(file.path)}
-                />
-              ))}
+              {changes.map((file) => {
+                const itemProps = getItemProps(file.path);
+
+                return (
+                  <FileListItem
+                    file={file}
+                    isSelected={effectiveSelectedFilePath === file.path}
+                    itemId={itemProps["data-item-id"]}
+                    key={file.path}
+                    onClick={itemProps.onClick}
+                  />
+                );
+              })}
             </div>
           )}
       </div>

@@ -63,7 +63,6 @@ export function useFileContents(
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
-          setContents(null);
         }
       })
       .finally(() => {
