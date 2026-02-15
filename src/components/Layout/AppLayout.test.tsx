@@ -9,7 +9,7 @@ describe("AppLayout", () => {
     // Clear any stored panel layout
     localStorage.clear();
     // Reset store state
-    useAppStore.setState({ viewMode: "history" });
+    useAppStore.setState({ viewMode: "history", isDiffMaximized: false });
   });
 
   it("renders the toolbar", () => {
@@ -94,6 +94,30 @@ describe("AppLayout", () => {
     });
 
     expect(useAppStore.getState().focusedRegion).toBe("files");
+  });
+
+  it("collapses and restores side panels when diff view is maximized", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+    const fileListPanel = screen.getByTestId("panel-file-list");
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+    expect(fileListPanel).toHaveAttribute("data-collapsed", "false");
+
+    act(() => {
+      screen.getByRole("button", { name: "Maximize diff view" }).click();
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+    expect(fileListPanel).toHaveAttribute("data-collapsed", "true");
+
+    act(() => {
+      screen.getByRole("button", { name: "Restore panel layout" }).click();
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+    expect(fileListPanel).toHaveAttribute("data-collapsed", "false");
   });
 
   it("applies custom className", () => {

@@ -12,6 +12,7 @@ export interface AppState {
   selectedFilePath: string | null;
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
+  isDiffMaximized: boolean;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
@@ -19,6 +20,8 @@ export interface AppState {
   selectFile: (path: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
+  setDiffMaximized: (maximized: boolean) => void;
+  toggleDiffMaximized: () => void;
   focusNextPanel: () => void;
   focusPrevPanel: () => void;
   clearRepos: () => void;
@@ -58,6 +61,7 @@ export const useAppStore = create<AppState>()(
       selectedFilePath: null,
       viewMode: "history" as ViewMode,
       focusedRegion: null,
+      isDiffMaximized: false,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -135,12 +139,21 @@ export const useAppStore = create<AppState>()(
             viewMode: mode,
             selectedFilePath: null,
             focusedRegion,
+            isDiffMaximized: false,
           };
         });
       },
 
       setFocusedRegion: (region: FocusRegion | null) => {
         set({ focusedRegion: region });
+      },
+
+      setDiffMaximized: (maximized: boolean) => {
+        set({ isDiffMaximized: maximized });
+      },
+
+      toggleDiffMaximized: () => {
+        set((state) => ({ isDiffMaximized: !state.isDiffMaximized }));
       },
 
       focusNextPanel: () => {
@@ -176,6 +189,7 @@ export const useAppStore = create<AppState>()(
           selectedRepoId: null,
           selectedCommitId: null,
           selectedFilePath: null,
+          isDiffMaximized: false,
         });
       },
     }),
@@ -200,3 +214,5 @@ export const useSelectedFilePath = () =>
 export const useViewMode = () => useAppStore((state) => state.viewMode);
 export const useFocusedRegion = () =>
   useAppStore((state) => state.focusedRegion);
+export const useIsDiffMaximized = () =>
+  useAppStore((state) => state.isDiffMaximized);

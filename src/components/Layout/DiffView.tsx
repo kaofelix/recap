@@ -5,7 +5,13 @@ import {
   Root,
   Trigger,
 } from "@radix-ui/react-tooltip";
-import { Rows3, SquareSplitHorizontal, WrapText } from "lucide-react";
+import {
+  Maximize,
+  Minimize,
+  Rows3,
+  SquareSplitHorizontal,
+  WrapText,
+} from "lucide-react";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
@@ -14,6 +20,8 @@ import { useFileContents } from "../../hooks/useFileContents";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
+  useAppStore,
+  useIsDiffMaximized,
   useSelectedCommitId,
   useSelectedFilePath,
   useSelectedRepo,
@@ -189,6 +197,8 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedFilePath = useSelectedFilePath();
   const viewMode = useViewMode();
   const isFocused = useIsFocused();
+  const isDiffMaximized = useIsDiffMaximized();
+  const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
   // In history mode, use the selected commit. In changes mode, use null (working directory).
   const commitId = viewMode === "history" ? selectedCommitId : null;
@@ -254,16 +264,55 @@ export function DiffView({ className }: DiffViewProps) {
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
         className={cn(
-          "flex h-10 items-center justify-between gap-2 px-3",
+          "flex h-10 items-center justify-between gap-2 pr-3 pl-2",
           "border-panel-border border-b",
           "bg-panel-header-bg",
           isFocused && "border-l-2 border-l-accent-primary"
         )}
       >
-        <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
-          {selectedFilePath ?? "Diff"}
-        </h2>
         <Provider delayDuration={300}>
+          <Root>
+            <Trigger asChild>
+              <button
+                aria-label={
+                  isDiffMaximized
+                    ? "Restore panel layout"
+                    : "Maximize diff view"
+                }
+                className={cn(
+                  "mr-0.5 flex items-center justify-center rounded p-0.5",
+                  "text-text-tertiary transition-colors",
+                  "hover:bg-bg-hover hover:text-text-secondary"
+                )}
+                onClick={toggleDiffMaximized}
+                type="button"
+              >
+                {isDiffMaximized ? (
+                  <Minimize className="h-4 w-4" />
+                ) : (
+                  <Maximize className="h-4 w-4" />
+                )}
+              </button>
+            </Trigger>
+            <Portal>
+              <Content
+                className={cn(
+                  "z-50 rounded px-2 py-1 text-xs",
+                  "bg-bg-tertiary text-text-primary",
+                  "border border-panel-border shadow-lg",
+                  "fade-in-0 zoom-in-95 animate-in duration-100"
+                )}
+                sideOffset={5}
+              >
+                {isDiffMaximized ? "Restore layout" : "Maximize diff view"}
+              </Content>
+            </Portal>
+          </Root>
+
+          <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
+            {selectedFilePath ?? "Diff"}
+          </h2>
+
           <div className="flex shrink-0 items-center gap-3">
             <div className="flex overflow-hidden rounded border border-border-primary">
               <Root>

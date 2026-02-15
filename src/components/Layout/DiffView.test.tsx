@@ -21,6 +21,7 @@ describe("DiffView", () => {
       selectedRepoId: null,
       selectedCommitId: null,
       selectedFilePath: null,
+      isDiffMaximized: false,
     });
   });
 
@@ -30,6 +31,7 @@ describe("DiffView", () => {
       selectedRepoId: null,
       selectedCommitId: null,
       selectedFilePath: null,
+      isDiffMaximized: false,
     });
   });
 
@@ -37,6 +39,23 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     expect(screen.getByText("Select a file to view diff")).toBeInTheDocument();
+  });
+
+  it("toggles maximize state from toolbar button", () => {
+    render(<DiffView />);
+
+    const maximizeButton = screen.getByRole("button", {
+      name: "Maximize diff view",
+    });
+
+    expect(useAppStore.getState().isDiffMaximized).toBe(false);
+
+    fireEvent.click(maximizeButton);
+
+    expect(useAppStore.getState().isDiffMaximized).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Restore panel layout" })
+    ).toBeInTheDocument();
   });
 
   it("shows loading state while fetching diff", () => {

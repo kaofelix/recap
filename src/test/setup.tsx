@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 // Cleanup after each test
@@ -127,24 +128,63 @@ vi.mock("react-diff-viewer-continued", () => ({
 }));
 
 // Mock react-resizable-panels
-vi.mock("react-resizable-panels", () => ({
-  Group: ({
-    children,
-    className,
-  }: {
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <div className={className} data-testid="panel-group">
-      {children}
-    </div>
-  ),
-  Panel: ({ children, id }: { children: React.ReactNode; id?: string }) => (
-    <div data-testid={`panel-${id || "unknown"}`}>{children}</div>
-  ),
-  Separator: () => <div data-testid="panel-separator" />,
-  useDefaultLayout: () => ({
-    getDefaultLayout: () => [20, 25, 55],
-    onLayoutChange: vi.fn(),
-  }),
-}));
+vi.mock("react-resizable-panels", () => {
+  const Panel = forwardRef(
+    (
+      {
+        children,
+        id,
+        panelRef,
+      }: {
+        children: React.ReactNode;
+        id?: string;
+        panelRef?: React.Ref<{
+          collapse: () => void;
+          expand: () => void;
+          isCollapsed: () => boolean;
+        }>;
+      },
+      ref
+    ) => {
+      const [collapsed, setCollapsed] = useState(false);
+
+      const handle = {
+        collapse: () => setCollapsed(true),
+        expand: () => setCollapsed(false),
+        isCollapsed: () => collapsed,
+      };
+
+      useImperativeHandle(ref, () => handle);
+      useImperativeHandle(panelRef, () => handle);
+
+      return (
+        <div
+          data-collapsed={String(collapsed)}
+          data-testid={`panel-${id || "unknown"}`}
+        >
+          {children}
+        </div>
+      );
+    }
+  );
+
+  return {
+    Group: ({
+      children,
+      className,
+    }: {
+      children: React.ReactNode;
+      className?: string;
+    }) => (
+      <div className={className} data-testid="panel-group">
+        {children}
+      </div>
+    ),
+    Panel,
+    Separator: () => <div data-testid="panel-separator" />,
+    useDefaultLayout: () => ({
+      defaultLayout: [20, 25, 55],
+      onLayoutChanged: vi.fn(),
+    }),
+  };
+});

@@ -25,8 +25,10 @@ describe("AppErrorBoundary", () => {
       expect(tauriMocks.invoke).toHaveBeenCalledWith(
         "report_frontend_error",
         expect.objectContaining({
-          source: "react-error-boundary",
-          message: "Kaboom",
+          report: expect.objectContaining({
+            source: "react-error-boundary",
+            message: "Kaboom",
+          }),
         })
       );
     });

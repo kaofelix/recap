@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   useAppStore,
+  useIsDiffMaximized,
   useRepos,
   useSelectedCommitId,
   useSelectedFilePath,
@@ -17,6 +18,7 @@ describe("appStore", () => {
       useAppStore.getState().clearRepos();
       useAppStore.getState().setViewMode("history");
       useAppStore.getState().setFocusedRegion(null);
+      useAppStore.getState().setDiffMaximized(false);
     });
   });
 
@@ -556,6 +558,32 @@ describe("appStore", () => {
     });
   });
 
+  describe("diff maximize state", () => {
+    it("should default diff maximize state to false", () => {
+      const { result } = renderHook(() => useIsDiffMaximized());
+
+      expect(result.current).toBe(false);
+    });
+
+    it("should toggle diff maximize state", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      expect(result.current.isDiffMaximized).toBe(false);
+
+      act(() => {
+        result.current.toggleDiffMaximized();
+      });
+
+      expect(result.current.isDiffMaximized).toBe(true);
+
+      act(() => {
+        result.current.toggleDiffMaximized();
+      });
+
+      expect(result.current.isDiffMaximized).toBe(false);
+    });
+  });
+
   describe("setViewMode", () => {
     it("should set view mode to changes", () => {
       const { result } = renderHook(() => useAppStore());
@@ -595,6 +623,22 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedFilePath).toBeNull();
+    });
+
+    it("should reset diff maximize state when switching modes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setDiffMaximized(true);
+      });
+
+      expect(result.current.isDiffMaximized).toBe(true);
+
+      act(() => {
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.isDiffMaximized).toBe(false);
     });
 
     it("should normalize focused region if current panel is hidden in next mode", () => {

@@ -1,6 +1,8 @@
+import { useEffect, useRef } from "react";
 import {
   Group,
   Panel,
+  type PanelImperativeHandle,
   Separator,
   useDefaultLayout,
 } from "react-resizable-panels";
@@ -24,6 +26,92 @@ const layoutStorage = {
   setItem: (key: string, value: string) => localStorage.setItem(key, value),
 };
 
+function isPanelCollapsed(panel: PanelImperativeHandle | null) {
+  if (!panel) {
+    return false;
+  }
+
+  try {
+    return panel.isCollapsed();
+  } catch {
+    return false;
+  }
+}
+
+function collapsePanel(panel: PanelImperativeHandle | null) {
+  if (!panel) {
+    return;
+  }
+
+  try {
+    panel.collapse();
+  } catch {
+    // Panel may be temporarily unmounted while view mode switches.
+  }
+}
+
+function expandPanel(panel: PanelImperativeHandle | null) {
+  if (!panel) {
+    return;
+  }
+
+  try {
+    panel.expand();
+  } catch {
+    // Panel may be temporarily unmounted while view mode switches.
+  }
+}
+
+interface CollapsedPanelsSnapshot {
+  sidebar: boolean;
+  fileList: boolean;
+}
+
+function captureCollapsedPanels(
+  sidebar: PanelImperativeHandle,
+  fileList: PanelImperativeHandle | null,
+  showFileList: boolean
+): CollapsedPanelsSnapshot {
+  return {
+    sidebar: isPanelCollapsed(sidebar),
+    fileList: showFileList ? isPanelCollapsed(fileList) : false,
+  };
+}
+
+function maximizePanels(
+  sidebar: PanelImperativeHandle,
+  fileList: PanelImperativeHandle | null,
+  showFileList: boolean
+) {
+  if (!isPanelCollapsed(sidebar)) {
+    collapsePanel(sidebar);
+  }
+
+  if (showFileList && fileList && !isPanelCollapsed(fileList)) {
+    collapsePanel(fileList);
+  }
+}
+
+function restorePanels(
+  sidebar: PanelImperativeHandle,
+  fileList: PanelImperativeHandle | null,
+  showFileList: boolean,
+  collapsedBeforeMaximize: CollapsedPanelsSnapshot
+) {
+  if (!collapsedBeforeMaximize.sidebar && isPanelCollapsed(sidebar)) {
+    expandPanel(sidebar);
+  }
+
+  if (
+    showFileList &&
+    fileList &&
+    !collapsedBeforeMaximize.fileList &&
+    isPanelCollapsed(fileList)
+  ) {
+    expandPanel(fileList);
+  }
+}
+
 export interface AppLayoutProps {
   className?: string;
 }
@@ -32,6 +120,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   const viewMode = useViewMode();
   const focusNextPanel = useAppStore((s) => s.focusNextPanel);
   const focusPrevPanel = useAppStore((s) => s.focusPrevPanel);
+  const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
@@ -39,8 +128,47 @@ export function AppLayout({ className }: AppLayoutProps) {
     storage: layoutStorage,
   });
 
+  const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
+  const fileListPanelRef = useRef<PanelImperativeHandle>(null);
+  const collapsedBeforeMaximizeRef = useRef({
+    sidebar: false,
+    fileList: false,
+  });
+  const wasDiffMaximizedRef = useRef(false);
+
   // In changes mode, we hide the file list panel since the sidebar shows files directly
   const showFileList = viewMode === "history";
+
+  useEffect(() => {
+    const sidebar = sidebarPanelRef.current;
+    const fileList = fileListPanelRef.current;
+
+    if (!sidebar) {
+      return;
+    }
+
+    if (isDiffMaximized) {
+      if (!wasDiffMaximizedRef.current) {
+        collapsedBeforeMaximizeRef.current = captureCollapsedPanels(
+          sidebar,
+          fileList,
+          showFileList
+        );
+      }
+
+      maximizePanels(sidebar, fileList, showFileList);
+      wasDiffMaximizedRef.current = true;
+      return;
+    }
+
+    restorePanels(
+      sidebar,
+      fileList,
+      showFileList,
+      collapsedBeforeMaximizeRef.current
+    );
+    wasDiffMaximizedRef.current = false;
+  }, [isDiffMaximized, showFileList]);
 
   // Set up keyboard handler
   useKeyboardHandler(defaultKeymap);
@@ -73,6 +201,7 @@ export function AppLayout({ className }: AppLayoutProps) {
           id="sidebar"
           maxSize="35%"
           minSize="15%"
+          panelRef={sidebarPanelRef}
         >
           <FocusProvider region="sidebar">
             <Sidebar className="h-full" />
@@ -98,6 +227,7 @@ export function AppLayout({ className }: AppLayoutProps) {
               id="file-list"
               maxSize="40%"
               minSize="15%"
+              panelRef={fileListPanelRef}
             >
               <FocusProvider region="files">
                 <FileList className="h-full" />

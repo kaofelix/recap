@@ -14,7 +14,7 @@ let isInitialized = false;
 
 export async function reportFrontendError(payload: FrontendErrorPayload) {
   try {
-    await invoke("report_frontend_error", payload);
+    await invoke("report_frontend_error", { report: payload });
   } catch (error) {
     console.error("Failed to report frontend error", error);
   }
