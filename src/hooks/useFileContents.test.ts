@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileContents } from "../types/diff";
 import { useFileContents } from "./useFileContents";
 
@@ -29,6 +29,10 @@ describe("useFileContents", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns initial state when repo is null", () => {
@@ -136,6 +140,45 @@ describe("useFileContents", () => {
       commitId: mockCommitId,
       filePath: "file2.ts",
     });
+  });
+
+  it("coalesces rapid file changes and fetches only latest file", async () => {
+    vi.useFakeTimers();
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const { rerender } = renderHook(
+      ({ filePath }) => useFileContents(mockRepo, filePath, mockCommitId),
+      { initialProps: { filePath: "file1.ts" } }
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    rerender({ filePath: "file2.ts" });
+    rerender({ filePath: "file3.ts" });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    const fileCalls = mockInvoke.mock.calls.filter(
+      (call) =>
+        call[0] === "get_file_contents" &&
+        typeof call[1] === "object" &&
+        call[1] !== null
+    );
+
+    const calledFilePaths = fileCalls.map(
+      (call) => (call[1] as { filePath: string }).filePath
+    );
+
+    expect(calledFilePaths).toContain("file1.ts");
+    expect(calledFilePaths).toContain("file3.ts");
+    expect(calledFilePaths).not.toContain("file2.ts");
+
+    vi.useRealTimers();
   });
 
   it("switches from commit to working directory when commitId changes to null", async () => {
