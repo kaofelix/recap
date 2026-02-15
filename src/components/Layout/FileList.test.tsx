@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
 import { FileList } from "./FileList";
@@ -23,6 +23,7 @@ describe("FileList", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
@@ -268,7 +269,60 @@ describe("FileList", () => {
     });
   });
 
+  it("debounces rapid commit changes and fetches only latest commit", async () => {
+    vi.useFakeTimers();
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit1",
+    });
+
+    const { rerender } = render(<FileList />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_commit_files", {
+      repoPath: "/test/repo",
+      commitId: "commit1",
+    });
+
+    useAppStore.setState({ selectedCommitId: "commit2" });
+    rerender(<FileList />);
+
+    useAppStore.setState({ selectedCommitId: "commit3" });
+    rerender(<FileList />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    const commitCalls = mockInvoke.mock.calls.filter(
+      (call) =>
+        call[0] === "get_commit_files" &&
+        typeof call[1] === "object" &&
+        call[1] !== null
+    );
+
+    const calledCommitIds = commitCalls.map(
+      (call) => (call[1] as { commitId: string }).commitId
+    );
+
+    expect(calledCommitIds).toContain("commit1");
+    expect(calledCommitIds).toContain("commit3");
+    expect(calledCommitIds).not.toContain("commit2");
+
+    vi.useRealTimers();
+  });
+
   it("keeps previous file list visible while loading next commit files", async () => {
+    vi.useFakeTimers();
     let resolveSecond: ((value: unknown) => void) | null = null;
 
     mockInvoke
@@ -298,15 +352,22 @@ describe("FileList", () => {
 
     const { rerender } = render(<FileList />);
 
-    await waitFor(() => {
-      expect(screen.getByText("first.ts")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
+
+    expect(screen.getByText("first.ts")).toBeInTheDocument();
 
     useAppStore.setState({ selectedCommitId: "commit2" });
     rerender(<FileList />);
 
     expect(screen.getByText("first.ts")).toBeInTheDocument();
     expect(screen.queryByText("Loading files...")).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
 
     resolveSecond?.([
       {
@@ -318,9 +379,11 @@ describe("FileList", () => {
       },
     ]);
 
-    await waitFor(() => {
-      expect(screen.getByText("second.ts")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
+
+    expect(screen.getByText("second.ts")).toBeInTheDocument();
   });
 
   it("auto-selects first file when files are loaded", async () => {

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIsFocused } from "../../context/FocusContext";
 import { useNavigableList } from "../../hooks/useNavigableList";
 import { cn } from "../../lib/utils";
@@ -22,6 +22,8 @@ interface UseCommitFilesResult {
   error: string | null;
 }
 
+const COMMIT_FETCH_DEBOUNCE_MS = 120;
+
 async function fetchCommitFiles(
   repoPath: string,
   commitId: string
@@ -36,45 +38,73 @@ function useCommitFiles(): UseCommitFilesResult {
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previousSelectionRef = useRef<{
+    repoPath: string | null;
+    commitId: string | null;
+  }>({
+    repoPath: null,
+    commitId: null,
+  });
 
   useEffect(() => {
     if (!(selectedRepo && selectedCommitId)) {
+      previousSelectionRef.current = { repoPath: null, commitId: null };
       setFiles([]);
       setError(null);
       return;
     }
 
     let cancelled = false;
+    let timeoutId: number | null = null;
     const repoPath = selectedRepo.path;
+
+    const previousSelection = previousSelectionRef.current;
+    const shouldDebounce =
+      previousSelection.repoPath === repoPath &&
+      previousSelection.commitId !== null &&
+      previousSelection.commitId !== selectedCommitId;
+
+    previousSelectionRef.current = { repoPath, commitId: selectedCommitId };
 
     setIsLoading(true);
     setError(null);
 
-    fetchCommitFiles(repoPath, selectedCommitId)
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-        setFiles(result);
-        if (result.length > 0) {
-          selectFile(result[0].path);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (cancelled) {
-          return;
-        }
-        setIsLoading(false);
-      });
+    const runFetch = () => {
+      fetchCommitFiles(repoPath, selectedCommitId)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          setFiles(result);
+          if (result.length > 0) {
+            selectFile(result[0].path);
+          }
+        })
+        .catch((err) => {
+          if (cancelled) {
+            return;
+          }
+          setError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (cancelled) {
+            return;
+          }
+          setIsLoading(false);
+        });
+    };
+
+    if (shouldDebounce) {
+      timeoutId = window.setTimeout(runFetch, COMMIT_FETCH_DEBOUNCE_MS);
+    } else {
+      runFetch();
+    }
 
     return () => {
       cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, [selectedRepo, selectedCommitId, selectFile]);
 
