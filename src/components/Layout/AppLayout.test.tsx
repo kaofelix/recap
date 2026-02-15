@@ -120,6 +120,58 @@ describe("AppLayout", () => {
     expect(fileListPanel).toHaveAttribute("data-collapsed", "false");
   });
 
+  it("toggles diff maximize via keyboard shortcut", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", metaKey: true })
+      );
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", metaKey: true })
+      );
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("restores previous panel sizes after maximize toggle", () => {
+    localStorage.setItem(
+      "mock-panel-layout:main-layout",
+      JSON.stringify({
+        sidebar: 33,
+        "file-list": 17,
+        "diff-view": 50,
+      })
+    );
+
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+    const fileListPanel = screen.getByTestId("panel-file-list");
+
+    expect(sidebarPanel).toHaveAttribute("data-size", "33");
+    expect(fileListPanel).toHaveAttribute("data-size", "17");
+
+    act(() => {
+      screen.getByRole("button", { name: "Maximize diff view" }).click();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Restore panel layout" }).click();
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-size", "33");
+    expect(fileListPanel).toHaveAttribute("data-size", "17");
+  });
+
   it("applies custom className", () => {
     const { container } = render(<AppLayout className="test-class" />);
 

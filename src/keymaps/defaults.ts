@@ -13,4 +13,8 @@ export const defaultKeymap: KeyBinding[] = [
 
   // Activate/select current item
   { key: "Enter", command: "navigation.activate" },
+
+  // Diff layout controls
+  { key: "meta+Enter", command: "layout.toggleDiffMaximized" },
+  { key: "ctrl+Enter", command: "layout.toggleDiffMaximized" },
 ];

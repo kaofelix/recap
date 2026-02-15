@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   Group,
+  type GroupImperativeHandle,
   Panel,
   type PanelImperativeHandle,
   Separator,
@@ -121,6 +122,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   const focusNextPanel = useAppStore((s) => s.focusNextPanel);
   const focusPrevPanel = useAppStore((s) => s.focusPrevPanel);
   const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
+  const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
@@ -128,12 +130,14 @@ export function AppLayout({ className }: AppLayoutProps) {
     storage: layoutStorage,
   });
 
+  const groupRef = useRef<GroupImperativeHandle>(null);
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const fileListPanelRef = useRef<PanelImperativeHandle>(null);
   const collapsedBeforeMaximizeRef = useRef({
     sidebar: false,
     fileList: false,
   });
+  const layoutBeforeMaximizeRef = useRef<Record<string, number> | null>(null);
   const wasDiffMaximizedRef = useRef(false);
 
   // In changes mode, we hide the file list panel since the sidebar shows files directly
@@ -154,6 +158,13 @@ export function AppLayout({ className }: AppLayoutProps) {
           fileList,
           showFileList
         );
+
+        try {
+          layoutBeforeMaximizeRef.current =
+            groupRef.current?.getLayout() ?? null;
+        } catch {
+          layoutBeforeMaximizeRef.current = null;
+        }
       }
 
       maximizePanels(sidebar, fileList, showFileList);
@@ -167,6 +178,17 @@ export function AppLayout({ className }: AppLayoutProps) {
       showFileList,
       collapsedBeforeMaximizeRef.current
     );
+
+    const layoutBeforeMaximize = layoutBeforeMaximizeRef.current;
+    if (layoutBeforeMaximize) {
+      try {
+        groupRef.current?.setLayout(layoutBeforeMaximize);
+      } catch {
+        // Group panel structure can briefly differ during view-mode transitions.
+      }
+      layoutBeforeMaximizeRef.current = null;
+    }
+
     wasDiffMaximizedRef.current = false;
   }, [isDiffMaximized, showFileList]);
 
@@ -176,6 +198,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   // Panel navigation commands
   useGlobalCommand("navigation.focusNextPanel", focusNextPanel);
   useGlobalCommand("navigation.focusPrevPanel", focusPrevPanel);
+  useGlobalCommand("layout.toggleDiffMaximized", toggleDiffMaximized);
 
   return (
     <div
@@ -190,6 +213,7 @@ export function AppLayout({ className }: AppLayoutProps) {
       <Group
         className="flex-1"
         defaultLayout={defaultLayout}
+        groupRef={groupRef}
         onLayoutChanged={onLayoutChanged}
         orientation="horizontal"
       >

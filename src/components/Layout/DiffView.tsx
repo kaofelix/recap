@@ -260,6 +260,13 @@ export function DiffView({ className }: DiffViewProps) {
     );
   }, [selectedFilePath]);
 
+  const maximizeButtonLabel = isDiffMaximized
+    ? "Restore panel layout"
+    : "Maximize diff view";
+  const maximizeTooltipLabel = isDiffMaximized
+    ? "Restore layout (⌘↵ / Ctrl+Enter)"
+    : "Maximize diff view (⌘↵ / Ctrl+Enter)";
+
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
@@ -274,17 +281,14 @@ export function DiffView({ className }: DiffViewProps) {
           <Root>
             <Trigger asChild>
               <button
-                aria-label={
-                  isDiffMaximized
-                    ? "Restore panel layout"
-                    : "Maximize diff view"
-                }
+                aria-label={maximizeButtonLabel}
                 className={cn(
                   "mr-0.5 flex items-center justify-center rounded p-0.5",
                   "text-text-tertiary transition-colors",
                   "hover:bg-bg-hover hover:text-text-secondary"
                 )}
                 onClick={toggleDiffMaximized}
+                title={maximizeTooltipLabel}
                 type="button"
               >
                 {isDiffMaximized ? (
@@ -304,7 +308,7 @@ export function DiffView({ className }: DiffViewProps) {
                 )}
                 sideOffset={5}
               >
-                {isDiffMaximized ? "Restore layout" : "Maximize diff view"}
+                {maximizeTooltipLabel}
               </Content>
             </Portal>
           </Root>

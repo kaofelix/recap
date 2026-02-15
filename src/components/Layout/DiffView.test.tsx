@@ -58,6 +58,19 @@ describe("DiffView", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows maximize shortcut in button tooltip text", () => {
+    render(<DiffView />);
+
+    const maximizeButton = screen.getByRole("button", {
+      name: "Maximize diff view",
+    });
+
+    expect(maximizeButton).toHaveAttribute(
+      "title",
+      "Maximize diff view (⌘↵ / Ctrl+Enter)"
+    );
+  });
+
   it("shows loading state while fetching diff", () => {
     useAppStore.setState({
       repos: [
