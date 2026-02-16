@@ -323,7 +323,9 @@ describe("FileList", () => {
 
   it("keeps previous file list visible while loading next commit files", async () => {
     vi.useFakeTimers();
-    let resolveSecond: ((value: unknown) => void) | null = null;
+    let resolveSecond: (value: unknown) => void = () => {
+      throw new Error("Second commit request resolver not initialized");
+    };
 
     mockInvoke
       .mockResolvedValueOnce([
@@ -369,7 +371,12 @@ describe("FileList", () => {
       await Promise.resolve();
     });
 
-    resolveSecond?.([
+    expect(mockInvoke).toHaveBeenCalledWith("get_commit_files", {
+      repoPath: "/test/repo",
+      commitId: "commit2",
+    });
+
+    resolveSecond([
       {
         path: "src/second.ts",
         status: "Added",

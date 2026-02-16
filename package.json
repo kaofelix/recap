@@ -1,7 +1,7 @@
 {
   "name": "recap",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,7 @@
     "check:release-version": "./scripts/check-release-version.sh",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "prepare": "lefthook install"
+    "prepare": "bun x lefthook install"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

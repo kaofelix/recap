@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { tauriMocks } from "../test/setup";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 
-function CrashComponent() {
+function CrashComponent(): never {
   throw new Error("Kaboom");
 }
 

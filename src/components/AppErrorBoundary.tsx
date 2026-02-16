@@ -30,7 +30,7 @@ export class AppErrorBoundary extends Component<
       source: "react-error-boundary",
       message: error.message,
       stack: error.stack,
-      componentStack: errorInfo.componentStack,
+      componentStack: errorInfo.componentStack ?? undefined,
       url: window.location.href,
       userAgent: window.navigator.userAgent,
       timestamp: new Date().toISOString(),

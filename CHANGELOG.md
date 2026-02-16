@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-02-16
+
+### Fixed
+
+- Resolved TypeScript build regressions in error-boundary and navigation tests that blocked release builds.
+- Enforced `pre-push` quality gates with `bun run build` and `bun run test` via Lefthook.
+
 ## [0.1.5] - 2026-02-16
 
 ### Fixed

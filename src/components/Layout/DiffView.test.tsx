@@ -200,7 +200,9 @@ describe("DiffView", () => {
   });
 
   it("keeps previous diff visible while loading next file", async () => {
-    let resolveSecond: ((value: unknown) => void) | null = null;
+    let resolveSecond: (value: unknown) => void = () => {
+      throw new Error("Second diff request resolver not initialized");
+    };
 
     mockInvoke
       .mockResolvedValueOnce({
@@ -236,18 +238,18 @@ describe("DiffView", () => {
     expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     expect(screen.queryByText("Loading diff...")).not.toBeInTheDocument();
 
-    resolveSecond?.({
-      old_content: "const b = 1;",
-      new_content: "const b = 2;",
-      is_binary: false,
-    });
-
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_file_contents", {
         repoPath: "/test/repo",
         commitId: "abc123",
         filePath: "src/second.ts",
       });
+    });
+
+    resolveSecond({
+      old_content: "const b = 1;",
+      new_content: "const b = 2;",
+      is_binary: false,
     });
   });
 
