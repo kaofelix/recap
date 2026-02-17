@@ -2,44 +2,30 @@ import { describe, expect, it } from "vitest";
 import { getLanguageFromPath, highlightCode } from "./syntax";
 
 describe("getLanguageFromPath", () => {
-  it("detects TypeScript files", () => {
-    expect(getLanguageFromPath("src/app.ts")).toBe("typescript");
-    expect(getLanguageFromPath("src/app.tsx")).toBe("tsx");
-  });
-
-  it("detects JavaScript files", () => {
-    expect(getLanguageFromPath("src/app.js")).toBe("javascript");
-    expect(getLanguageFromPath("src/app.jsx")).toBe("jsx");
-  });
-
-  it("detects Rust files", () => {
-    expect(getLanguageFromPath("src/main.rs")).toBe("rust");
-  });
-
-  it("detects Python files", () => {
-    expect(getLanguageFromPath("script.py")).toBe("python");
-  });
-
-  it("detects CSS files", () => {
-    expect(getLanguageFromPath("styles.css")).toBe("css");
-    expect(getLanguageFromPath("styles.scss")).toBe("scss");
-  });
-
-  it("detects HTML files", () => {
-    expect(getLanguageFromPath("index.html")).toBe("markup");
-  });
-
-  it("detects JSON files", () => {
-    expect(getLanguageFromPath("package.json")).toBe("json");
-  });
-
-  it("detects YAML files", () => {
-    expect(getLanguageFromPath("config.yml")).toBe("yaml");
-    expect(getLanguageFromPath("config.yaml")).toBe("yaml");
-  });
-
-  it("detects Markdown files", () => {
-    expect(getLanguageFromPath("README.md")).toBe("markdown");
+  it.each([
+    ["src/app.ts", "typescript"],
+    ["src/app.tsx", "tsx"],
+    ["src/app.js", "javascript"],
+    ["src/app.jsx", "jsx"],
+    ["src/main.rs", "rust"],
+    ["script.py", "python"],
+    ["styles.css", "css"],
+    ["styles.scss", "scss"],
+    ["index.html", "markup"],
+    ["package.json", "json"],
+    ["config.yml", "yaml"],
+    ["config.yaml", "yaml"],
+    ["README.md", "markdown"],
+    ["lib/example.rb", "ruby"],
+    ["Sources/App.swift", "swift"],
+    ["src/main.c", "c"],
+    ["src/main.cpp", "cpp"],
+    ["src/ViewController.m", "objectivec"],
+    ["src/ViewController.mm", "objectivec"],
+    ["Dockerfile", "docker"],
+    ["Makefile", "makefile"],
+  ])("detects language for %s", (filePath, expectedLanguage) => {
+    expect(getLanguageFromPath(filePath)).toBe(expectedLanguage);
   });
 
   it("returns null for unknown extensions", () => {
@@ -59,27 +45,25 @@ describe("getLanguageFromPath", () => {
 });
 
 describe("highlightCode", () => {
-  it("highlights JavaScript code", () => {
-    const code = "const x = 1;";
-    const result = highlightCode(code, "javascript");
+  it.each([
+    ["javascript", "const x = 1;", ["token", "keyword"]],
+    ["typescript", "const x: number = 1;", ["token"]],
+    ["rust", "fn main() {}", ["token", "keyword"]],
+    ["ruby", "def greet(name)\n  puts name\nend", ["token", "keyword"]],
+    [
+      "swift",
+      "func greet(name: String) -> String { name }",
+      ["token", "keyword"],
+    ],
+    ["c", "int main(void) { return 0; }", ["token", "keyword"]],
+    ["cpp", "int main() { return 0; }", ["token", "keyword"]],
+    ["objectivec", "@interface Greeter : NSObject\n@end", ["token", "keyword"]],
+  ])("highlights %s code", (language, code, expectedClasses: string[]) => {
+    const result = highlightCode(code, language);
 
-    expect(result).toContain("token");
-    expect(result).toContain("keyword");
-  });
-
-  it("highlights TypeScript code", () => {
-    const code = "const x: number = 1;";
-    const result = highlightCode(code, "typescript");
-
-    expect(result).toContain("token");
-  });
-
-  it("highlights Rust code", () => {
-    const code = "fn main() {}";
-    const result = highlightCode(code, "rust");
-
-    expect(result).toContain("token");
-    expect(result).toContain("keyword");
+    for (const expectedClass of expectedClasses) {
+      expect(result).toContain(expectedClass);
+    }
   });
 
   it("returns escaped HTML for unknown languages", () => {

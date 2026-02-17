@@ -13,13 +13,18 @@ import "prismjs/components/prism-tsx"; // Depends on typescript, jsx
 import "prismjs/components/prism-scss"; // Depends on css
 import "prismjs/components/prism-sass"; // Depends on css
 import "prismjs/components/prism-less"; // Depends on css
+import "prismjs/components/prism-c"; // Depends on clike
+import "prismjs/components/prism-cpp"; // Depends on c
+import "prismjs/components/prism-objectivec"; // Depends on c
 import "prismjs/components/prism-java";
 import "prismjs/components/prism-scala"; // Depends on java
 import "prismjs/components/prism-kotlin"; // Depends on java
+import "prismjs/components/prism-ruby"; // Depends on clike
 
 // Independent languages
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-python";
+import "prismjs/components/prism-swift";
 import "prismjs/components/prism-bash";
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-yaml";
@@ -69,7 +74,10 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   cc: "cpp",
   cxx: "cpp",
   hpp: "cpp",
+  m: "objectivec",
+  mm: "objectivec",
   go: "go",
+  swift: "swift",
 
   // Scripting
   py: "python",
@@ -90,6 +98,12 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   sql: "sql",
   graphql: "graphql",
   gql: "graphql",
+};
+
+/**
+ * Map of exact file basenames to Prism.js language identifiers.
+ */
+const BASENAME_TO_LANGUAGE: Record<string, string> = {
   dockerfile: "docker",
   makefile: "makefile",
 };
@@ -99,12 +113,20 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
  * Returns null if the language cannot be determined.
  */
 export function getLanguageFromPath(filePath: string): string | null {
-  const lastDot = filePath.lastIndexOf(".");
+  const normalizedPath = filePath.toLowerCase();
+  const fileName = normalizedPath.split(/[\\/]/).pop() ?? normalizedPath;
+
+  const basenameLanguage = BASENAME_TO_LANGUAGE[fileName];
+  if (basenameLanguage) {
+    return basenameLanguage;
+  }
+
+  const lastDot = fileName.lastIndexOf(".");
   if (lastDot === -1) {
     return null;
   }
 
-  const extension = filePath.slice(lastDot + 1).toLowerCase();
+  const extension = fileName.slice(lastDot + 1);
   return EXTENSION_TO_LANGUAGE[extension] ?? null;
 }
 
