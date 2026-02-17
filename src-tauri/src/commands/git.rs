@@ -17,6 +17,14 @@ pub fn get_commit_files(
 }
 
 #[tauri::command]
+pub fn get_commit_range_files(
+    repo_path: String,
+    commit_ids: Vec<String>,
+) -> Result<Vec<git_service::ChangedFile>, String> {
+    git_service::get_commit_range_files(&repo_path, &commit_ids)
+}
+
+#[tauri::command]
 pub fn get_file_diff(
     repo_path: String,
     commit_id: String,
@@ -32,6 +40,15 @@ pub fn get_file_contents(
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
     git_service::get_file_contents(&repo_path, &commit_id, &file_path)
+}
+
+#[tauri::command]
+pub fn get_commit_range_file_contents(
+    repo_path: String,
+    commit_ids: Vec<String>,
+    file_path: String,
+) -> Result<git_service::FileContents, String> {
+    git_service::get_commit_range_file_contents(&repo_path, &commit_ids, &file_path)
 }
 
 #[tauri::command]

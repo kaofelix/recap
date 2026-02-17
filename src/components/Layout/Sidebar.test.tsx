@@ -6,6 +6,8 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { commandEmitter } from "../../commands";
+import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
 import { Sidebar } from "./Sidebar";
 
@@ -21,6 +23,8 @@ describe("Sidebar", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
+      selectedCommitId: null,
+      selectedCommitIds: [],
       viewMode: "history",
     });
   });
@@ -29,6 +33,8 @@ describe("Sidebar", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
+      selectedCommitId: null,
+      selectedCommitIds: [],
       viewMode: "history",
     });
   });
@@ -105,6 +111,107 @@ describe("Sidebar", () => {
 
     expect(screen.getByText("fix: bug fix")).toBeInTheDocument();
     expect(screen.getByText(/abc123d/)).toBeInTheDocument(); // Short SHA
+  });
+
+  it("supports cmd-click multi-select in history mode", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+      {
+        id: "commit-b",
+        message: "feat: second",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1800,
+      },
+      {
+        id: "commit-c",
+        message: "feat: third",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      viewMode: "history",
+    });
+
+    render(<Sidebar />);
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: first")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("feat: first"));
+    fireEvent.click(screen.getByText("feat: third"), { metaKey: true });
+
+    expect(useAppStore.getState().selectedCommitIds).toEqual([
+      "commit-a",
+      "commit-c",
+    ]);
+  });
+
+  it("supports shift-click range selection in history mode", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+      {
+        id: "commit-b",
+        message: "feat: second",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1800,
+      },
+      {
+        id: "commit-c",
+        message: "feat: third",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      viewMode: "history",
+    });
+
+    render(<Sidebar />);
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: first")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("feat: first"));
+    fireEvent.click(screen.getByText("feat: third"), { shiftKey: true });
+
+    expect(useAppStore.getState().selectedCommitIds).toEqual([
+      "commit-a",
+      "commit-b",
+      "commit-c",
+    ]);
   });
 
   it("shows error message when fetch fails", async () => {
@@ -200,6 +307,53 @@ describe("Sidebar", () => {
     });
   });
 
+  it("navigates commits with navigation commands when sidebar is focused", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+      {
+        id: "commit-b",
+        message: "feat: second",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1800,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit-a",
+      focusedRegion: "sidebar",
+      viewMode: "history",
+    });
+
+    render(
+      <FocusProvider region="sidebar">
+        <Sidebar />
+      </FocusProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: first")).toBeInTheDocument();
+    });
+
+    act(() => {
+      commandEmitter.emit("navigation.selectNext");
+    });
+
+    expect(useAppStore.getState().selectedCommitId).toBe("commit-b");
+  });
+
   describe("Changes view", () => {
     it("switches to changes view when Changes button is clicked", async () => {
       mockInvoke.mockResolvedValue([]);
@@ -288,6 +442,53 @@ describe("Sidebar", () => {
       expect(screen.getByText("new-file.ts")).toBeInTheDocument();
       expect(screen.getByText("M")).toBeInTheDocument(); // Modified indicator
       expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
+    });
+
+    it("navigates changed files with navigation commands when sidebar is focused", async () => {
+      const mockChanges = [
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 10,
+          deletions: 5,
+          old_path: null,
+        },
+        {
+          path: "src/new-file.ts",
+          status: "Untracked",
+          additions: 20,
+          deletions: 0,
+          old_path: null,
+        },
+      ];
+
+      mockInvoke.mockResolvedValue(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedFilePath: "src/App.tsx",
+        focusedRegion: "sidebar",
+        viewMode: "changes",
+      });
+
+      render(
+        <FocusProvider region="sidebar">
+          <Sidebar />
+        </FocusProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("App.tsx")).toBeInTheDocument();
+      });
+
+      act(() => {
+        commandEmitter.emit("navigation.selectNext");
+      });
+
+      expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
     });
 
     it("shows addition and deletion counts for changed files", async () => {

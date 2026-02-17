@@ -1,5 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { commandEmitter } from "../../commands";
+import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
 import { FileList } from "./FileList";
 
@@ -19,6 +21,7 @@ describe("FileList", () => {
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedCommitIds: [],
     });
   });
 
@@ -28,6 +31,7 @@ describe("FileList", () => {
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedCommitIds: [],
     });
   });
 
@@ -98,6 +102,55 @@ describe("FileList", () => {
 
     expect(screen.getByText("Button.tsx")).toBeInTheDocument();
     expect(screen.getByText("(2)")).toBeInTheDocument();
+  });
+
+  it("navigates files with navigation commands when files panel is focused", async () => {
+    const mockFiles = [
+      {
+        path: "src/App.tsx",
+        status: "Modified",
+        additions: 10,
+        deletions: 5,
+        old_path: null,
+      },
+      {
+        path: "src/components/Button.tsx",
+        status: "Added",
+        additions: 25,
+        deletions: 0,
+        old_path: null,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockFiles);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/App.tsx",
+      focusedRegion: "files",
+    });
+
+    render(
+      <FocusProvider region="files">
+        <FileList />
+      </FocusProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("App.tsx")).toBeInTheDocument();
+    });
+
+    act(() => {
+      commandEmitter.emit("navigation.selectNext");
+    });
+
+    expect(useAppStore.getState().selectedFilePath).toBe(
+      "src/components/Button.tsx"
+    );
   });
 
   it("shows file status indicators", async () => {
@@ -237,6 +290,49 @@ describe("FileList", () => {
     });
   });
 
+  it("calls get_commit_range_files when multiple commits are selected", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1", "commit2"],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_commit_range_files", {
+        repoPath: "/test/repo",
+        commitIds: ["commit1", "commit2"],
+      });
+    });
+  });
+
+  it("shows multi-commit header text when multiple commits are selected", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1", "commit2", "commit3"],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Showing changes from 3 commits")
+      ).toBeInTheDocument();
+    });
+  });
+
   it("refetches files when selected commit changes", async () => {
     mockInvoke.mockResolvedValue([]);
 
@@ -258,7 +354,10 @@ describe("FileList", () => {
     });
 
     // Change selected commit
-    useAppStore.setState({ selectedCommitId: "commit2" });
+    useAppStore.setState({
+      selectedCommitId: "commit2",
+      selectedCommitIds: ["commit2"],
+    });
     rerender(<FileList />);
 
     await waitFor(() => {

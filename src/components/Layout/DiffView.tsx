@@ -23,6 +23,7 @@ import {
   useAppStore,
   useIsDiffMaximized,
   useSelectedCommitId,
+  useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
@@ -33,6 +34,9 @@ export interface DiffViewProps {
 }
 
 type DiffDisplayMode = "split" | "unified";
+
+const NON_CONSECUTIVE_SELECTION_ERROR =
+  "Unable to display diff for multiple non-consecutive commits";
 
 /** Theme variables for the diff viewer using CSS variables */
 const themeVariables = {
@@ -120,8 +124,30 @@ function DiffPlaceholder({ message }: { message: string }) {
   );
 }
 
+function getMaximizeLabels(isDiffMaximized: boolean) {
+  if (isDiffMaximized) {
+    return {
+      buttonLabel: "Restore panel layout",
+      tooltipLabel: "Restore layout (⌘↵ / Ctrl+Enter)",
+    };
+  }
+
+  return {
+    buttonLabel: "Maximize diff view",
+    tooltipLabel: "Maximize diff view (⌘↵ / Ctrl+Enter)",
+  };
+}
+
 /** Error message component */
 function DiffError({ message }: { message: string }) {
+  if (message.includes(NON_CONSECUTIVE_SELECTION_ERROR)) {
+    return (
+      <div className="py-8 text-center text-sm text-text-secondary">
+        {NON_CONSECUTIVE_SELECTION_ERROR}
+      </div>
+    );
+  }
+
   return (
     <div className="py-8 text-center text-red-500 text-sm">
       Error: {message}
@@ -194,19 +220,22 @@ function DiffContent({
 export function DiffView({ className }: DiffViewProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
+  const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
   const viewMode = useViewMode();
   const isFocused = useIsFocused();
   const isDiffMaximized = useIsDiffMaximized();
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
-  // In history mode, use the selected commit. In changes mode, use null (working directory).
+  // In history mode, use selected commit(s). In changes mode, use working directory.
   const commitId = viewMode === "history" ? selectedCommitId : null;
+  const activeCommitIds = viewMode === "history" ? selectedCommitIds : [];
 
   const { contents, isLoading, error } = useFileContents(
     selectedRepo,
     selectedFilePath,
-    commitId
+    commitId,
+    activeCommitIds
   );
 
   const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
@@ -260,12 +289,10 @@ export function DiffView({ className }: DiffViewProps) {
     );
   }, [selectedFilePath]);
 
-  const maximizeButtonLabel = isDiffMaximized
-    ? "Restore panel layout"
-    : "Maximize diff view";
-  const maximizeTooltipLabel = isDiffMaximized
-    ? "Restore layout (⌘↵ / Ctrl+Enter)"
-    : "Maximize diff view (⌘↵ / Ctrl+Enter)";
+  const {
+    buttonLabel: maximizeButtonLabel,
+    tooltipLabel: maximizeTooltipLabel,
+  } = getMaximizeLabels(isDiffMaximized);
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>

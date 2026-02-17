@@ -6,6 +6,7 @@ import { cn } from "../../lib/utils";
 import {
   useAppStore,
   useSelectedCommitId,
+  useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
 } from "../../store/appStore";
@@ -23,6 +24,8 @@ interface UseCommitFilesResult {
 }
 
 const COMMIT_FETCH_DEBOUNCE_MS = 120;
+const NON_CONSECUTIVE_SELECTION_ERROR =
+  "Unable to display diff for multiple non-consecutive commits";
 
 async function fetchCommitFiles(
   repoPath: string,
@@ -31,24 +34,35 @@ async function fetchCommitFiles(
   return invoke<ChangedFile[]>("get_commit_files", { repoPath, commitId });
 }
 
+async function fetchCommitRangeFiles(
+  repoPath: string,
+  commitIds: string[]
+): Promise<ChangedFile[]> {
+  return invoke<ChangedFile[]>("get_commit_range_files", {
+    repoPath,
+    commitIds,
+  });
+}
+
 function useCommitFiles(): UseCommitFilesResult {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
+  const selectedCommitIds = useSelectedCommitIds();
   const selectFile = useAppStore((state) => state.selectFile);
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previousSelectionRef = useRef<{
     repoPath: string | null;
-    commitId: string | null;
+    commitKey: string | null;
   }>({
     repoPath: null,
-    commitId: null,
+    commitKey: null,
   });
 
   useEffect(() => {
     if (!(selectedRepo && selectedCommitId)) {
-      previousSelectionRef.current = { repoPath: null, commitId: null };
+      previousSelectionRef.current = { repoPath: null, commitKey: null };
       setFiles([]);
       setError(null);
       return;
@@ -57,20 +71,28 @@ function useCommitFiles(): UseCommitFilesResult {
     let cancelled = false;
     let timeoutId: number | null = null;
     const repoPath = selectedRepo.path;
+    const activeCommitIds =
+      selectedCommitIds.length > 0 ? selectedCommitIds : [selectedCommitId];
+    const commitKey = activeCommitIds.join("::");
 
     const previousSelection = previousSelectionRef.current;
     const shouldDebounce =
       previousSelection.repoPath === repoPath &&
-      previousSelection.commitId !== null &&
-      previousSelection.commitId !== selectedCommitId;
+      previousSelection.commitKey !== null &&
+      previousSelection.commitKey !== commitKey;
 
-    previousSelectionRef.current = { repoPath, commitId: selectedCommitId };
+    previousSelectionRef.current = { repoPath, commitKey };
 
     setIsLoading(true);
     setError(null);
 
     const runFetch = () => {
-      fetchCommitFiles(repoPath, selectedCommitId)
+      const request =
+        activeCommitIds.length > 1
+          ? fetchCommitRangeFiles(repoPath, activeCommitIds)
+          : fetchCommitFiles(repoPath, activeCommitIds[0]);
+
+      request
         .then((result) => {
           if (cancelled) {
             return;
@@ -85,6 +107,8 @@ function useCommitFiles(): UseCommitFilesResult {
             return;
           }
           setError(err instanceof Error ? err.message : String(err));
+          setFiles([]);
+          selectFile(null);
         })
         .finally(() => {
           if (cancelled) {
@@ -106,7 +130,7 @@ function useCommitFiles(): UseCommitFilesResult {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [selectedRepo, selectedCommitId, selectFile]);
+  }, [selectedRepo, selectedCommitId, selectedCommitIds, selectFile]);
 
   return { files, isLoading, error };
 }
@@ -125,6 +149,7 @@ function FileListContent({
   files: ChangedFile[];
   selectedFilePath: string | null;
   getItemProps: (id: string) => {
+    "aria-selected": boolean;
     "data-item-id": string;
     onClick: () => void;
   };
@@ -146,6 +171,14 @@ function FileListContent({
   }
 
   if (error && files.length === 0) {
+    if (error.includes(NON_CONSECUTIVE_SELECTION_ERROR)) {
+      return (
+        <div className="py-8 text-center text-sm text-text-secondary">
+          {NON_CONSECUTIVE_SELECTION_ERROR}
+        </div>
+      );
+    }
+
     return (
       <div className="py-8 text-center text-red-500 text-sm">
         Error: {error}
@@ -182,10 +215,19 @@ function FileListContent({
 
 export function FileList({ className }: FileListProps) {
   const selectedCommitId = useSelectedCommitId();
+  const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
   const selectFile = useAppStore((state) => state.selectFile);
   const { files, isLoading, error } = useCommitFiles();
   const isFocused = useIsFocused();
+  let activeCommitIds: string[] = [];
+  if (selectedCommitIds.length > 0) {
+    activeCommitIds = selectedCommitIds;
+  } else if (selectedCommitId) {
+    activeCommitIds = [selectedCommitId];
+  }
+
+  const isMultiCommitSelection = activeCommitIds.length > 1;
 
   const itemIds = files.map((file) => file.path);
   const effectiveSelectedFilePath = selectedFilePath ?? files[0]?.path ?? null;
@@ -212,6 +254,11 @@ export function FileList({ className }: FileListProps) {
         {files.length > 0 && (
           <span className="shrink-0 text-text-secondary text-xs">
             ({files.length})
+          </span>
+        )}
+        {isMultiCommitSelection && (
+          <span className="min-w-0 truncate text-text-secondary text-xs">
+            Showing changes from {activeCommitIds.length} commits
           </span>
         )}
       </div>

@@ -9,6 +9,7 @@ export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
   selectedCommitId: string | null;
+  selectedCommitIds: string[];
   selectedFilePath: string | null;
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
@@ -17,6 +18,8 @@ export interface AppState {
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
   selectCommit: (id: string | null) => void;
+  selectCommitRange: (ids: string[]) => void;
+  toggleCommitSelection: (id: string) => void;
   selectFile: (path: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
@@ -58,6 +61,7 @@ export const useAppStore = create<AppState>()(
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedCommitIds: [],
       selectedFilePath: null,
       viewMode: "history" as ViewMode,
       focusedRegion: null,
@@ -98,6 +102,7 @@ export const useAppStore = create<AppState>()(
           // Clear commit/file selection when repo changes
           ...(newSelectedId !== selectedRepoId && {
             selectedCommitId: null,
+            selectedCommitIds: [],
             selectedFilePath: null,
           }),
         });
@@ -112,6 +117,7 @@ export const useAppStore = create<AppState>()(
           set({
             selectedRepoId: id,
             selectedCommitId: null,
+            selectedCommitIds: [],
             selectedFilePath: null,
           });
         }
@@ -119,7 +125,35 @@ export const useAppStore = create<AppState>()(
 
       selectCommit: (id: string | null) => {
         // Clear file selection when commit changes
-        set({ selectedCommitId: id, selectedFilePath: null });
+        set({
+          selectedCommitId: id,
+          selectedCommitIds: id ? [id] : [],
+          selectedFilePath: null,
+        });
+      },
+
+      selectCommitRange: (ids: string[]) => {
+        const normalized = [...new Set(ids)];
+        set({
+          selectedCommitId: normalized[0] ?? null,
+          selectedCommitIds: normalized,
+          selectedFilePath: null,
+        });
+      },
+
+      toggleCommitSelection: (id: string) => {
+        set((state) => {
+          const exists = state.selectedCommitIds.includes(id);
+          const selectedCommitIds = exists
+            ? state.selectedCommitIds.filter((commitId) => commitId !== id)
+            : [...state.selectedCommitIds, id];
+
+          return {
+            selectedCommitId: selectedCommitIds[0] ?? null,
+            selectedCommitIds,
+            selectedFilePath: null,
+          };
+        });
       },
 
       selectFile: (path: string | null) => {
@@ -188,6 +222,7 @@ export const useAppStore = create<AppState>()(
           repos: [],
           selectedRepoId: null,
           selectedCommitId: null,
+          selectedCommitIds: [],
           selectedFilePath: null,
           isDiffMaximized: false,
         });
@@ -209,6 +244,8 @@ export const useSelectedRepo = () =>
   );
 export const useSelectedCommitId = () =>
   useAppStore((state) => state.selectedCommitId);
+export const useSelectedCommitIds = () =>
+  useAppStore((state) => state.selectedCommitIds);
 export const useSelectedFilePath = () =>
   useAppStore((state) => state.selectedFilePath);
 export const useViewMode = () => useAppStore((state) => state.viewMode);

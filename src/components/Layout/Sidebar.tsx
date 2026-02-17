@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { useCallback, useEffect } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef } from "react";
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommits } from "../../hooks/useCommits";
 import { useNavigableList } from "../../hooks/useNavigableList";
@@ -8,6 +8,7 @@ import { cn } from "../../lib/utils";
 import {
   useAppStore,
   useSelectedCommitId,
+  useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
@@ -32,12 +33,35 @@ function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }
 
+function getCommitRangeSelection(
+  commitIds: string[],
+  startId: string,
+  endId: string
+): string[] {
+  const startIndex = commitIds.indexOf(startId);
+  const endIndex = commitIds.indexOf(endId);
+
+  if (startIndex === -1 || endIndex === -1) {
+    return [endId];
+  }
+
+  const from = Math.min(startIndex, endIndex);
+  const to = Math.max(startIndex, endIndex);
+
+  return commitIds.slice(from, to + 1);
+}
+
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
+  const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
   const viewMode = useViewMode();
   const selectCommit = useAppStore((state) => state.selectCommit);
+  const selectCommitRange = useAppStore((state) => state.selectCommitRange);
+  const toggleCommitSelection = useAppStore(
+    (state) => state.toggleCommitSelection
+  );
   const selectFile = useAppStore((state) => state.selectFile);
   const setViewMode = useAppStore((state) => state.setViewMode);
 
@@ -68,25 +92,31 @@ export function Sidebar({ className }: SidebarProps) {
       return;
     }
 
-    const selectedCommitExists = commits.some(
-      (commit) => commit.id === selectedCommitId
-    );
+    const hasValidSelection =
+      selectedCommitIds.length > 0 &&
+      selectedCommitIds.every((id) =>
+        commits.some((commit) => commit.id === id)
+      );
 
-    if (!selectedCommitExists) {
+    if (!hasValidSelection) {
       selectCommit(commits[0].id);
+      commitSelectionAnchorRef.current = commits[0].id;
     }
   }, [
     commits,
-    selectedCommitId,
+    selectedCommitIds,
     selectCommit,
     viewMode,
     isLoadingCommits,
     commitsError,
   ]);
 
+  const commitSelectionAnchorRef = useRef<string | null>(null);
+
   const handleSelectItem = useCallback(
     (id: string) => {
       if (viewMode === "history") {
+        commitSelectionAnchorRef.current = id;
         selectCommit(id);
       } else {
         selectFile(id);
@@ -95,12 +125,44 @@ export function Sidebar({ className }: SidebarProps) {
     [viewMode, selectCommit, selectFile]
   );
 
-  const itemIds =
-    viewMode === "history"
-      ? commits.map((commit) => commit.id)
-      : changes.map((file) => file.path);
+  const commitIds = commits.map((commit) => commit.id);
 
-  const effectiveSelectedCommitId = selectedCommitId ?? commits[0]?.id ?? null;
+  const handleCommitClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>, commitId: string) => {
+      const isToggle = event.metaKey || event.ctrlKey;
+      const isRange = event.shiftKey;
+
+      if (isRange) {
+        const anchorId =
+          commitSelectionAnchorRef.current ?? selectedCommitIds[0] ?? commitId;
+        const range = getCommitRangeSelection(commitIds, anchorId, commitId);
+        selectCommitRange(range);
+        return;
+      }
+
+      commitSelectionAnchorRef.current = commitId;
+
+      if (isToggle) {
+        toggleCommitSelection(commitId);
+        return;
+      }
+
+      selectCommit(commitId);
+    },
+    [
+      commitIds,
+      selectedCommitIds,
+      selectCommit,
+      selectCommitRange,
+      toggleCommitSelection,
+    ]
+  );
+
+  const itemIds =
+    viewMode === "history" ? commitIds : changes.map((file) => file.path);
+
+  const effectiveSelectedCommitId =
+    selectedCommitIds[0] ?? selectedCommitId ?? commits[0]?.id ?? null;
   const effectiveSelectedFilePath =
     selectedFilePath ?? changes[0]?.path ?? null;
   const selectedId =
@@ -190,26 +252,30 @@ export function Sidebar({ className }: SidebarProps) {
           !error &&
           commits.length > 0 && (
             <div className="space-y-1">
-              {commits.map((commit) => (
-                <button
-                  className={cn(
-                    "w-full cursor-pointer rounded p-2 text-left",
-                    "hover:bg-bg-hover",
-                    effectiveSelectedCommitId === commit.id && "bg-accent-muted"
-                  )}
-                  key={commit.id}
-                  type="button"
-                  {...getItemProps(commit.id)}
-                >
-                  <div className="truncate font-medium text-sm text-text-primary">
-                    {commit.message}
-                  </div>
-                  <div className="mt-0.5 text-text-secondary text-xs">
-                    {shortSha(commit.id)} ·{" "}
-                    {formatRelativeTime(commit.timestamp)}
-                  </div>
-                </button>
-              ))}
+              {commits.map((commit) => {
+                const itemProps = getItemProps(commit.id);
+                return (
+                  <button
+                    className={cn(
+                      "w-full cursor-pointer rounded p-2 text-left",
+                      "hover:bg-bg-hover",
+                      selectedCommitIds.includes(commit.id) && "bg-accent-muted"
+                    )}
+                    key={commit.id}
+                    type="button"
+                    {...itemProps}
+                    onClick={(event) => handleCommitClick(event, commit.id)}
+                  >
+                    <div className="truncate font-medium text-sm text-text-primary">
+                      {commit.message}
+                    </div>
+                    <div className="mt-0.5 text-text-secondary text-xs">
+                      {shortSha(commit.id)} ·{" "}
+                      {formatRelativeTime(commit.timestamp)}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 

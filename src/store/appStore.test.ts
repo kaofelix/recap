@@ -5,6 +5,7 @@ import {
   useIsDiffMaximized,
   useRepos,
   useSelectedCommitId,
+  useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
   useSelectedRepoId,
@@ -263,6 +264,7 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedCommitId).toBe("abc123");
+      expect(result.current.selectedCommitIds).toEqual(["abc123"]);
     });
 
     it("should clear selection when passed null", () => {
@@ -277,6 +279,45 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedCommitIds).toEqual([]);
+    });
+
+    it("should replace selection when selecting a commit range", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.selectCommit("abc123");
+      });
+
+      act(() => {
+        result.current.selectCommitRange(["def456", "ghi789"]);
+      });
+
+      expect(result.current.selectedCommitIds).toEqual(["def456", "ghi789"]);
+      expect(result.current.selectedCommitId).toBe("def456");
+    });
+
+    it("should toggle commit selection on and off", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.toggleCommitSelection("abc123");
+      });
+
+      expect(result.current.selectedCommitIds).toEqual(["abc123"]);
+
+      act(() => {
+        result.current.toggleCommitSelection("def456");
+      });
+
+      expect(result.current.selectedCommitIds).toEqual(["abc123", "def456"]);
+
+      act(() => {
+        result.current.toggleCommitSelection("abc123");
+      });
+
+      expect(result.current.selectedCommitIds).toEqual(["def456"]);
+      expect(result.current.selectedCommitId).toBe("def456");
     });
 
     it("should be cleared when repo selection changes", () => {
@@ -295,12 +336,14 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedCommitId).toBe("abc123");
+      expect(result.current.selectedCommitIds).toEqual(["abc123"]);
 
       act(() => {
         result.current.selectRepo(repo2.id);
       });
 
       expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedCommitIds).toEqual([]);
     });
   });
 
@@ -467,6 +510,19 @@ describe("appStore", () => {
       });
 
       expect(selectedCommitResult.current).toBe("abc123def456");
+    });
+
+    it("useSelectedCommitIds should return all selected commit ids", () => {
+      const { result: storeResult } = renderHook(() => useAppStore());
+      const { result: selectedCommitIdsResult } = renderHook(() =>
+        useSelectedCommitIds()
+      );
+
+      act(() => {
+        storeResult.current.selectCommitRange(["abc123", "def456"]);
+      });
+
+      expect(selectedCommitIdsResult.current).toEqual(["abc123", "def456"]);
     });
 
     it("useSelectedFilePath should return selected file path", () => {

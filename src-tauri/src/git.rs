@@ -190,6 +190,75 @@ pub fn list_commits(repo_path: &str, limit: Option<usize>) -> Result<Vec<Commit>
     Ok(commits)
 }
 
+fn resolve_commit_selection_range(
+    repo: &Repository,
+    commit_ids: &[String],
+) -> Result<(git2::Oid, git2::Oid), String> {
+    if commit_ids.is_empty() {
+        return Err("At least one commit must be selected".to_string());
+    }
+
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| format!("Failed to create revwalk: {}", e))?;
+    revwalk
+        .push_head()
+        .map_err(|e| format!("Failed to push HEAD: {}", e))?;
+
+    let mut commit_indices = std::collections::HashMap::new();
+
+    for (index, oid_result) in revwalk.enumerate() {
+        let oid = oid_result.map_err(|e| format!("Failed to get commit oid: {}", e))?;
+        commit_indices.insert(oid.to_string(), index);
+    }
+
+    let mut selected_indices = Vec::new();
+
+    for commit_id in commit_ids {
+        let index = commit_indices.get(commit_id).ok_or_else(|| {
+            format!("Unable to find selected commit '{}' in current history", commit_id)
+        })?;
+        selected_indices.push(*index);
+    }
+
+    let min_index = *selected_indices
+        .iter()
+        .min()
+        .ok_or_else(|| "At least one commit must be selected".to_string())?;
+    let max_index = *selected_indices
+        .iter()
+        .max()
+        .ok_or_else(|| "At least one commit must be selected".to_string())?;
+
+    let expected_selection_size = max_index - min_index + 1;
+    if expected_selection_size != selected_indices.len() {
+        return Err("Unable to display diff for multiple non-consecutive commits".to_string());
+    }
+
+    let newest_commit = commit_ids
+        .iter()
+        .min_by_key(|id| commit_indices.get(*id).copied().unwrap_or(usize::MAX))
+        .ok_or_else(|| "At least one commit must be selected".to_string())?;
+    let oldest_commit = commit_ids
+        .iter()
+        .max_by_key(|id| commit_indices.get(*id).copied().unwrap_or(0))
+        .ok_or_else(|| "At least one commit must be selected".to_string())?;
+
+    let newest_oid = git2::Oid::from_str(newest_commit)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", newest_commit, e))?;
+    let oldest_oid = git2::Oid::from_str(oldest_commit)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", oldest_commit, e))?;
+
+    repo
+        .find_commit(newest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+    repo
+        .find_commit(oldest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    Ok((oldest_oid, newest_oid))
+}
+
 /// Gets the list of files changed in a specific commit
 ///
 /// # Arguments
@@ -262,6 +331,91 @@ pub fn get_commit_files(repo_path: &str, commit_id: &str) -> Result<Vec<ChangedF
         let mut deletions = 0u32;
 
         // Use a patch to get accurate line counts
+        if let Ok(patch) = git2::Patch::from_diff(&diff, delta_idx) {
+            if let Some(patch) = patch {
+                let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+                additions = adds as u32;
+                deletions = dels as u32;
+            }
+        }
+
+        files.push(ChangedFile {
+            path,
+            status: delta.status().into(),
+            additions,
+            deletions,
+            old_path,
+        });
+    }
+
+    Ok(files)
+}
+
+/// Gets the list of files changed across a selected commit range.
+///
+/// The range uses the oldest selected commit's parent tree as the baseline,
+/// and the newest selected commit's tree as the target.
+pub fn get_commit_range_files(repo_path: &str, commit_ids: &[String]) -> Result<Vec<ChangedFile>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
+
+    let newest_commit = repo
+        .find_commit(newest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+    let oldest_commit = repo
+        .find_commit(oldest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    let newest_tree = newest_commit
+        .tree()
+        .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+    let oldest_parent_tree = if oldest_commit.parent_count() > 0 {
+        Some(
+            oldest_commit
+                .parent(0)
+                .map_err(|e| format!("Failed to get parent commit: {}", e))?
+                .tree()
+                .map_err(|e| format!("Failed to get parent tree: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    let mut diff_opts = DiffOptions::new();
+    let diff = repo
+        .diff_tree_to_tree(
+            oldest_parent_tree.as_ref(),
+            Some(&newest_tree),
+            Some(&mut diff_opts),
+        )
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    let mut files: Vec<ChangedFile> = Vec::new();
+
+    for delta_idx in 0..diff.deltas().len() {
+        let delta = diff.get_delta(delta_idx).expect("Delta should exist");
+
+        let new_file = delta.new_file();
+        let old_file = delta.old_file();
+
+        let path = new_file
+            .path()
+            .or_else(|| old_file.path())
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let old_path = if delta.status() == Delta::Renamed {
+            old_file.path().map(|p| p.to_string_lossy().to_string())
+        } else {
+            None
+        };
+
+        let mut additions = 0u32;
+        let mut deletions = 0u32;
+
         if let Ok(patch) = git2::Patch::from_diff(&diff, delta_idx) {
             if let Some(patch) = patch {
                 let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
@@ -498,6 +652,105 @@ pub fn get_file_contents(
     // Verify the file actually changed in this commit
     if new_result.is_none() && old_result.is_none() {
         return Err(format!("File '{}' not found in commit", file_path));
+    }
+
+    let old_content = match old_result {
+        Some(Ok(content)) => Some(content),
+        Some(Err(e)) if e != "Binary file" => return Err(e),
+        _ => None,
+    };
+
+    let new_content = match new_result {
+        Some(Ok(content)) => Some(content),
+        Some(Err(e)) if e != "Binary file" => return Err(e),
+        _ => None,
+    };
+
+    Ok(FileContents {
+        old_content,
+        new_content,
+        is_binary: false,
+    })
+}
+
+/// Gets full file contents before and after a selected commit range.
+///
+/// The old content comes from the parent of the oldest selected commit.
+/// The new content comes from the newest selected commit.
+pub fn get_commit_range_file_contents(
+    repo_path: &str,
+    commit_ids: &[String],
+    file_path: &str,
+) -> Result<FileContents, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
+
+    let newest_commit = repo
+        .find_commit(newest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+    let oldest_commit = repo
+        .find_commit(oldest_oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    let newest_tree = newest_commit
+        .tree()
+        .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+    let oldest_parent_tree = if oldest_commit.parent_count() > 0 {
+        Some(
+            oldest_commit
+                .parent(0)
+                .map_err(|e| format!("Failed to get parent commit: {}", e))?
+                .tree()
+                .map_err(|e| format!("Failed to get parent tree: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    let get_content = |tree: &git2::Tree, path: &str| -> Option<Result<String, String>> {
+        match tree.get_path(std::path::Path::new(path)) {
+            Ok(entry) => {
+                let object = match entry.to_object(&repo) {
+                    Ok(obj) => obj,
+                    Err(e) => return Some(Err(format!("Failed to get object: {}", e))),
+                };
+                if let Some(blob) = object.as_blob() {
+                    if blob.is_binary() {
+                        return Some(Err("Binary file".to_string()));
+                    }
+                    match std::str::from_utf8(blob.content()) {
+                        Ok(s) => Some(Ok(s.to_string())),
+                        Err(_) => Some(Err("File is not valid UTF-8".to_string())),
+                    }
+                } else {
+                    Some(Err("Not a blob".to_string()))
+                }
+            }
+            Err(_) => None,
+        }
+    };
+
+    let new_result = get_content(&newest_tree, file_path);
+    let old_result = oldest_parent_tree
+        .as_ref()
+        .and_then(|parent_tree| get_content(parent_tree, file_path));
+
+    let is_binary = matches!(&new_result, Some(Err(e)) if e == "Binary file")
+        || matches!(&old_result, Some(Err(e)) if e == "Binary file");
+
+    if is_binary {
+        return Ok(FileContents {
+            old_content: None,
+            new_content: None,
+            is_binary: true,
+        });
+    }
+
+    if new_result.is_none() && old_result.is_none() {
+        return Err(format!("File '{}' not found in selected commit range", file_path));
     }
 
     let old_content = match old_result {
@@ -1269,6 +1522,50 @@ mod tests {
         let result = get_commit_files(path, "not-a-valid-sha");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid commit ID"));
+    }
+
+    #[test]
+    fn test_get_commit_range_files_for_consecutive_commits() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let commit_ids = vec![commits[1].id.clone(), commits[0].id.clone()];
+
+        let files = get_commit_range_files(path, &commit_ids).expect("Should return changed files");
+
+        assert!(!files.is_empty());
+        assert!(files.iter().any(|file| file.path == "README.md"));
+        assert!(files.iter().any(|file| file.path == "file.txt"));
+    }
+
+    #[test]
+    fn test_get_commit_range_files_rejects_non_consecutive_selection() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        std::fs::write(path.join("extra.txt"), "extra content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Add extra file"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, None).expect("Should return commits");
+        let non_consecutive_ids = vec![commits[0].id.clone(), commits[2].id.clone()];
+
+        let result = get_commit_range_files(path_str, &non_consecutive_ids);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Unable to display diff for multiple non-consecutive commits"));
     }
 
     // Tests for get_file_diff

@@ -20,6 +20,7 @@ describe("DiffView", () => {
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedCommitIds: [],
       selectedFilePath: null,
       isDiffMaximized: false,
     });
@@ -30,6 +31,7 @@ describe("DiffView", () => {
       repos: [],
       selectedRepoId: null,
       selectedCommitId: null,
+      selectedCommitIds: [],
       selectedFilePath: null,
       isDiffMaximized: false,
     });
@@ -196,6 +198,65 @@ describe("DiffView", () => {
         commitId: "commit123",
         filePath: "src/utils.ts",
       });
+    });
+  });
+
+  it("calls get_commit_range_file_contents when multiple commits are selected", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: "old content",
+      new_content: "new content",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123", "def456"],
+      selectedFilePath: "src/first.ts",
+      viewMode: "history",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "get_commit_range_file_contents",
+        {
+          repoPath: "/test/repo",
+          commitIds: ["abc123", "def456"],
+          filePath: "src/first.ts",
+        }
+      );
+    });
+  });
+
+  it("shows clear error message for non-consecutive multi-select", async () => {
+    mockInvoke.mockRejectedValue(
+      new Error("Unable to display diff for multiple non-consecutive commits")
+    );
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123", "def456"],
+      selectedFilePath: "src/first.ts",
+      viewMode: "history",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /Unable to display diff for multiple non-consecutive commits/
+        )
+      ).toBeInTheDocument();
     });
   });
 

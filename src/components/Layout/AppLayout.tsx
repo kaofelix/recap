@@ -1,3 +1,4 @@
+import { GitGraph } from "lucide-react";
 import { useEffect, useRef } from "react";
 import {
   Group,
@@ -8,11 +9,17 @@ import {
   useDefaultLayout,
 } from "react-resizable-panels";
 import { FocusProvider } from "../../context/FocusContext";
+import { useCommits } from "../../hooks/useCommits";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useKeyboardHandler } from "../../hooks/useKeyboardHandler";
 import { defaultKeymap } from "../../keymaps/defaults";
 import { cn } from "../../lib/utils";
-import { useAppStore, useViewMode } from "../../store/appStore";
+import {
+  useAppStore,
+  useSelectedCommitIds,
+  useSelectedRepo,
+  useViewMode,
+} from "../../store/appStore";
 import { DiffView } from "./DiffView";
 import { FileList } from "./FileList";
 import { Sidebar } from "./Sidebar";
@@ -113,16 +120,71 @@ function restorePanels(
   }
 }
 
+function isConsecutiveCommitSelection(
+  selectedCommitIds: string[],
+  orderedCommitIds: string[]
+): boolean {
+  if (selectedCommitIds.length <= 1) {
+    return true;
+  }
+
+  const indexById = new Map(orderedCommitIds.map((id, index) => [id, index]));
+  const indices = selectedCommitIds
+    .map((id) => indexById.get(id))
+    .filter((value): value is number => typeof value === "number");
+
+  if (indices.length !== selectedCommitIds.length) {
+    return true;
+  }
+
+  const min = Math.min(...indices);
+  const max = Math.max(...indices);
+
+  return max - min + 1 === selectedCommitIds.length;
+}
+
+function NonConsecutiveCommitsState() {
+  return (
+    <div className="flex h-full items-center justify-center bg-panel-bg px-8">
+      <div className="-mt-8 flex max-w-xl flex-col items-center text-center">
+        <div
+          className={cn(
+            "mb-6 flex h-16 w-16 items-center justify-center rounded-full",
+            "border border-panel-border bg-panel-header-bg"
+          )}
+        >
+          <GitGraph className="h-8 w-8 text-text-tertiary" />
+        </div>
+
+        <h3 className="font-semibold text-base text-text-primary leading-tight">
+          Can’t show a diff for non-consecutive commits.
+        </h3>
+        <p className="mt-2 max-w-md text-sm text-text-secondary leading-relaxed">
+          Select one commit or a consecutive range to view changes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export interface AppLayoutProps {
   className?: string;
 }
 
 export function AppLayout({ className }: AppLayoutProps) {
   const viewMode = useViewMode();
+  const selectedRepo = useSelectedRepo();
+  const selectedCommitIds = useSelectedCommitIds();
   const focusNextPanel = useAppStore((s) => s.focusNextPanel);
   const focusPrevPanel = useAppStore((s) => s.focusPrevPanel);
   const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
+
+  const {
+    commits,
+    isLoading: isLoadingCommits,
+    error: commitsError,
+  } = useCommits(selectedRepo, viewMode === "history");
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
@@ -140,8 +202,20 @@ export function AppLayout({ className }: AppLayoutProps) {
   const layoutBeforeMaximizeRef = useRef<Record<string, number> | null>(null);
   const wasDiffMaximizedRef = useRef(false);
 
-  // In changes mode, we hide the file list panel since the sidebar shows files directly
-  const showFileList = viewMode === "history";
+  const hasNonConsecutiveSelection =
+    viewMode === "history" &&
+    !isLoadingCommits &&
+    !commitsError &&
+    selectedCommitIds.length > 1 &&
+    !isConsecutiveCommitSelection(
+      selectedCommitIds,
+      commits.map((commit) => commit.id)
+    );
+
+  // In changes mode, we hide the file list panel since the sidebar shows files directly.
+  // In history mode with non-consecutive selection, we temporarily show a single
+  // full-width state panel on the right.
+  const showFileList = viewMode === "history" && !hasNonConsecutiveSelection;
 
   useEffect(() => {
     const sidebar = sidebarPanelRef.current;
@@ -269,15 +343,19 @@ export function AppLayout({ className }: AppLayoutProps) {
           </>
         )}
 
-        {/* Diff View Panel */}
+        {/* Right Panel */}
         <Panel
           defaultSize={showFileList ? "55%" : "80%"}
           id="diff-view"
           minSize="30%"
         >
-          <FocusProvider region="diff">
-            <DiffView className="h-full" />
-          </FocusProvider>
+          {hasNonConsecutiveSelection ? (
+            <NonConsecutiveCommitsState />
+          ) : (
+            <FocusProvider region="diff">
+              <DiffView className="h-full" />
+            </FocusProvider>
+          )}
         </Panel>
       </Group>
     </div>

@@ -10,6 +10,7 @@ interface UseFileContentsResult {
 }
 
 const DIFF_FETCH_DEBOUNCE_MS = 120;
+const EMPTY_COMMIT_IDS: string[] = [];
 
 /**
  * Fetch file contents for diffing, abstracting away the source.
@@ -18,11 +19,13 @@ const DIFF_FETCH_DEBOUNCE_MS = 120;
  * @param repo - The repository to fetch from
  * @param filePath - The file path to fetch
  * @param commitId - If provided, fetch from this commit. If null, fetch from working directory.
+ * @param commitIds - Optional commit selection (single or range) for history mode.
  */
 export function useFileContents(
   repo: Repository | null,
   filePath: string | null,
-  commitId: string | null
+  commitId: string | null,
+  commitIds: string[] = EMPTY_COMMIT_IDS
 ): UseFileContentsResult {
   const [contents, setContents] = useState<FileContents | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +43,17 @@ export function useFileContents(
       return;
     }
 
-    const targetKey = `${repoPath}::${commitId ?? "working"}::${filePath}`;
+    let activeCommitIds: string[] = [];
+    if (commitIds.length > 0) {
+      activeCommitIds = commitIds;
+    } else if (commitId) {
+      activeCommitIds = [commitId];
+    }
+
+    const commitKey =
+      activeCommitIds.length > 0 ? activeCommitIds.join("::") : "working";
+
+    const targetKey = `${repoPath}::${commitKey}::${filePath}`;
     const shouldDebounce =
       previousTargetRef.current !== null &&
       previousTargetRef.current !== targetKey;
@@ -53,13 +66,22 @@ export function useFileContents(
     setError(null);
 
     const fetchContents = async (): Promise<FileContents> => {
-      if (commitId) {
-        return invoke<FileContents>("get_file_contents", {
+      if (activeCommitIds.length > 1) {
+        return invoke<FileContents>("get_commit_range_file_contents", {
           repoPath,
-          commitId,
+          commitIds: activeCommitIds,
           filePath,
         });
       }
+
+      if (activeCommitIds.length === 1) {
+        return invoke<FileContents>("get_file_contents", {
+          repoPath,
+          commitId: activeCommitIds[0],
+          filePath,
+        });
+      }
+
       return invoke<FileContents>("get_working_file_contents", {
         repoPath,
         filePath,
@@ -76,6 +98,7 @@ export function useFileContents(
         .catch((err) => {
           if (!cancelled) {
             setError(err instanceof Error ? err.message : String(err));
+            setContents(null);
           }
         })
         .finally(() => {
@@ -97,7 +120,7 @@ export function useFileContents(
         window.clearTimeout(timeoutId);
       }
     };
-  }, [repoPath, filePath, commitId]);
+  }, [repoPath, filePath, commitId, commitIds]);
 
   return { contents, isLoading, error };
 }
