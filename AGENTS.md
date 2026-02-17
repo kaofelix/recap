@@ -48,6 +48,14 @@ Use `dex` to track tasks:
 - Backend: Rust `#[cfg(test)]` (`cargo test` in `src-tauri/`)
 - Always add tests for new functionality
 
+## Releases
+
+- Bump version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
+- Add user-visible notes to `CHANGELOG.md` under the new version.
+- Validate version sync with `bun run check:release-version -- vX.Y.Z`.
+- Create release commit, tag (`vX.Y.Z`), and push `main` + tag.
+- GitHub Actions workflow `.github/workflows/release.yml` creates a draft release from the tag.
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Zustand, Radix UI
