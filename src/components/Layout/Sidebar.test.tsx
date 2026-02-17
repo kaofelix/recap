@@ -17,6 +17,38 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
+function mockChangesOnly(changes: unknown[]) {
+  mockInvoke.mockImplementation((command: unknown) => {
+    if (command === "get_working_changes") {
+      return Promise.resolve(changes);
+    }
+
+    if (command === "list_commits") {
+      return Promise.resolve([]);
+    }
+
+    return Promise.resolve([]);
+  });
+}
+
+function mockChangesSequence(sequence: unknown[][]) {
+  let callIndex = 0;
+
+  mockInvoke.mockImplementation((command: unknown) => {
+    if (command === "get_working_changes") {
+      const index = Math.min(callIndex, sequence.length - 1);
+      callIndex += 1;
+      return Promise.resolve(sequence[index] ?? []);
+    }
+
+    if (command === "list_commits") {
+      return Promise.resolve([]);
+    }
+
+    return Promise.resolve([]);
+  });
+}
+
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -358,6 +390,113 @@ describe("Sidebar", () => {
     expect(useAppStore.getState().selectedCommitId).toBe("commit-b");
   });
 
+  describe("commit auto-refresh", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(async () => {
+      await act(async () => {
+        vi.useRealTimers();
+      });
+    });
+
+    it("refreshes commit list during polling in History view", async () => {
+      const initialCommits = [
+        {
+          id: "commit-a",
+          message: "feat: first",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 3600,
+        },
+      ];
+
+      const updatedCommits = [
+        {
+          id: "commit-b",
+          message: "feat: latest",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+        },
+        ...initialCommits,
+      ];
+
+      mockInvoke
+        .mockResolvedValueOnce(initialCommits)
+        .mockResolvedValueOnce(updatedCommits);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      render(<Sidebar />);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("feat: first")).toBeInTheDocument();
+      expect(screen.queryByText("feat: latest")).not.toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("feat: latest")).toBeInTheDocument();
+    });
+
+    it("keeps polling commits while viewing Changes", async () => {
+      mockInvoke.mockReset();
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([]);
+        }
+
+        if (command === "get_working_changes") {
+          return Promise.resolve([]);
+        }
+
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const initialCommitCalls = mockInvoke.mock.calls.filter(
+        (call) => call[0] === "list_commits"
+      ).length;
+      expect(initialCommitCalls).toBe(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+        await Promise.resolve();
+      });
+
+      const polledCommitCalls = mockInvoke.mock.calls.filter(
+        (call) => call[0] === "list_commits"
+      ).length;
+      expect(polledCommitCalls).toBe(2);
+    });
+  });
+
   describe("Changes view", () => {
     it("switches to changes view when Changes button is clicked", async () => {
       mockInvoke.mockResolvedValue([]);
@@ -426,7 +565,7 @@ describe("Sidebar", () => {
         },
       ];
 
-      mockInvoke.mockResolvedValue(mockChanges);
+      mockChangesOnly(mockChanges);
 
       useAppStore.setState({
         repos: [
@@ -466,7 +605,7 @@ describe("Sidebar", () => {
         },
       ];
 
-      mockInvoke.mockResolvedValue(mockChanges);
+      mockChangesOnly(mockChanges);
 
       useAppStore.setState({
         repos: [
@@ -502,7 +641,7 @@ describe("Sidebar", () => {
         },
       ];
 
-      mockInvoke.mockResolvedValue(mockChanges);
+      mockChangesOnly(mockChanges);
 
       useAppStore.setState({
         repos: [
@@ -538,7 +677,7 @@ describe("Sidebar", () => {
         },
       ];
 
-      mockInvoke.mockResolvedValue(mockChanges);
+      mockChangesOnly(mockChanges);
 
       useAppStore.setState({
         repos: [
@@ -578,7 +717,7 @@ describe("Sidebar", () => {
         },
       ];
 
-      mockInvoke.mockResolvedValue(mockChanges);
+      mockChangesOnly(mockChanges);
 
       useAppStore.setState({
         repos: [
@@ -618,7 +757,7 @@ describe("Sidebar", () => {
           },
         ];
 
-        mockInvoke.mockResolvedValue(mockChanges);
+        mockChangesOnly(mockChanges);
 
         useAppStore.setState({
           repos: [
@@ -634,21 +773,30 @@ describe("Sidebar", () => {
         await act(async () => {
           await Promise.resolve();
         });
-        expect(mockInvoke).toHaveBeenCalledTimes(1);
+        const initialChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(initialChangesCalls).toBe(1);
 
         // Advance time by 2 seconds - should trigger poll
         await act(async () => {
           vi.advanceTimersByTime(2000);
           await Promise.resolve();
         });
-        expect(mockInvoke).toHaveBeenCalledTimes(2);
+        const firstPolledChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(firstPolledChangesCalls).toBe(2);
 
         // Advance time by another 2 seconds
         await act(async () => {
           vi.advanceTimersByTime(2000);
           await Promise.resolve();
         });
-        expect(mockInvoke).toHaveBeenCalledTimes(3);
+        const secondPolledChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(secondPolledChangesCalls).toBe(3);
       });
 
       it("stops polling when switching to History view", async () => {
@@ -708,7 +856,10 @@ describe("Sidebar", () => {
         await act(async () => {
           await Promise.resolve();
         });
-        expect(mockInvoke).toHaveBeenCalledTimes(1);
+        const initialChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(initialChangesCalls).toBe(1);
 
         // Unmount the component
         unmount();
@@ -719,8 +870,11 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
 
-        // Should not have made any more calls
-        expect(mockInvoke).toHaveBeenCalledTimes(1);
+        // Should not have made any more get_working_changes calls
+        const postUnmountChangesCalls = mockInvoke.mock.calls.filter(
+          (call) => call[0] === "get_working_changes"
+        ).length;
+        expect(postUnmountChangesCalls).toBe(1);
       });
 
       it("updates display when file list changes", async () => {
@@ -751,9 +905,7 @@ describe("Sidebar", () => {
           },
         ];
 
-        mockInvoke
-          .mockResolvedValueOnce(initialChanges)
-          .mockResolvedValueOnce(updatedChanges);
+        mockChangesSequence([initialChanges, updatedChanges]);
 
         useAppStore.setState({
           repos: [
@@ -813,9 +965,7 @@ describe("Sidebar", () => {
           },
         ];
 
-        mockInvoke
-          .mockResolvedValueOnce(initialChanges)
-          .mockResolvedValueOnce(updatedChanges);
+        mockChangesSequence([initialChanges, updatedChanges]);
 
         useAppStore.setState({
           repos: [

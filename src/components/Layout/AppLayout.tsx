@@ -180,11 +180,14 @@ export function AppLayout({ className }: AppLayoutProps) {
   const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
+  const shouldTrackCommitOrdering =
+    viewMode === "history" && selectedCommitIds.length > 1;
+
   const {
     commits,
     isLoading: isLoadingCommits,
     error: commitsError,
-  } = useCommits(selectedRepo, viewMode === "history");
+  } = useCommits(selectedRepo, shouldTrackCommitOrdering);
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,

@@ -69,7 +69,7 @@ export function Sidebar({ className }: SidebarProps) {
     commits,
     isLoading: isLoadingCommits,
     error: commitsError,
-  } = useCommits(selectedRepo, viewMode === "history");
+  } = useCommits(selectedRepo, !!selectedRepo);
 
   const {
     changes,
