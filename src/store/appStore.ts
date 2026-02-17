@@ -14,6 +14,7 @@ export interface AppState {
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
+  workingChangesRevision: number;
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
@@ -25,6 +26,7 @@ export interface AppState {
   setFocusedRegion: (region: FocusRegion | null) => void;
   setDiffMaximized: (maximized: boolean) => void;
   toggleDiffMaximized: () => void;
+  bumpWorkingChangesRevision: () => void;
   focusNextPanel: () => void;
   focusPrevPanel: () => void;
   clearRepos: () => void;
@@ -66,6 +68,7 @@ export const useAppStore = create<AppState>()(
       viewMode: "history" as ViewMode,
       focusedRegion: null,
       isDiffMaximized: false,
+      workingChangesRevision: 0,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -190,6 +193,12 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ isDiffMaximized: !state.isDiffMaximized }));
       },
 
+      bumpWorkingChangesRevision: () => {
+        set((state) => ({
+          workingChangesRevision: state.workingChangesRevision + 1,
+        }));
+      },
+
       focusNextPanel: () => {
         set((state) => {
           const visiblePanels = getVisiblePanels(state.viewMode);
@@ -225,6 +234,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitIds: [],
           selectedFilePath: null,
           isDiffMaximized: false,
+          workingChangesRevision: 0,
         });
       },
     }),
@@ -253,3 +263,5 @@ export const useFocusedRegion = () =>
   useAppStore((state) => state.focusedRegion);
 export const useIsDiffMaximized = () =>
   useAppStore((state) => state.isDiffMaximized);
+export const useWorkingChangesRevision = () =>
+  useAppStore((state) => state.workingChangesRevision);

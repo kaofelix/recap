@@ -211,6 +211,79 @@ describe("useFileContents", () => {
     });
   });
 
+  it("refetches when refresh key changes", async () => {
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const emptyCommitIds: string[] = [];
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) =>
+        useFileContents(
+          mockRepo,
+          mockFilePath,
+          null,
+          emptyCommitIds,
+          refreshKey
+        ),
+      { initialProps: { refreshKey: 0 } }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    mockInvoke.mockResolvedValueOnce({
+      old_content: "old content",
+      new_content: "updated content",
+      is_binary: false,
+    });
+
+    const initialCallCount = mockInvoke.mock.calls.length;
+
+    rerender({ refreshKey: 1 });
+
+    await waitFor(() => {
+      expect(mockInvoke.mock.calls.length).toBeGreaterThan(initialCallCount);
+      expect(result.current.contents?.new_content).toBe("updated content");
+    });
+
+    expect(mockInvoke).toHaveBeenLastCalledWith("get_working_file_contents", {
+      repoPath: mockRepo.path,
+      filePath: mockFilePath,
+    });
+  });
+
+  it("keeps previous contents when refresh fails", async () => {
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const emptyCommitIds: string[] = [];
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) =>
+        useFileContents(
+          mockRepo,
+          mockFilePath,
+          null,
+          emptyCommitIds,
+          refreshKey
+        ),
+      { initialProps: { refreshKey: 0 } }
+    );
+
+    await waitFor(() => {
+      expect(result.current.contents).toEqual(mockContents);
+    });
+
+    mockInvoke.mockRejectedValueOnce(new Error("Refresh failed"));
+
+    rerender({ refreshKey: 1 });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.error).toBe("Refresh failed");
+    });
+
+    expect(result.current.contents).toEqual(mockContents);
+  });
+
   it("clears contents when filePath becomes null", async () => {
     mockInvoke.mockResolvedValue(mockContents);
 

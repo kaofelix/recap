@@ -27,6 +27,7 @@ import {
   useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
+  useWorkingChangesRevision,
 } from "../../store/appStore";
 
 export interface DiffViewProps {
@@ -37,6 +38,7 @@ type DiffDisplayMode = "split" | "unified";
 
 const NON_CONSECUTIVE_SELECTION_ERROR =
   "Unable to display diff for multiple non-consecutive commits";
+const WORKING_DIFF_POLL_INTERVAL_MS = 2000;
 
 /** Theme variables for the diff viewer using CSS variables */
 const themeVariables = {
@@ -223,19 +225,38 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
   const viewMode = useViewMode();
+  const workingChangesRevision = useWorkingChangesRevision();
   const isFocused = useIsFocused();
   const isDiffMaximized = useIsDiffMaximized();
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
+
+  const [workingDiffPollTick, setWorkingDiffPollTick] = useState(0);
 
   // In history mode, use selected commit(s). In changes mode, use working directory.
   const commitId = viewMode === "history" ? selectedCommitId : null;
   const activeCommitIds = viewMode === "history" ? selectedCommitIds : [];
 
+  useEffect(() => {
+    if (!(viewMode === "changes" && selectedRepo && selectedFilePath)) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setWorkingDiffPollTick((tick) => tick + 1);
+    }, WORKING_DIFF_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedFilePath, selectedRepo, viewMode]);
+
+  const refreshKey =
+    viewMode === "changes" ? workingChangesRevision + workingDiffPollTick : 0;
+
   const { contents, isLoading, error } = useFileContents(
     selectedRepo,
     selectedFilePath,
     commitId,
-    activeCommitIds
+    activeCommitIds,
+    refreshKey
   );
 
   const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(

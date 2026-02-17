@@ -25,7 +25,8 @@ export function useFileContents(
   repo: Repository | null,
   filePath: string | null,
   commitId: string | null,
-  commitIds: string[] = EMPTY_COMMIT_IDS
+  commitIds: string[] = EMPTY_COMMIT_IDS,
+  refreshKey = 0
 ): UseFileContentsResult {
   const [contents, setContents] = useState<FileContents | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +54,7 @@ export function useFileContents(
     const commitKey =
       activeCommitIds.length > 0 ? activeCommitIds.join("::") : "working";
 
-    const targetKey = `${repoPath}::${commitKey}::${filePath}`;
+    const targetKey = `${repoPath}::${commitKey}::${filePath}::${refreshKey}`;
     const shouldDebounce =
       previousTargetRef.current !== null &&
       previousTargetRef.current !== targetKey;
@@ -98,7 +99,6 @@ export function useFileContents(
         .catch((err) => {
           if (!cancelled) {
             setError(err instanceof Error ? err.message : String(err));
-            setContents(null);
           }
         })
         .finally(() => {
@@ -120,7 +120,7 @@ export function useFileContents(
         window.clearTimeout(timeoutId);
       }
     };
-  }, [repoPath, filePath, commitId, commitIds]);
+  }, [repoPath, filePath, commitId, commitIds, refreshKey]);
 
   return { contents, isLoading, error };
 }

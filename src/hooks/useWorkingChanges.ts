@@ -41,6 +41,9 @@ export function useWorkingChanges(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectFile = useAppStore((state) => state.selectFile);
+  const bumpWorkingChangesRevision = useAppStore(
+    (state) => state.bumpWorkingChangesRevision
+  );
 
   const fetchChanges = useCallback(
     async (isInitialLoad: boolean) => {
@@ -60,6 +63,11 @@ export function useWorkingChanges(
         });
         setChanges(result);
         clearStaleSelection(result, selectFile);
+
+        // Trigger diff refresh for the selected file during background polling.
+        if (!isInitialLoad) {
+          bumpWorkingChangesRevision();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         setChanges([]);
@@ -69,7 +77,7 @@ export function useWorkingChanges(
         }
       }
     },
-    [selectFile, selectedRepo]
+    [bumpWorkingChangesRevision, selectFile, selectedRepo]
   );
 
   useEffect(() => {

@@ -726,4 +726,18 @@ describe("appStore", () => {
       expect(result.current.viewMode).toBe("history");
     });
   });
+
+  describe("working changes revision", () => {
+    it("increments revision when bumpWorkingChangesRevision is called", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      expect(result.current.workingChangesRevision).toBe(0);
+
+      act(() => {
+        result.current.bumpWorkingChangesRevision();
+      });
+
+      expect(result.current.workingChangesRevision).toBe(1);
+    });
+  });
 });
