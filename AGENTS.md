@@ -41,6 +41,7 @@ Use `dex` to track tasks:
 - `dex show <id> --full` before starting a task
 - `dex complete <id> --result "..." --commit <sha>` when done
 - See `.dex/` for task history
+- Before creating any commit, check the dex task status for the work being committed. If the task is done, run `dex complete ...` first and include the resulting `.dex/tasks.jsonl` change in that same commit (do not leave task status updates for a separate follow-up commit).
 
 ## Testing
 
