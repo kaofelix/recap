@@ -22,8 +22,10 @@ describe("useCommand", () => {
     useAppStore.setState({ focusedRegion: null });
   });
 
-  afterEach(() => {
-    useAppStore.setState({ focusedRegion: null });
+  afterEach(async () => {
+    await act(async () => {
+      useAppStore.setState({ focusedRegion: null });
+    });
     vi.clearAllMocks();
   });
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "../store/appStore";
 import { FocusProvider, useFocusRegion, useIsFocused } from "./FocusContext";
@@ -20,8 +20,10 @@ describe("FocusContext", () => {
     useAppStore.setState({ focusedRegion: null });
   });
 
-  afterEach(() => {
-    useAppStore.setState({ focusedRegion: null });
+  afterEach(async () => {
+    await act(async () => {
+      useAppStore.setState({ focusedRegion: null });
+    });
   });
 
   describe("useFocusRegion", () => {

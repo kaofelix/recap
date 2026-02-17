@@ -25,13 +25,15 @@ describe("FileList", () => {
     });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    useAppStore.setState({
-      repos: [],
-      selectedRepoId: null,
-      selectedCommitId: null,
-      selectedCommitIds: [],
+  afterEach(async () => {
+    await act(async () => {
+      vi.useRealTimers();
+      useAppStore.setState({
+        repos: [],
+        selectedRepoId: null,
+        selectedCommitId: null,
+        selectedCommitIds: [],
+      });
     });
   });
 
@@ -354,11 +356,13 @@ describe("FileList", () => {
     });
 
     // Change selected commit
-    useAppStore.setState({
-      selectedCommitId: "commit2",
-      selectedCommitIds: ["commit2"],
+    await act(async () => {
+      useAppStore.setState({
+        selectedCommitId: "commit2",
+        selectedCommitIds: ["commit2"],
+      });
+      rerender(<FileList />);
     });
-    rerender(<FileList />);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_commit_files", {
@@ -391,11 +395,15 @@ describe("FileList", () => {
       commitId: "commit1",
     });
 
-    useAppStore.setState({ selectedCommitId: "commit2" });
-    rerender(<FileList />);
+    await act(async () => {
+      useAppStore.setState({ selectedCommitId: "commit2" });
+      rerender(<FileList />);
+    });
 
-    useAppStore.setState({ selectedCommitId: "commit3" });
-    rerender(<FileList />);
+    await act(async () => {
+      useAppStore.setState({ selectedCommitId: "commit3" });
+      rerender(<FileList />);
+    });
 
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -459,8 +467,10 @@ describe("FileList", () => {
 
     expect(screen.getByText("first.ts")).toBeInTheDocument();
 
-    useAppStore.setState({ selectedCommitId: "commit2" });
-    rerender(<FileList />);
+    await act(async () => {
+      useAppStore.setState({ selectedCommitId: "commit2" });
+      rerender(<FileList />);
+    });
 
     expect(screen.getByText("first.ts")).toBeInTheDocument();
     expect(screen.queryByText("Loading files...")).not.toBeInTheDocument();
@@ -475,15 +485,17 @@ describe("FileList", () => {
       commitId: "commit2",
     });
 
-    resolveSecond([
-      {
-        path: "src/second.ts",
-        status: "Added",
-        additions: 10,
-        deletions: 0,
-        old_path: null,
-      },
-    ]);
+    await act(async () => {
+      resolveSecond([
+        {
+          path: "src/second.ts",
+          status: "Added",
+          additions: 10,
+          deletions: 0,
+          old_path: null,
+        },
+      ]);
+    });
 
     await act(async () => {
       await Promise.resolve();

@@ -1,3 +1,4 @@
+import { act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __testing } from "../../hooks/useTheme";
 import { render, screen, userEvent } from "../../test/utils";
@@ -23,8 +24,10 @@ describe("ThemeToggleButton", () => {
     document.documentElement.classList.remove("dark");
   });
 
-  afterEach(() => {
-    window.matchMedia = originalMatchMedia;
+  afterEach(async () => {
+    await act(async () => {
+      window.matchMedia = originalMatchMedia;
+    });
   });
 
   it("renders a button with accessible label", () => {

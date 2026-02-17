@@ -12,6 +12,13 @@ interface UseFileContentsResult {
 const DIFF_FETCH_DEBOUNCE_MS = 120;
 const EMPTY_COMMIT_IDS: string[] = [];
 
+/** Empty result for when no file is selected */
+const EMPTY_RESULT: UseFileContentsResult = {
+  contents: null,
+  isLoading: false,
+  error: null,
+};
+
 /**
  * Fetch file contents for diffing, abstracting away the source.
  * Works for both commit-based diffs (history mode) and working directory diffs (changes mode).
@@ -37,10 +44,9 @@ export function useFileContents(
   const repoPath = repo?.path ?? null;
 
   useEffect(() => {
+    // Return empty result without state updates when no file is selected
     if (!(repoPath && filePath)) {
       previousTargetRef.current = null;
-      setContents(null);
-      setError(null);
       return;
     }
 
@@ -121,6 +127,11 @@ export function useFileContents(
       }
     };
   }, [repoPath, filePath, commitId, commitIds, refreshKey]);
+
+  // Return empty result when no file is selected (avoids act() warnings in tests)
+  if (!(repoPath && filePath)) {
+    return EMPTY_RESULT;
+  }
 
   return { contents, isLoading, error };
 }

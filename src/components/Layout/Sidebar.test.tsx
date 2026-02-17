@@ -29,13 +29,15 @@ describe("Sidebar", () => {
     });
   });
 
-  afterEach(() => {
-    useAppStore.setState({
-      repos: [],
-      selectedRepoId: null,
-      selectedCommitId: null,
-      selectedCommitIds: [],
-      viewMode: "history",
+  afterEach(async () => {
+    await act(async () => {
+      useAppStore.setState({
+        repos: [],
+        selectedRepoId: null,
+        selectedCommitId: null,
+        selectedCommitIds: [],
+        viewMode: "history",
+      });
     });
   });
 
@@ -296,8 +298,10 @@ describe("Sidebar", () => {
     });
 
     // Change selected repo
-    useAppStore.setState({ selectedRepoId: "2" });
-    rerender(<Sidebar />);
+    await act(async () => {
+      useAppStore.setState({ selectedRepoId: "2" });
+      rerender(<Sidebar />);
+    });
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
@@ -525,8 +529,10 @@ describe("Sidebar", () => {
         vi.useFakeTimers();
       });
 
-      afterEach(() => {
-        vi.useRealTimers();
+      afterEach(async () => {
+        await act(async () => {
+          vi.useRealTimers();
+        });
       });
 
       it("polls for changes every 2 seconds when in Changes view", async () => {

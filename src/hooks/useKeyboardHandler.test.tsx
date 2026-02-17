@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../commands";
 import type { KeyBinding } from "../keymaps/types";
@@ -17,8 +17,10 @@ describe("useKeyboardHandler", () => {
     emitSpy = vi.spyOn(commandEmitter, "emit");
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
+    await act(async () => {
+      vi.restoreAllMocks();
+    });
   });
 
   it("emits command when matching key is pressed", () => {

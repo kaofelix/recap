@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../commands";
 import { useAppStore } from "../store/appStore";
@@ -21,8 +21,10 @@ describe("useGlobalCommand", () => {
     useAppStore.setState({ focusedRegion: null });
   });
 
-  afterEach(() => {
-    useAppStore.setState({ focusedRegion: null });
+  afterEach(async () => {
+    await act(async () => {
+      useAppStore.setState({ focusedRegion: null });
+    });
     vi.clearAllMocks();
   });
 

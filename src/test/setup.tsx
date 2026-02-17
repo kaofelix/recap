@@ -1,12 +1,63 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 
-// Cleanup after each test
-afterEach(() => {
-  cleanup();
+// Cleanup after each test - wrap in act() to avoid warnings from pending state updates
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
   vi.clearAllMocks();
+});
+
+// Mock @radix-ui/react-tooltip to avoid act() warnings in tests
+// Radix Tooltip has internal async state that causes warnings in tests
+vi.mock("@radix-ui/react-tooltip", async () => {
+  const React = await import("react");
+
+  const TooltipProvider = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+
+  const TooltipRoot = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+
+  const TooltipTrigger = ({
+    children,
+    asChild,
+  }: {
+    children: React.ReactNode;
+    asChild?: boolean;
+  }) => {
+    if (asChild && React.isValidElement(children)) {
+      return children;
+    }
+    return React.createElement("button", null, children);
+  };
+
+  const TooltipPortal = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+
+  const TooltipContent = ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) =>
+    React.createElement(
+      "div",
+      { className, role: "tooltip", "data-testid": "tooltip-content" },
+      children
+    );
+
+  return {
+    Provider: TooltipProvider,
+    Root: TooltipRoot,
+    Trigger: TooltipTrigger,
+    Portal: TooltipPortal,
+    Content: TooltipContent,
+  };
 });
 
 // Mock localStorage

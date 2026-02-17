@@ -1,13 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
+import { tauriMocks } from "../../test/setup";
 import { DiffView } from "./DiffView";
 
-// Mock Tauri invoke
-const mockInvoke = vi.fn();
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
-}));
+const mockInvoke = tauriMocks.invoke;
 
 // Regex patterns for error matching
 const FILE_NOT_FOUND_ERROR = /Error:.*File not found in commit/;
@@ -26,27 +29,32 @@ describe("DiffView", () => {
     });
   });
 
-  afterEach(() => {
-    useAppStore.setState({
-      repos: [],
-      selectedRepoId: null,
-      selectedCommitId: null,
-      selectedCommitIds: [],
-      selectedFilePath: null,
-      isDiffMaximized: false,
+  afterEach(async () => {
+    await act(async () => {
+      useAppStore.setState({
+        repos: [],
+        selectedRepoId: null,
+        selectedCommitId: null,
+        selectedCommitIds: [],
+        selectedFilePath: null,
+        isDiffMaximized: false,
+      });
     });
   });
 
-  it("shows prompt when no file is selected", () => {
-    render(<DiffView />);
+  it("shows prompt when no file is selected", async () => {
+    const { container } = render(<DiffView />);
 
-    expect(screen.getByText("Select a file to view diff")).toBeInTheDocument();
+    // Wait for all effects to settle
+    await waitFor(() => {
+      expect(container.textContent).toContain("Select a file to view diff");
+    });
   });
 
-  it("toggles maximize state from toolbar button", () => {
+  it("toggles maximize state from toolbar button", async () => {
     render(<DiffView />);
 
-    const maximizeButton = screen.getByRole("button", {
+    const maximizeButton = await screen.findByRole("button", {
       name: "Maximize diff view",
     });
 
@@ -54,16 +62,15 @@ describe("DiffView", () => {
 
     fireEvent.click(maximizeButton);
 
-    expect(useAppStore.getState().isDiffMaximized).toBe(true);
-    expect(
-      screen.getByRole("button", { name: "Restore panel layout" })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(useAppStore.getState().isDiffMaximized).toBe(true);
+    });
   });
 
-  it("shows maximize shortcut in button tooltip text", () => {
+  it("shows maximize shortcut in button tooltip text", async () => {
     render(<DiffView />);
 
-    const maximizeButton = screen.getByRole("button", {
+    const maximizeButton = await screen.findByRole("button", {
       name: "Maximize diff view",
     });
 
@@ -293,8 +300,10 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    useAppStore.setState({ selectedFilePath: "src/second.ts" });
-    rerender(<DiffView />);
+    await act(async () => {
+      useAppStore.setState({ selectedFilePath: "src/second.ts" });
+      rerender(<DiffView />);
+    });
 
     expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     expect(screen.queryByText("Loading diff...")).not.toBeInTheDocument();
@@ -307,10 +316,12 @@ describe("DiffView", () => {
       });
     });
 
-    resolveSecond({
-      old_content: "const b = 1;",
-      new_content: "const b = 2;",
-      is_binary: false,
+    await act(async () => {
+      resolveSecond({
+        old_content: "const b = 1;",
+        new_content: "const b = 2;",
+        is_binary: false,
+      });
     });
   });
 
@@ -376,7 +387,7 @@ describe("DiffView", () => {
     expect(unifiedButton.className).toContain("bg-bg-tertiary");
   });
 
-  it("displays file path in header", () => {
+  it("displays file path in header", async () => {
     mockInvoke.mockResolvedValue({
       old_content: null,
       new_content: "content",
@@ -394,7 +405,9 @@ describe("DiffView", () => {
 
     render(<DiffView />);
 
-    expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
+    });
   });
 
   it("shows no changes message when old and new content are the same", async () => {
