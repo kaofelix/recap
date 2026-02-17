@@ -13,25 +13,38 @@ interface UseWorkingChangesResult {
 const POLL_INTERVAL_MS = 2000;
 
 /**
- * Clear file selection if the selected file is no longer in the changes list.
+ * Keep file selection aligned with available changes.
+ * - Preserve current selection when it still exists.
+ * - Auto-select the first change when there is no valid selection.
+ * - Clear selection when there are no changes.
  */
-function clearStaleSelection(
+function reconcileSelection(
   changes: ChangedFile[],
   selectFile: (path: string | null) => void
 ): void {
   const currentSelectedFile = useAppStore.getState().selectedFilePath;
+
+  if (changes.length === 0) {
+    if (currentSelectedFile !== null) {
+      selectFile(null);
+    }
+    return;
+  }
+
   const fileStillExists = changes.some(
     (file) => file.path === currentSelectedFile
   );
 
-  if (currentSelectedFile && !fileStillExists) {
-    selectFile(null);
+  if (fileStillExists) {
+    return;
   }
+
+  selectFile(changes[0].path);
 }
 
 /**
  * Fetch working changes for a repository with auto-polling when active.
- * Clears file selection when the selected file is no longer in the changes list.
+ * Keeps file selection synchronized with the current changes list.
  */
 export function useWorkingChanges(
   selectedRepo: Repository | null,
@@ -62,7 +75,7 @@ export function useWorkingChanges(
           repoPath: selectedRepo.path,
         });
         setChanges(result);
-        clearStaleSelection(result, selectFile);
+        reconcileSelection(result, selectFile);
 
         // Trigger diff refresh for the selected file during background polling.
         if (!isInitialLoad) {

@@ -448,6 +448,78 @@ describe("Sidebar", () => {
       expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
     });
 
+    it("auto-selects the first changed file when entering Changes view with no selection", async () => {
+      const mockChanges = [
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 10,
+          deletions: 5,
+          old_path: null,
+        },
+        {
+          path: "src/new-file.ts",
+          status: "Untracked",
+          additions: 20,
+          deletions: 0,
+          old_path: null,
+        },
+      ];
+
+      mockInvoke.mockResolvedValue(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedFilePath: null,
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(useAppStore.getState().selectedFilePath).toBe("src/App.tsx");
+      });
+    });
+
+    it("does not override an existing valid file selection in Changes view", async () => {
+      const mockChanges = [
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 10,
+          deletions: 5,
+          old_path: null,
+        },
+        {
+          path: "src/new-file.ts",
+          status: "Untracked",
+          additions: 20,
+          deletions: 0,
+          old_path: null,
+        },
+      ];
+
+      mockInvoke.mockResolvedValue(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedFilePath: "src/new-file.ts",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
+      });
+    });
+
     it("navigates changed files with navigation commands when sidebar is focused", async () => {
       const mockChanges = [
         {
@@ -712,7 +784,7 @@ describe("Sidebar", () => {
         expect(screen.getByText("NewFile.tsx")).toBeInTheDocument();
       });
 
-      it("clears file selection when selected file disappears from changes", async () => {
+      it("auto-selects the first remaining file when selected file disappears from changes", async () => {
         const initialChanges = [
           {
             path: "src/App.tsx",
@@ -770,8 +842,8 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
 
-        // Selection should be cleared since the file no longer exists
-        expect(useAppStore.getState().selectedFilePath).toBeNull();
+        // Selection should move to the first remaining file
+        expect(useAppStore.getState().selectedFilePath).toBe("src/Other.tsx");
       });
     });
   });
