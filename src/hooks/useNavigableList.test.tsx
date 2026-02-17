@@ -154,9 +154,48 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    fireEvent.click(getByRole("button", { name: "c" }));
+    fireEvent.click(getByRole("option", { name: "c" }));
 
     expect(onSelect).toHaveBeenCalledWith("c");
+  });
+
+  it("sets aria-selected on items based on selectedId", () => {
+    const onSelect = vi.fn();
+
+    const { getByRole } = render(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="b"
+        />
+      </FocusProvider>
+    );
+
+    expect(getByRole("option", { name: "a" })).toHaveAttribute(
+      "aria-selected",
+      "false"
+    );
+    expect(getByRole("option", { name: "b" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+  });
+
+  it("sets listbox role on the container", () => {
+    const onSelect = vi.fn();
+
+    const { getByRole } = render(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="a"
+        />
+      </FocusProvider>
+    );
+
+    expect(getByRole("listbox")).toBeInTheDocument();
   });
 
   it("scrolls selected item into view when selectedId changes", () => {
@@ -173,7 +212,7 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    const bButton = getByRole("button", { name: "b" });
+    const bButton = getByRole("option", { name: "b" });
     Object.defineProperty(bButton, "scrollIntoView", {
       value: scrollIntoView,
       writable: true,

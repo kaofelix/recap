@@ -9,13 +9,16 @@ interface UseNavigableListOptions {
 }
 
 interface NavigableItemProps {
+  "aria-selected": boolean;
   "data-item-id": string;
   onClick: () => void;
+  role: "option";
 }
 
 interface UseNavigableListResult {
   containerProps: {
     ref: RefObject<HTMLDivElement | null>;
+    role: "listbox";
   };
   getItemProps: (id: string) => NavigableItemProps;
 }
@@ -91,15 +94,18 @@ export function useNavigableList({
 
   const getItemProps = useCallback(
     (id: string): NavigableItemProps => ({
+      "aria-selected": selectedId === id,
       "data-item-id": id,
       onClick: () => onSelect(id),
+      role: "option",
     }),
-    [onSelect]
+    [onSelect, selectedId]
   );
 
   return {
     containerProps: {
       ref: containerRef,
+      role: "listbox",
     },
     getItemProps,
   };
