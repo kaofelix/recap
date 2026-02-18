@@ -390,6 +390,108 @@ describe("Sidebar", () => {
     expect(useAppStore.getState().selectedCommitId).toBe("commit-b");
   });
 
+  it("uses accent selected commit style when sidebar is focused", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit-a",
+      selectedCommitIds: ["commit-a"],
+      focusedRegion: "sidebar",
+      viewMode: "history",
+    });
+
+    render(
+      <FocusProvider region="sidebar">
+        <Sidebar />
+      </FocusProvider>
+    );
+
+    const row = await screen.findByText("feat: first");
+    const rowButton = row.closest("button");
+    expect(rowButton).toHaveClass("bg-accent-muted");
+  });
+
+  it("uses muted selected commit style when sidebar is unfocused", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit-a",
+      selectedCommitIds: ["commit-a"],
+      focusedRegion: "files",
+      viewMode: "history",
+    });
+
+    render(
+      <FocusProvider region="sidebar">
+        <Sidebar />
+      </FocusProvider>
+    );
+
+    const row = await screen.findByText("feat: first");
+    const rowButton = row.closest("button");
+    expect(rowButton).toHaveClass("bg-list-selected-unfocused");
+    expect(rowButton).not.toHaveClass("bg-accent-muted");
+  });
+
+  it("uses desktop-style commit rows (no pointer cursor and no hover fill)", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "commit-a",
+      viewMode: "history",
+    });
+
+    render(<Sidebar />);
+
+    const row = await screen.findByText("feat: first");
+    const rowButton = row.closest("button");
+    expect(rowButton).toHaveClass("cursor-default");
+    expect(rowButton).not.toHaveClass("cursor-pointer");
+    expect(rowButton).not.toHaveClass("hover:bg-bg-hover");
+  });
+
   describe("commit auto-refresh", () => {
     beforeEach(() => {
       vi.useFakeTimers();

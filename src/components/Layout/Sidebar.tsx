@@ -257,9 +257,11 @@ export function Sidebar({ className }: SidebarProps) {
                 return (
                   <button
                     className={cn(
-                      "w-full cursor-pointer rounded p-2 text-left",
-                      "hover:bg-bg-hover",
-                      selectedCommitIds.includes(commit.id) && "bg-accent-muted"
+                      "w-full cursor-default rounded p-2 text-left",
+                      selectedCommitIds.includes(commit.id) &&
+                        (isFocused
+                          ? "bg-accent-muted"
+                          : "bg-list-selected-unfocused")
                     )}
                     key={commit.id}
                     type="button"
@@ -301,6 +303,7 @@ export function Sidebar({ className }: SidebarProps) {
                 return (
                   <FileListItem
                     file={file}
+                    isFocused={isFocused}
                     isSelected={effectiveSelectedFilePath === file.path}
                     itemId={itemProps["data-item-id"]}
                     key={file.path}

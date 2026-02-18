@@ -142,12 +142,14 @@ function FileListContent({
   files,
   selectedFilePath,
   getItemProps,
+  isFocused,
 }: {
   hasCommit: boolean;
   isLoading: boolean;
   error: string | null;
   files: ChangedFile[];
   selectedFilePath: string | null;
+  isFocused: boolean;
   getItemProps: (id: string) => {
     "aria-selected": boolean;
     "data-item-id": string;
@@ -202,6 +204,7 @@ function FileListContent({
         return (
           <FileListItem
             file={file}
+            isFocused={isFocused}
             isSelected={selectedFilePath === file.path}
             itemId={itemProps["data-item-id"]}
             key={file.path}
@@ -269,6 +272,7 @@ export function FileList({ className }: FileListProps) {
           files={files}
           getItemProps={getItemProps}
           hasCommit={!!selectedCommitId}
+          isFocused={isFocused}
           isLoading={isLoading}
           selectedFilePath={effectiveSelectedFilePath}
         />

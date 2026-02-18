@@ -64,13 +64,33 @@ describe("FileListItem", () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it("applies selected styles when isSelected is true", () => {
+  it("applies accent selected styles when focused", () => {
     const { container } = render(
-      <FileListItem file={mockFile} isSelected={true} onClick={noop} />
+      <FileListItem
+        file={mockFile}
+        isFocused={true}
+        isSelected={true}
+        onClick={noop}
+      />
     );
 
     const item = container.firstChild;
     expect(item).toHaveClass("bg-accent-muted");
+  });
+
+  it("applies muted selected styles when unfocused", () => {
+    const { container } = render(
+      <FileListItem
+        file={mockFile}
+        isFocused={false}
+        isSelected={true}
+        onClick={noop}
+      />
+    );
+
+    const item = container.firstChild;
+    expect(item).toHaveClass("bg-list-selected-unfocused");
+    expect(item).not.toHaveClass("bg-accent-muted");
   });
 
   it("does not apply selected styles when isSelected is false", () => {
@@ -80,6 +100,18 @@ describe("FileListItem", () => {
 
     const item = container.firstChild;
     expect(item).not.toHaveClass("bg-accent-muted");
+    expect(item).not.toHaveClass("bg-list-selected-unfocused");
+  });
+
+  it("uses desktop-style row affordance (no pointer cursor and no hover fill)", () => {
+    const { container } = render(
+      <FileListItem file={mockFile} isSelected={false} onClick={noop} />
+    );
+
+    const item = container.firstChild;
+    expect(item).toHaveClass("cursor-default");
+    expect(item).not.toHaveClass("cursor-pointer");
+    expect(item).not.toHaveClass("hover:bg-bg-hover");
   });
 
   it("renders correct status letter for Added files", () => {

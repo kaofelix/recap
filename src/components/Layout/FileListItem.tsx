@@ -11,6 +11,7 @@ import type { ChangedFile, FileStatus } from "../../types/file";
 export interface FileListItemProps {
   file: ChangedFile;
   isSelected: boolean;
+  isFocused?: boolean;
   onClick: () => void;
   itemId?: string;
 }
@@ -90,6 +91,7 @@ function formatStatsTooltip(additions: number, deletions: number): string {
 export function FileListItem({
   file,
   isSelected,
+  isFocused = false,
   onClick,
   itemId,
 }: FileListItemProps) {
@@ -99,9 +101,9 @@ export function FileListItem({
   return (
     <button
       className={cn(
-        "file-list-item flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left",
-        "hover:bg-bg-hover",
-        isSelected && "bg-accent-muted"
+        "file-list-item flex w-full cursor-default items-center gap-2 rounded px-2 py-1.5 text-left",
+        isSelected &&
+          (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused")
       )}
       data-item-id={itemId}
       onClick={onClick}
