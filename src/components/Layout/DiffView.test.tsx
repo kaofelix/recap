@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { commandEmitter } from "../../commands";
 import { useAppStore } from "../../store/appStore";
 import { tauriMocks } from "../../test/setup";
 import { DiffView } from "./DiffView";
@@ -387,6 +388,62 @@ describe("DiffView", () => {
     expect(unifiedButton.className).toContain("bg-bg-tertiary");
   });
 
+  it("shows | shortcut hint in split/unified button tooltips", () => {
+    render(<DiffView />);
+
+    expect(screen.getByRole("button", { name: "Split view" })).toHaveAttribute(
+      "title",
+      "Split view (toggle |)"
+    );
+    expect(
+      screen.getByRole("button", { name: "Unified view" })
+    ).toHaveAttribute("title", "Unified view (toggle |)");
+  });
+
+  it("toggles display mode when toggle command is emitted", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: "old content",
+      new_content: "new content",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/App.tsx",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+        "data-split-view",
+        "true"
+      );
+    });
+
+    act(() => {
+      commandEmitter.emit("layout.toggleDiffDisplayMode");
+    });
+
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+      "data-split-view",
+      "false"
+    );
+
+    act(() => {
+      commandEmitter.emit("layout.toggleDiffDisplayMode");
+    });
+
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+      "data-split-view",
+      "true"
+    );
+  });
+
   it("displays file path in header", async () => {
     mockInvoke.mockResolvedValue({
       old_content: null,
@@ -638,6 +695,42 @@ describe("DiffView", () => {
 
     expect(screen.getByRole("button", { name: "Split view" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Unified view" })).toBeDisabled();
+  });
+
+  it("does not toggle display mode command for one-sided diffs", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: null,
+      new_content: "new file content",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "new-file.ts",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+        "data-split-view",
+        "false"
+      );
+    });
+
+    act(() => {
+      commandEmitter.emit("layout.toggleDiffDisplayMode");
+    });
+
+    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+      "data-split-view",
+      "false"
+    );
+    expect(localStorage.getItem("diff-view-mode")).toBe("split");
   });
 
   it("disables view mode toggle for deleted files", async () => {

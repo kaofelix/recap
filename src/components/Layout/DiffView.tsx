@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
 import { useFileContents } from "../../hooks/useFileContents";
+import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
@@ -296,6 +297,18 @@ export function DiffView({ className }: DiffViewProps) {
   // Force unified view for added/deleted files (split view wastes space)
   const effectiveDisplayMode = isOneSided ? "unified" : diffDisplayMode;
 
+  const toggleDiffDisplayMode = () => {
+    if (isOneSided) {
+      return;
+    }
+
+    setDiffDisplayMode((current) =>
+      current === "split" ? "unified" : "split"
+    );
+  };
+
+  useGlobalCommand("layout.toggleDiffDisplayMode", toggleDiffDisplayMode);
+
   // Memoize the syntax highlighting render function
   const renderContent = useMemo(() => {
     const language = selectedFilePath
@@ -384,6 +397,7 @@ export function DiffView({ className }: DiffViewProps) {
                     )}
                     disabled={isOneSided}
                     onClick={() => setDiffDisplayMode("split")}
+                    title="Split view (toggle |)"
                     type="button"
                   >
                     <SquareSplitHorizontal className="h-4 w-4" />
@@ -399,7 +413,7 @@ export function DiffView({ className }: DiffViewProps) {
                     )}
                     sideOffset={5}
                   >
-                    Split view
+                    Split view (toggle |)
                   </Content>
                 </Portal>
               </Root>
@@ -421,6 +435,7 @@ export function DiffView({ className }: DiffViewProps) {
                     )}
                     disabled={isOneSided}
                     onClick={() => setDiffDisplayMode("unified")}
+                    title="Unified view (toggle |)"
                     type="button"
                   >
                     <Rows3 className="h-4 w-4" />
@@ -436,7 +451,7 @@ export function DiffView({ className }: DiffViewProps) {
                     )}
                     sideOffset={5}
                   >
-                    Unified view
+                    Unified view (toggle |)
                   </Content>
                 </Portal>
               </Root>

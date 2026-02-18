@@ -66,6 +66,18 @@ describe("useKeyboardHandler", () => {
     expect(emitSpy).toHaveBeenCalledWith("navigation.selectNext");
   });
 
+  it("emits command for shifted symbol keys", () => {
+    const keymap: KeyBinding[] = [
+      { key: "shift+|", command: "layout.toggleDiffDisplayMode" },
+    ];
+
+    render(<KeyboardHandlerTest keymap={keymap} />);
+
+    fireEvent.keyDown(document, { key: "|", shiftKey: true });
+
+    expect(emitSpy).toHaveBeenCalledWith("layout.toggleDiffDisplayMode");
+  });
+
   it("does not emit for non-matching key", () => {
     const keymap: KeyBinding[] = [
       { key: "ArrowDown", command: "navigation.selectNext" },
