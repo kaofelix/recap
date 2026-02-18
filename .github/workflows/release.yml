@@ -44,6 +44,15 @@ jobs:
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
+      - name: Extract release notes from CHANGELOG
+        id: release_notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build, sign, notarize and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -62,7 +71,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Recap ${{ github.ref_name }}'
-          releaseBody: 'See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.'
+          releaseBody: ${{ steps.release_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
