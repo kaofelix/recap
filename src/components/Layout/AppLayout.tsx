@@ -300,8 +300,7 @@ export function AppLayout({ className }: AppLayoutProps) {
           collapsible
           defaultSize="20%"
           id="sidebar"
-          maxSize="35%"
-          minSize="15%"
+          minSize="100px"
           panelRef={sidebarPanelRef}
         >
           <FocusProvider region="sidebar">
@@ -326,8 +325,7 @@ export function AppLayout({ className }: AppLayoutProps) {
               collapsible
               defaultSize="25%"
               id="file-list"
-              maxSize="40%"
-              minSize="15%"
+              minSize="100px"
               panelRef={fileListPanelRef}
             >
               <FocusProvider region="files">
