@@ -22,8 +22,8 @@ describe("AppLayout", () => {
   it("renders the sidebar with view mode toggle", () => {
     render(<AppLayout />);
 
-    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Changes" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Changes" })).toBeInTheDocument();
   });
 
   it("renders the file list panel", () => {

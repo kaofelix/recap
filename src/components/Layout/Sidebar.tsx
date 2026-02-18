@@ -181,38 +181,42 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Header with view mode toggle */}
       <div
         className={cn(
-          "flex h-10 items-center px-2",
+          "flex h-10",
           "border-panel-border border-b",
-          "bg-panel-header-bg",
-          isFocused && "border-l-2 border-l-accent-primary"
+          "bg-panel-header-bg"
         )}
+        role="tablist"
       >
-        <div className="flex gap-1">
-          <button
-            className={cn(
-              "rounded px-3 py-1 font-medium text-sm transition-colors",
-              viewMode === "history"
-                ? "bg-accent-muted text-text-primary"
-                : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
-            )}
-            onClick={() => setViewMode("history")}
-            type="button"
-          >
-            History
-          </button>
-          <button
-            className={cn(
-              "rounded px-3 py-1 font-medium text-sm transition-colors",
-              viewMode === "changes"
-                ? "bg-accent-muted text-text-primary"
-                : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
-            )}
-            onClick={() => setViewMode("changes")}
-            type="button"
-          >
-            Changes
-          </button>
-        </div>
+        <button
+          aria-selected={viewMode === "history"}
+          className={cn(
+            "flex flex-1 items-center justify-center",
+            "border-b-2 font-medium text-xs transition-colors",
+            viewMode === "history"
+              ? "border-accent-primary text-text-primary"
+              : "border-transparent bg-bg-tertiary text-text-secondary hover:text-text-primary"
+          )}
+          onClick={() => setViewMode("history")}
+          role="tab"
+          type="button"
+        >
+          History
+        </button>
+        <button
+          aria-selected={viewMode === "changes"}
+          className={cn(
+            "flex flex-1 items-center justify-center",
+            "border-b-2 font-medium text-xs transition-colors",
+            viewMode === "changes"
+              ? "border-accent-primary text-text-primary"
+              : "border-transparent bg-bg-tertiary text-text-secondary hover:text-text-primary"
+          )}
+          onClick={() => setViewMode("changes")}
+          role="tab"
+          type="button"
+        >
+          Changes
+        </button>
       </div>
 
       {/* Content area */}

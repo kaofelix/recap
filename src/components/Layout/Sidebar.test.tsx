@@ -84,8 +84,8 @@ describe("Sidebar", () => {
   it("shows view mode toggle buttons", () => {
     render(<Sidebar />);
 
-    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Changes" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Changes" })).toBeInTheDocument();
   });
 
   it("shows loading state while fetching commits", async () => {
@@ -612,7 +612,7 @@ describe("Sidebar", () => {
 
       render(<Sidebar />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("get_working_changes", {

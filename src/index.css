@@ -25,7 +25,11 @@
   /* Accent colors */
   --theme-accent-primary: #0969da;
   --theme-accent-hover: #0860c7;
-  --theme-accent-muted: #ddf4ff;
+  --theme-accent-muted: color-mix(
+    in oklch,
+    var(--theme-accent-primary) 15%,
+    white
+  );
   --theme-list-selected-unfocused: #f3f4f6;
 
   /* Diff colors */
@@ -80,7 +84,11 @@
   /* Accent colors */
   --theme-accent-primary: #58a6ff;
   --theme-accent-hover: #79b8ff;
-  --theme-accent-muted: #1f3a5f;
+  --theme-accent-muted: color-mix(
+    in oklch,
+    var(--theme-accent-primary) 20%,
+    var(--theme-bg-secondary)
+  );
   --theme-list-selected-unfocused: #21262d;
 
   /* Diff colors */
