@@ -18,6 +18,7 @@ import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
 import { useFileContents } from "../../hooks/useFileContents";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
+import { useTheme } from "../../hooks/useTheme";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
@@ -53,12 +54,19 @@ const themeVariables = {
     addedColor: "var(--color-diff-add-text)",
     removedBackground: "var(--color-diff-delete-bg)",
     removedColor: "var(--color-diff-delete-text)",
+    changedBackground: "var(--color-bg-hover)",
     wordAddedBackground: "var(--color-diff-add-word-bg)",
     wordRemovedBackground: "var(--color-diff-delete-word-bg)",
     addedGutterBackground: "var(--color-diff-add-gutter-bg)",
     removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
     gutterBackground: "var(--color-panel-header-bg)",
+    gutterBackgroundDark: "var(--color-bg-hover)",
+    highlightBackground: "var(--color-bg-hover)",
+    highlightGutterBackground: "var(--color-bg-hover)",
     gutterColor: "var(--color-text-tertiary)",
+    addedGutterColor: "var(--color-text-primary)",
+    removedGutterColor: "var(--color-text-primary)",
+    codeFoldContentColor: "var(--color-text-secondary)",
     codeFoldBackground: "var(--color-bg-secondary)",
     codeFoldGutterBackground: "var(--color-bg-secondary)",
     emptyLineBackground: "var(--color-bg-secondary)",
@@ -73,12 +81,19 @@ const themeVariables = {
     addedColor: "var(--color-diff-add-text)",
     removedBackground: "var(--color-diff-delete-bg)",
     removedColor: "var(--color-diff-delete-text)",
+    changedBackground: "var(--color-bg-hover)",
     wordAddedBackground: "var(--color-diff-add-word-bg)",
     wordRemovedBackground: "var(--color-diff-delete-word-bg)",
     addedGutterBackground: "var(--color-diff-add-gutter-bg)",
     removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
     gutterBackground: "var(--color-panel-header-bg)",
+    gutterBackgroundDark: "var(--color-bg-hover)",
+    highlightBackground: "var(--color-bg-hover)",
+    highlightGutterBackground: "var(--color-bg-hover)",
     gutterColor: "var(--color-text-tertiary)",
+    addedGutterColor: "var(--color-text-primary)",
+    removedGutterColor: "var(--color-text-primary)",
+    codeFoldContentColor: "var(--color-text-secondary)",
     codeFoldBackground: "var(--color-bg-secondary)",
     codeFoldGutterBackground: "var(--color-bg-secondary)",
     emptyLineBackground: "var(--color-bg-secondary)",
@@ -169,6 +184,7 @@ interface DiffContentProps {
   newValue: string;
   splitView: boolean;
   wordWrap: boolean;
+  isDarkTheme: boolean;
   renderContent: (source: string) => ReactElement;
 }
 
@@ -183,6 +199,7 @@ function DiffContent({
   newValue,
   splitView,
   wordWrap,
+  isDarkTheme,
   renderContent,
 }: DiffContentProps) {
   const diffStyles = useMemo(() => getDiffStyles(wordWrap), [wordWrap]);
@@ -215,7 +232,7 @@ function DiffContent({
       renderContent={renderContent}
       splitView={splitView}
       styles={diffStyles}
-      useDarkTheme={document.documentElement.classList.contains("dark")}
+      useDarkTheme={isDarkTheme}
     />
   );
 }
@@ -228,6 +245,8 @@ export function DiffView({ className }: DiffViewProps) {
   const viewMode = useViewMode();
   const workingChangesRevision = useWorkingChangesRevision();
   const isFocused = useIsFocused();
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const isDiffMaximized = useIsDiffMaximized();
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
@@ -498,6 +517,7 @@ export function DiffView({ className }: DiffViewProps) {
           hasData={hasData}
           hasFile={!!selectedFilePath}
           isBinary={isBinary}
+          isDarkTheme={isDarkTheme}
           isLoading={isLoading}
           newValue={newValue}
           oldValue={oldValue}

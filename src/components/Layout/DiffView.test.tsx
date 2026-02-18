@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../../commands";
+import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
 import { tauriMocks } from "../../test/setup";
 import { DiffView } from "./DiffView";
@@ -20,6 +21,8 @@ describe("DiffView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    themeTesting.resetState();
+    document.documentElement.classList.remove("dark");
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
@@ -129,6 +132,61 @@ describe("DiffView", () => {
       // Check that the diff viewer is rendered
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
+  });
+
+  it("provides explicit gutter hover colors for both light and dark diff themes", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: "line one",
+      new_content: "line two",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/App.tsx",
+    });
+
+    render(<DiffView />);
+
+    const viewer = await screen.findByTestId("diff-viewer");
+
+    expect(viewer).toHaveAttribute(
+      "data-gutter-background-dark-light",
+      "var(--color-bg-hover)"
+    );
+    expect(viewer).toHaveAttribute(
+      "data-gutter-background-dark-dark",
+      "var(--color-bg-hover)"
+    );
+  });
+
+  it("uses resolved theme to drive diff dark mode instead of DOM class", async () => {
+    themeTesting.setThemeMode("dark");
+    document.documentElement.classList.remove("dark");
+
+    mockInvoke.mockResolvedValue({
+      old_content: "line one",
+      new_content: "line two",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      selectedFilePath: "src/App.tsx",
+    });
+
+    render(<DiffView />);
+
+    const viewer = await screen.findByTestId("diff-viewer");
+    expect(viewer).toHaveAttribute("data-use-dark-theme", "true");
   });
 
   it("shows binary file message", async () => {

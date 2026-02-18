@@ -149,11 +149,20 @@ vi.mock("react-diff-viewer-continued", () => ({
     newValue,
     splitView,
     renderContent,
+    useDarkTheme,
+    styles,
   }: {
     oldValue: string;
     newValue: string;
     splitView: boolean;
     renderContent?: (source: string) => React.ReactElement;
+    useDarkTheme?: boolean;
+    styles?: {
+      variables?: {
+        light?: Record<string, string>;
+        dark?: Record<string, string>;
+      };
+    };
   }) => {
     // If renderContent is provided, use it to render the content
     const renderValue = (value: string) => {
@@ -164,7 +173,17 @@ vi.mock("react-diff-viewer-continued", () => ({
     };
 
     return (
-      <div data-split-view={splitView} data-testid="diff-viewer">
+      <div
+        data-gutter-background-dark-dark={
+          styles?.variables?.dark?.gutterBackgroundDark
+        }
+        data-gutter-background-dark-light={
+          styles?.variables?.light?.gutterBackgroundDark
+        }
+        data-split-view={splitView}
+        data-testid="diff-viewer"
+        data-use-dark-theme={String(Boolean(useDarkTheme))}
+      >
         <div data-testid="diff-old">{renderValue(oldValue)}</div>
         <div data-testid="diff-new">{renderValue(newValue)}</div>
       </div>
