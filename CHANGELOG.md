@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-18
+
+### Added
+
+- **Multi-commit range selection** — Select a range of commits to view a combined diff across all selected commits.
+- **Split/Unified diff toggle** — Press `|` to switch between split and unified diff views.
+- **More syntax highlighting** — Swift, Ruby, C, C++, Objective-C, Dockerfile, and Makefile now have syntax highlighting in the diff view.
+- Sidebar panels can now be resized to a smaller minimum width.
+
+### Fixed
+
+- Changes view now selects the first diff automatically on open.
+- History view now refreshes when the repository updates in the background.
+- Dark mode: improved contrast in diff gutter hover and line details.
+
 ## [0.1.6] - 2026-02-16
 
 ### Fixed
