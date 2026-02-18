@@ -25,14 +25,26 @@ import { FileList } from "./FileList";
 import { Sidebar } from "./Sidebar";
 import { Toolbar } from "./Toolbar";
 
-const PANEL_IDS = ["sidebar", "file-list", "diff-view"] as const;
-const LAYOUT_ID = "main-layout";
+// Outer group: sidebar | right-content (stable across all modes)
+const OUTER_LAYOUT_ID = "main-layout";
+const OUTER_PANEL_IDS = ["sidebar", "right-content"] as const;
+
+// Inner group (inside right-content): file-list | diff-view (history) or diff-view (changes)
+const INNER_LAYOUT_ID = "content-layout";
+const INNER_PANEL_IDS = ["file-list", "diff-view"] as const;
 
 // Custom storage for panel layout persistence
 const layoutStorage = {
   getItem: (key: string) => localStorage.getItem(key),
   setItem: (key: string, value: string) => localStorage.setItem(key, value),
 };
+
+const separatorClassName = cn(
+  "w-px bg-panel-border hover:bg-accent-primary/50",
+  "transition-colors duration-150",
+  "data-[active]:bg-accent-primary",
+  "focus:outline-none"
+);
 
 function isPanelCollapsed(panel: PanelImperativeHandle | null) {
   if (!panel) {
@@ -120,6 +132,46 @@ function restorePanels(
   }
 }
 
+interface BeforeMaximizeLayouts {
+  outer: Record<string, number> | null;
+  inner: Record<string, number> | null;
+}
+
+function captureGroupLayouts(
+  outerGroup: GroupImperativeHandle | null,
+  innerGroup: GroupImperativeHandle | null
+): BeforeMaximizeLayouts {
+  try {
+    return {
+      outer: outerGroup?.getLayout() ?? null,
+      inner: innerGroup?.getLayout() ?? null,
+    };
+  } catch {
+    return { outer: null, inner: null };
+  }
+}
+
+function applyGroupLayouts(
+  outerGroup: GroupImperativeHandle | null,
+  innerGroup: GroupImperativeHandle | null,
+  layouts: BeforeMaximizeLayouts
+) {
+  try {
+    if (layouts.outer) {
+      outerGroup?.setLayout(layouts.outer);
+    }
+  } catch {
+    // Group panel structure can briefly differ during view-mode transitions.
+  }
+  try {
+    if (layouts.inner) {
+      innerGroup?.setLayout(layouts.inner);
+    }
+  } catch {
+    // Group panel structure can briefly differ during view-mode transitions.
+  }
+}
+
 function isConsecutiveCommitSelection(
   selectedCommitIds: string[],
   orderedCommitIds: string[]
@@ -157,7 +209,7 @@ function NonConsecutiveCommitsState() {
         </div>
 
         <h3 className="font-semibold text-base text-text-primary leading-tight">
-          Can’t show a diff for non-consecutive commits.
+          Can't show a diff for non-consecutive commits.
         </h3>
         <p className="mt-2 max-w-md text-sm text-text-secondary leading-relaxed">
           Select one commit or a consecutive range to view changes.
@@ -189,20 +241,36 @@ export function AppLayout({ className }: AppLayoutProps) {
     error: commitsError,
   } = useCommits(selectedRepo, shouldTrackCommitOrdering);
 
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: LAYOUT_ID,
-    panelIds: [...PANEL_IDS],
+  // Outer layout: sidebar | right-content — structure never changes, so
+  // sidebar width is naturally preserved across History/Changes mode switches.
+  const {
+    defaultLayout: outerDefaultLayout,
+    onLayoutChanged: outerOnLayoutChanged,
+  } = useDefaultLayout({
+    id: OUTER_LAYOUT_ID,
+    panelIds: [...OUTER_PANEL_IDS],
     storage: layoutStorage,
   });
 
-  const groupRef = useRef<GroupImperativeHandle>(null);
+  // Inner layout: file-list | diff-view — persisted separately from the outer layout.
+  const {
+    defaultLayout: innerDefaultLayout,
+    onLayoutChanged: innerOnLayoutChanged,
+  } = useDefaultLayout({
+    id: INNER_LAYOUT_ID,
+    panelIds: [...INNER_PANEL_IDS],
+    storage: layoutStorage,
+  });
+
+  const outerGroupRef = useRef<GroupImperativeHandle>(null);
+  const innerGroupRef = useRef<GroupImperativeHandle>(null);
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const fileListPanelRef = useRef<PanelImperativeHandle>(null);
-  const collapsedBeforeMaximizeRef = useRef({
+  const collapsedBeforeMaximizeRef = useRef<CollapsedPanelsSnapshot>({
     sidebar: false,
     fileList: false,
   });
-  const layoutBeforeMaximizeRef = useRef<Record<string, number> | null>(null);
+  const layoutBeforeMaximizeRef = useRef<BeforeMaximizeLayouts | null>(null);
   const wasDiffMaximizedRef = useRef(false);
 
   const hasNonConsecutiveSelection =
@@ -215,9 +283,7 @@ export function AppLayout({ className }: AppLayoutProps) {
       commits.map((commit) => commit.id)
     );
 
-  // In changes mode, we hide the file list panel since the sidebar shows files directly.
-  // In history mode with non-consecutive selection, we temporarily show a single
-  // full-width state panel on the right.
+  // File list is shown in the inner group only in history mode with a valid selection.
   const showFileList = viewMode === "history" && !hasNonConsecutiveSelection;
 
   useEffect(() => {
@@ -235,13 +301,10 @@ export function AppLayout({ className }: AppLayoutProps) {
           fileList,
           showFileList
         );
-
-        try {
-          layoutBeforeMaximizeRef.current =
-            groupRef.current?.getLayout() ?? null;
-        } catch {
-          layoutBeforeMaximizeRef.current = null;
-        }
+        layoutBeforeMaximizeRef.current = captureGroupLayouts(
+          outerGroupRef.current,
+          innerGroupRef.current
+        );
       }
 
       maximizePanels(sidebar, fileList, showFileList);
@@ -256,13 +319,13 @@ export function AppLayout({ className }: AppLayoutProps) {
       collapsedBeforeMaximizeRef.current
     );
 
-    const layoutBeforeMaximize = layoutBeforeMaximizeRef.current;
-    if (layoutBeforeMaximize) {
-      try {
-        groupRef.current?.setLayout(layoutBeforeMaximize);
-      } catch {
-        // Group panel structure can briefly differ during view-mode transitions.
-      }
+    const savedLayouts = layoutBeforeMaximizeRef.current;
+    if (savedLayouts) {
+      applyGroupLayouts(
+        outerGroupRef.current,
+        innerGroupRef.current,
+        savedLayouts
+      );
       layoutBeforeMaximizeRef.current = null;
     }
 
@@ -287,14 +350,14 @@ export function AppLayout({ className }: AppLayoutProps) {
     >
       <Toolbar />
 
+      {/* Outer group: sidebar | right-content */}
       <Group
         className="flex-1"
-        defaultLayout={defaultLayout}
-        groupRef={groupRef}
-        onLayoutChanged={onLayoutChanged}
+        defaultLayout={outerDefaultLayout}
+        groupRef={outerGroupRef}
+        onLayoutChanged={outerOnLayoutChanged}
         orientation="horizontal"
       >
-        {/* Sidebar - Commits/Changes Panel */}
         <Panel
           collapsedSize="0px"
           collapsible
@@ -308,55 +371,49 @@ export function AppLayout({ className }: AppLayoutProps) {
           </FocusProvider>
         </Panel>
 
-        <Separator
-          className={cn(
-            "w-px bg-panel-border hover:bg-accent-primary/50",
-            "transition-colors duration-150",
-            "data-[active]:bg-accent-primary",
-            "focus:outline-none"
-          )}
-        />
+        <Separator className={separatorClassName} />
 
-        {/* File List Panel - only visible in history mode */}
-        {showFileList && (
-          <>
-            <Panel
-              collapsedSize="0px"
-              collapsible
-              defaultSize="25%"
-              id="file-list"
-              minSize="100px"
-              panelRef={fileListPanelRef}
-            >
-              <FocusProvider region="files">
-                <FileList className="h-full" />
-              </FocusProvider>
-            </Panel>
+        {/* Right-content panel: always present, contains the inner group */}
+        <Panel defaultSize="80%" id="right-content" minSize="30%">
+          {/* Inner group: file-list | diff-view (history) or diff-view (changes) */}
+          <Group
+            className="h-full"
+            defaultLayout={innerDefaultLayout}
+            groupRef={innerGroupRef}
+            onLayoutChanged={innerOnLayoutChanged}
+            orientation="horizontal"
+          >
+            {/* File list panel — only in history mode with a valid selection */}
+            {showFileList && (
+              <>
+                <Panel
+                  collapsedSize="0px"
+                  collapsible
+                  defaultSize="30%"
+                  id="file-list"
+                  minSize="100px"
+                  panelRef={fileListPanelRef}
+                >
+                  <FocusProvider region="files">
+                    <FileList className="h-full" />
+                  </FocusProvider>
+                </Panel>
 
-            <Separator
-              className={cn(
-                "w-px bg-panel-border hover:bg-accent-primary/50",
-                "transition-colors duration-150",
-                "data-[active]:bg-accent-primary",
-                "focus:outline-none"
+                <Separator className={separatorClassName} />
+              </>
+            )}
+
+            {/* Diff panel — always present in the inner group */}
+            <Panel defaultSize="70%" id="diff-view" minSize="30%">
+              {hasNonConsecutiveSelection ? (
+                <NonConsecutiveCommitsState />
+              ) : (
+                <FocusProvider region="diff">
+                  <DiffView className="h-full" />
+                </FocusProvider>
               )}
-            />
-          </>
-        )}
-
-        {/* Right Panel */}
-        <Panel
-          defaultSize={showFileList ? "55%" : "80%"}
-          id="diff-view"
-          minSize="30%"
-        >
-          {hasNonConsecutiveSelection ? (
-            <NonConsecutiveCommitsState />
-          ) : (
-            <FocusProvider region="diff">
-              <DiffView className="h-full" />
-            </FocusProvider>
-          )}
+            </Panel>
+          </Group>
         </Panel>
       </Group>
     </div>

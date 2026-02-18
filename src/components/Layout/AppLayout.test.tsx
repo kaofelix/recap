@@ -67,11 +67,12 @@ describe("AppLayout", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders three resizable panels", () => {
+  it("renders all resizable panels", () => {
     render(<AppLayout />);
 
     // With our mock, panels have data-testid="panel-{id}"
     expect(screen.getByTestId("panel-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("panel-right-content")).toBeInTheDocument();
     expect(screen.getByTestId("panel-file-list")).toBeInTheDocument();
     expect(screen.getByTestId("panel-diff-view")).toBeInTheDocument();
   });
@@ -80,8 +81,18 @@ describe("AppLayout", () => {
     render(<AppLayout />);
 
     // With our mock, separators have data-testid="panel-separator"
+    // In history mode: 1 outer (sidebar|right-content) + 1 inner (file-list|diff-view)
     const separators = screen.getAllByTestId("panel-separator");
     expect(separators.length).toBe(2);
+  });
+
+  it("renders only one separator in changes mode", () => {
+    useAppStore.setState({ viewMode: "changes" });
+    render(<AppLayout />);
+
+    // In changes mode: 1 outer separator only (no file-list in inner group)
+    const separators = screen.getAllByTestId("panel-separator");
+    expect(separators.length).toBe(1);
   });
 
   it("advances to the next panel on consecutive navigation commands", () => {
@@ -143,13 +154,15 @@ describe("AppLayout", () => {
   });
 
   it("restores previous panel sizes after maximize toggle", () => {
+    // Outer layout: sidebar width is stored under "main-layout"
     localStorage.setItem(
       "mock-panel-layout:main-layout",
-      JSON.stringify({
-        sidebar: 33,
-        "file-list": 17,
-        "diff-view": 50,
-      })
+      JSON.stringify({ sidebar: 33, "right-content": 67 })
+    );
+    // Inner layout: file-list/diff split stored under "content-layout"
+    localStorage.setItem(
+      "mock-panel-layout:content-layout",
+      JSON.stringify({ "file-list": 17, "diff-view": 83 })
     );
 
     render(<AppLayout />);
@@ -170,6 +183,55 @@ describe("AppLayout", () => {
 
     expect(sidebarPanel).toHaveAttribute("data-size", "33");
     expect(fileListPanel).toHaveAttribute("data-size", "17");
+  });
+
+  it("preserves sidebar width when switching from History to Changes mode", () => {
+    localStorage.setItem(
+      "mock-panel-layout:main-layout",
+      JSON.stringify({ sidebar: 33, "right-content": 67 })
+    );
+
+    useAppStore.setState({ viewMode: "history" });
+    render(<AppLayout />);
+
+    expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
+      "data-size",
+      "33"
+    );
+
+    act(() => {
+      useAppStore.getState().setViewMode("changes");
+    });
+
+    // Sidebar is in the outer group which never restructures — width is preserved
+    expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
+      "data-size",
+      "33"
+    );
+  });
+
+  it("preserves sidebar width when switching from Changes to History mode", () => {
+    localStorage.setItem(
+      "mock-panel-layout:main-layout",
+      JSON.stringify({ sidebar: 33, "right-content": 67 })
+    );
+
+    useAppStore.setState({ viewMode: "changes" });
+    render(<AppLayout />);
+
+    expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
+      "data-size",
+      "33"
+    );
+
+    act(() => {
+      useAppStore.getState().setViewMode("history");
+    });
+
+    expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
+      "data-size",
+      "33"
+    );
   });
 
   it("applies custom className", () => {
