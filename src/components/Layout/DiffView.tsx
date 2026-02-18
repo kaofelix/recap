@@ -6,6 +6,8 @@ import {
   Trigger,
 } from "@radix-ui/react-tooltip";
 import {
+  ChevronDown,
+  ChevronUp,
   Maximize,
   Minimize,
   Rows3,
@@ -13,9 +15,10 @@ import {
   WrapText,
 } from "lucide-react";
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
+import { useCommand } from "../../hooks/useCommand";
 import { useFileContents } from "../../hooks/useFileContents";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useTheme } from "../../hooks/useTheme";
@@ -23,6 +26,7 @@ import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
+  useChangedFiles,
   useIsDiffMaximized,
   useSelectedCommitId,
   useSelectedCommitIds,
@@ -31,6 +35,7 @@ import {
   useViewMode,
   useWorkingChangesRevision,
 } from "../../store/appStore";
+import type { ChangedFile } from "../../types/file";
 
 export interface DiffViewProps {
   className?: string;
@@ -142,6 +147,131 @@ function DiffPlaceholder({ message }: { message: string }) {
   );
 }
 
+/** Hook for file navigation logic */
+function useFileNavigation(
+  changedFiles: ChangedFile[],
+  selectedFilePath: string | null
+) {
+  const selectFile = useAppStore((s) => s.selectFile);
+
+  const currentFileIndex = selectedFilePath
+    ? changedFiles.findIndex((f) => f.path === selectedFilePath)
+    : -1;
+  const isFirstFile = currentFileIndex <= 0;
+  const isLastFile =
+    currentFileIndex === -1 || currentFileIndex >= changedFiles.length - 1;
+  const canNavigate = changedFiles.length > 1;
+
+  const selectPreviousFile = useCallback(() => {
+    if (!isFirstFile && currentFileIndex > 0) {
+      selectFile(changedFiles[currentFileIndex - 1].path);
+    }
+  }, [isFirstFile, currentFileIndex, changedFiles, selectFile]);
+
+  const selectNextFile = useCallback(() => {
+    if (!isLastFile && currentFileIndex < changedFiles.length - 1) {
+      selectFile(changedFiles[currentFileIndex + 1].path);
+    }
+  }, [isLastFile, currentFileIndex, changedFiles, selectFile]);
+
+  return {
+    isFirstFile,
+    isLastFile,
+    canNavigate,
+    selectPreviousFile,
+    selectNextFile,
+  };
+}
+
+/** File navigation buttons component */
+function FileNavigationButtons({
+  isFirstFile,
+  isLastFile,
+  canNavigate,
+  onPrevious,
+  onNext,
+}: {
+  isFirstFile: boolean;
+  isLastFile: boolean;
+  canNavigate: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex overflow-hidden rounded border border-border-primary">
+      <Root>
+        <Trigger asChild>
+          <button
+            aria-label="Previous file"
+            className={cn(
+              "flex items-center justify-center p-1",
+              "transition-colors",
+              "bg-bg-secondary text-text-tertiary",
+              !isFirstFile &&
+                canNavigate &&
+                "hover:bg-bg-hover hover:text-text-secondary",
+              (isFirstFile || !canNavigate) && "cursor-not-allowed opacity-50"
+            )}
+            disabled={isFirstFile || !canNavigate}
+            onClick={onPrevious}
+            type="button"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+        </Trigger>
+        <Portal>
+          <Content
+            className={cn(
+              "z-50 rounded px-2 py-1 text-xs",
+              "bg-bg-tertiary text-text-primary",
+              "border border-panel-border shadow-lg",
+              "fade-in-0 zoom-in-95 animate-in duration-100"
+            )}
+            sideOffset={5}
+          >
+            Previous file (↑)
+          </Content>
+        </Portal>
+      </Root>
+      <Root>
+        <Trigger asChild>
+          <button
+            aria-label="Next file"
+            className={cn(
+              "flex items-center justify-center p-1",
+              "border-border-primary border-l",
+              "transition-colors",
+              "bg-bg-secondary text-text-tertiary",
+              !isLastFile &&
+                canNavigate &&
+                "hover:bg-bg-hover hover:text-text-secondary",
+              (isLastFile || !canNavigate) && "cursor-not-allowed opacity-50"
+            )}
+            disabled={isLastFile || !canNavigate}
+            onClick={onNext}
+            type="button"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </Trigger>
+        <Portal>
+          <Content
+            className={cn(
+              "z-50 rounded px-2 py-1 text-xs",
+              "bg-bg-tertiary text-text-primary",
+              "border border-panel-border shadow-lg",
+              "fade-in-0 zoom-in-95 animate-in duration-100"
+            )}
+            sideOffset={5}
+          >
+            Next file (↓)
+          </Content>
+        </Portal>
+      </Root>
+    </div>
+  );
+}
+
 function getMaximizeLabels(isDiffMaximized: boolean) {
   if (isDiffMaximized) {
     return {
@@ -249,6 +379,16 @@ export function DiffView({ className }: DiffViewProps) {
   const isDarkTheme = resolvedTheme === "dark";
   const isDiffMaximized = useIsDiffMaximized();
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
+  const changedFiles = useChangedFiles();
+
+  // File navigation
+  const {
+    isFirstFile,
+    isLastFile,
+    canNavigate,
+    selectPreviousFile,
+    selectNextFile,
+  } = useFileNavigation(changedFiles, selectedFilePath);
 
   const [workingDiffPollTick, setWorkingDiffPollTick] = useState(0);
 
@@ -328,6 +468,10 @@ export function DiffView({ className }: DiffViewProps) {
 
   useGlobalCommand("layout.toggleDiffDisplayMode", toggleDiffDisplayMode);
 
+  // Keyboard navigation for files when diff view is focused
+  useCommand("navigation.selectNext", selectNextFile);
+  useCommand("navigation.selectPrev", selectPreviousFile);
+
   // Memoize the syntax highlighting render function
   const renderContent = useMemo(() => {
     const language = selectedFilePath
@@ -392,6 +536,15 @@ export function DiffView({ className }: DiffViewProps) {
               </Content>
             </Portal>
           </Root>
+
+          {/* File navigation buttons */}
+          <FileNavigationButtons
+            canNavigate={canNavigate}
+            isFirstFile={isFirstFile}
+            isLastFile={isLastFile}
+            onNext={selectNextFile}
+            onPrevious={selectPreviousFile}
+          />
 
           <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
             {selectedFilePath ?? "Diff"}

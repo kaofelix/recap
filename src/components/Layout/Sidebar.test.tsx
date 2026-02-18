@@ -1099,4 +1099,79 @@ describe("Sidebar", () => {
       });
     });
   });
+
+  describe("changedFiles sync", () => {
+    it("syncs working changes to changedFiles store in changes mode", async () => {
+      const mockChanges = [
+        {
+          path: "src/App.tsx",
+          status: "Modified",
+          additions: 5,
+          deletions: 2,
+          old_path: null,
+        },
+        {
+          path: "src/Button.tsx",
+          status: "Added",
+          additions: 10,
+          deletions: 0,
+          old_path: null,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+        changedFiles: [],
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(useAppStore.getState().changedFiles).toEqual(mockChanges);
+      });
+    });
+
+    it("clears changedFiles in store when working changes fetch fails", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "get_working_changes") {
+          return Promise.reject(new Error("Failed to get working changes"));
+        }
+
+        if (command === "list_commits") {
+          return Promise.resolve([]);
+        }
+
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+        changedFiles: [
+          {
+            path: "old-file.ts",
+            status: "Modified",
+            additions: 1,
+            deletions: 1,
+            old_path: null,
+          },
+        ],
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(useAppStore.getState().changedFiles).toEqual([]);
+      });
+    });
+  });
 });

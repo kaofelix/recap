@@ -20,6 +20,7 @@ describe("appStore", () => {
       useAppStore.getState().setViewMode("history");
       useAppStore.getState().setFocusedRegion(null);
       useAppStore.getState().setDiffMaximized(false);
+      useAppStore.getState().setChangedFiles([]);
     });
   });
 
@@ -738,6 +739,170 @@ describe("appStore", () => {
       });
 
       expect(result.current.workingChangesRevision).toBe(1);
+    });
+  });
+
+  describe("changedFiles", () => {
+    const makeFile = (
+      path: string,
+      status: "Modified" | "Added" | "Deleted" = "Modified"
+    ) => ({
+      path,
+      status,
+      additions: 0,
+      deletions: 0,
+      old_path: null,
+    });
+
+    it("should default to empty array", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+
+    it("should update changedFiles via setChangedFiles", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [
+        makeFile("src/App.tsx", "Modified"),
+        makeFile("src/index.ts", "Added"),
+      ];
+
+      act(() => {
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+    });
+
+    it("should be cleared when commit selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [makeFile("src/App.tsx")];
+
+      act(() => {
+        result.current.selectCommit("abc123");
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+
+      act(() => {
+        result.current.selectCommit("def456");
+      });
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+
+    it("should be cleared when commit range selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [makeFile("src/App.tsx")];
+
+      act(() => {
+        result.current.selectCommit("abc123");
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+
+      act(() => {
+        result.current.selectCommitRange(["def456", "ghi789"]);
+      });
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+
+    it("should be cleared when toggling commit selection", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [makeFile("src/App.tsx")];
+
+      act(() => {
+        result.current.selectCommit("abc123");
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+
+      act(() => {
+        result.current.toggleCommitSelection("def456");
+      });
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+
+    it("should be cleared when view mode changes", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [makeFile("src/App.tsx")];
+
+      act(() => {
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+
+      act(() => {
+        result.current.setViewMode("changes");
+      });
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+
+    it("should be cleared when repo selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+      const files = [makeFile("src/App.tsx")];
+
+      act(() => {
+        result.current.addRepo("/path/one");
+        result.current.addRepo("/path/two");
+      });
+
+      const [repo1, repo2] = result.current.repos;
+
+      act(() => {
+        result.current.selectRepo(repo1.id);
+        result.current.setChangedFiles(files);
+      });
+
+      expect(result.current.changedFiles).toEqual(files);
+
+      act(() => {
+        result.current.selectRepo(repo2.id);
+      });
+
+      expect(result.current.changedFiles).toEqual([]);
+    });
+  });
+
+  describe("toggleDiffMaximized focus behavior", () => {
+    it("should set focusedRegion to diff when maximizing", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setFocusedRegion("sidebar");
+      });
+
+      expect(result.current.focusedRegion).toBe("sidebar");
+
+      act(() => {
+        result.current.toggleDiffMaximized();
+      });
+
+      expect(result.current.isDiffMaximized).toBe(true);
+      expect(result.current.focusedRegion).toBe("diff");
+    });
+
+    it("should not change focusedRegion when un-maximizing", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setDiffMaximized(true);
+        result.current.setFocusedRegion("diff");
+      });
+
+      act(() => {
+        result.current.toggleDiffMaximized();
+      });
+
+      expect(result.current.isDiffMaximized).toBe(false);
+      expect(result.current.focusedRegion).toBe("diff");
     });
   });
 });

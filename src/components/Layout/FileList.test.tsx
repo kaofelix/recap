@@ -560,4 +560,67 @@ describe("FileList", () => {
 
     expect(useAppStore.getState().selectedFilePath).toBeNull();
   });
+
+  it("syncs changed files to the global store when loaded", async () => {
+    const mockFiles = [
+      {
+        path: "src/App.tsx",
+        status: "Modified",
+        additions: 10,
+        deletions: 5,
+        old_path: null,
+      },
+      {
+        path: "src/components/Button.tsx",
+        status: "Added",
+        additions: 25,
+        deletions: 0,
+        old_path: null,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockFiles);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      changedFiles: [],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().changedFiles).toEqual(mockFiles);
+    });
+  });
+
+  it("clears changed files in store when fetch fails", async () => {
+    mockInvoke.mockRejectedValue(new Error("Failed to get commit files"));
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: "abc123",
+      changedFiles: [
+        {
+          path: "old-file.ts",
+          status: "Modified",
+          additions: 1,
+          deletions: 1,
+          old_path: null,
+        },
+      ],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().changedFiles).toEqual([]);
+    });
+  });
 });

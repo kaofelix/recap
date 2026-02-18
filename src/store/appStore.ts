@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { ChangedFile } from "../types/file";
 import type { FocusRegion } from "../types/focus";
 import type { Repository } from "../types/repository";
 
@@ -11,6 +12,7 @@ export interface AppState {
   selectedCommitId: string | null;
   selectedCommitIds: string[];
   selectedFilePath: string | null;
+  changedFiles: ChangedFile[];
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
@@ -22,6 +24,7 @@ export interface AppState {
   selectCommitRange: (ids: string[]) => void;
   toggleCommitSelection: (id: string) => void;
   selectFile: (path: string | null) => void;
+  setChangedFiles: (files: ChangedFile[]) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
   setDiffMaximized: (maximized: boolean) => void;
@@ -65,6 +68,7 @@ export const useAppStore = create<AppState>()(
       selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
+      changedFiles: [],
       viewMode: "history" as ViewMode,
       focusedRegion: null,
       isDiffMaximized: false,
@@ -107,6 +111,7 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
+            changedFiles: [],
           }),
         });
       },
@@ -122,16 +127,18 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
+            changedFiles: [],
           });
         }
       },
 
       selectCommit: (id: string | null) => {
-        // Clear file selection when commit changes
+        // Clear file selection and changed files when commit changes
         set({
           selectedCommitId: id,
           selectedCommitIds: id ? [id] : [],
           selectedFilePath: null,
+          changedFiles: [],
         });
       },
 
@@ -141,6 +148,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitId: normalized[0] ?? null,
           selectedCommitIds: normalized,
           selectedFilePath: null,
+          changedFiles: [],
         });
       },
 
@@ -155,12 +163,17 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: selectedCommitIds[0] ?? null,
             selectedCommitIds,
             selectedFilePath: null,
+            changedFiles: [],
           };
         });
       },
 
       selectFile: (path: string | null) => {
         set({ selectedFilePath: path });
+      },
+
+      setChangedFiles: (files: ChangedFile[]) => {
+        set({ changedFiles: files });
       },
 
       setViewMode: (mode: ViewMode) => {
@@ -175,6 +188,7 @@ export const useAppStore = create<AppState>()(
           return {
             viewMode: mode,
             selectedFilePath: null,
+            changedFiles: [],
             focusedRegion,
             isDiffMaximized: false,
           };
@@ -190,7 +204,14 @@ export const useAppStore = create<AppState>()(
       },
 
       toggleDiffMaximized: () => {
-        set((state) => ({ isDiffMaximized: !state.isDiffMaximized }));
+        set((state) => {
+          const willBeMaximized = !state.isDiffMaximized;
+          return {
+            isDiffMaximized: willBeMaximized,
+            // Auto-focus diff panel when maximizing
+            ...(willBeMaximized && { focusedRegion: "diff" as FocusRegion }),
+          };
+        });
       },
 
       bumpWorkingChangesRevision: () => {
@@ -233,6 +254,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitId: null,
           selectedCommitIds: [],
           selectedFilePath: null,
+          changedFiles: [],
           isDiffMaximized: false,
           workingChangesRevision: 0,
         });
@@ -265,3 +287,4 @@ export const useIsDiffMaximized = () =>
   useAppStore((state) => state.isDiffMaximized);
 export const useWorkingChangesRevision = () =>
   useAppStore((state) => state.workingChangesRevision);
+export const useChangedFiles = () => useAppStore((state) => state.changedFiles);

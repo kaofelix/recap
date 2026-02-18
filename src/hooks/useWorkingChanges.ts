@@ -54,6 +54,7 @@ export function useWorkingChanges(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectFile = useAppStore((state) => state.selectFile);
+  const setChangedFiles = useAppStore((state) => state.setChangedFiles);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
   );
@@ -75,6 +76,7 @@ export function useWorkingChanges(
           repoPath: selectedRepo.path,
         });
         setChanges(result);
+        setChangedFiles(result);
         reconcileSelection(result, selectFile);
 
         // Trigger diff refresh for the selected file during background polling.
@@ -84,13 +86,14 @@ export function useWorkingChanges(
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         setChanges([]);
+        setChangedFiles([]);
       } finally {
         if (isInitialLoad) {
           setIsLoading(false);
         }
       }
     },
-    [bumpWorkingChangesRevision, selectFile, selectedRepo]
+    [bumpWorkingChangesRevision, selectFile, selectedRepo, setChangedFiles]
   );
 
   useEffect(() => {

@@ -49,6 +49,7 @@ function useCommitFiles(): UseCommitFilesResult {
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectFile = useAppStore((state) => state.selectFile);
+  const setChangedFiles = useAppStore((state) => state.setChangedFiles);
   const [files, setFiles] = useState<ChangedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,7 @@ function useCommitFiles(): UseCommitFilesResult {
             return;
           }
           setFiles(result);
+          setChangedFiles(result);
           if (result.length > 0) {
             selectFile(result[0].path);
           }
@@ -108,6 +110,7 @@ function useCommitFiles(): UseCommitFilesResult {
           }
           setError(err instanceof Error ? err.message : String(err));
           setFiles([]);
+          setChangedFiles([]);
           selectFile(null);
         })
         .finally(() => {
@@ -130,7 +133,13 @@ function useCommitFiles(): UseCommitFilesResult {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [selectedRepo, selectedCommitId, selectedCommitIds, selectFile]);
+  }, [
+    selectedRepo,
+    selectedCommitId,
+    selectedCommitIds,
+    selectFile,
+    setChangedFiles,
+  ]);
 
   return { files, isLoading, error };
 }

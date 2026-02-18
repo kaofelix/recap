@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../../commands";
+import { FocusProvider } from "../../context/FocusContext";
 import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
 import { tauriMocks } from "../../test/setup";
@@ -18,6 +19,17 @@ const mockInvoke = tauriMocks.invoke;
 const FILE_NOT_FOUND_ERROR = /Error:.*File not found in commit/;
 
 describe("DiffView", () => {
+  const makeFile = (
+    path: string,
+    status: "Modified" | "Added" | "Deleted" = "Modified"
+  ) => ({
+    path,
+    status,
+    additions: 0,
+    deletions: 0,
+    old_path: null,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -29,6 +41,7 @@ describe("DiffView", () => {
       selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
+      changedFiles: [],
       isDiffMaximized: false,
     });
   });
@@ -41,6 +54,7 @@ describe("DiffView", () => {
         selectedCommitId: null,
         selectedCommitIds: [],
         selectedFilePath: null,
+        changedFiles: [],
         isDiffMaximized: false,
       });
     });
@@ -845,5 +859,262 @@ describe("DiffView", () => {
 
     expect(screen.getByRole("button", { name: "Split view" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Unified view" })).toBeEnabled();
+  });
+
+  describe("file navigation", () => {
+    it("shows up and down navigation buttons", () => {
+      useAppStore.setState({
+        changedFiles: [makeFile("src/a.ts"), makeFile("src/b.ts")],
+        selectedFilePath: "src/a.ts",
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Next file" })
+      ).toBeInTheDocument();
+    });
+
+    it("disables up button when first file is selected", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/a.ts",
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Next file" })).toBeEnabled();
+    });
+
+    it("disables down button when last file is selected", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/c.ts",
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Next file" })).toBeDisabled();
+    });
+
+    it("enables both buttons when middle file is selected", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/b.ts",
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Next file" })).toBeEnabled();
+    });
+
+    it("disables both buttons when only one file exists", () => {
+      useAppStore.setState({
+        changedFiles: [makeFile("src/only.ts")],
+        selectedFilePath: "src/only.ts",
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Next file" })).toBeDisabled();
+    });
+
+    it("selects next file when clicking down button", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/a.ts",
+      });
+
+      render(<DiffView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Next file" }));
+
+      expect(useAppStore.getState().selectedFilePath).toBe("src/b.ts");
+    });
+
+    it("selects previous file when clicking up button", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/b.ts",
+      });
+
+      render(<DiffView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Previous file" }));
+
+      expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
+    });
+
+    it("disables both buttons when no files exist", () => {
+      useAppStore.setState({
+        changedFiles: [],
+        selectedFilePath: null,
+      });
+
+      render(<DiffView />);
+
+      expect(
+        screen.getByRole("button", { name: "Previous file" })
+      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Next file" })).toBeDisabled();
+    });
+
+    it("navigates to next file on navigation.selectNext command when focused", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/a.ts",
+        focusedRegion: "diff",
+      });
+
+      render(
+        <FocusProvider region="diff">
+          <DiffView />
+        </FocusProvider>
+      );
+
+      act(() => {
+        commandEmitter.emit("navigation.selectNext");
+      });
+
+      expect(useAppStore.getState().selectedFilePath).toBe("src/b.ts");
+    });
+
+    it("navigates to previous file on navigation.selectPrev command when focused", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/b.ts",
+        focusedRegion: "diff",
+      });
+
+      render(
+        <FocusProvider region="diff">
+          <DiffView />
+        </FocusProvider>
+      );
+
+      act(() => {
+        commandEmitter.emit("navigation.selectPrev");
+      });
+
+      expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
+    });
+
+    it("does not navigate when diff view is not focused", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/a.ts",
+        focusedRegion: "sidebar",
+      });
+
+      render(
+        <FocusProvider region="diff">
+          <DiffView />
+        </FocusProvider>
+      );
+
+      act(() => {
+        commandEmitter.emit("navigation.selectNext");
+      });
+
+      // Should NOT change because diff is not focused
+      expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
+    });
+
+    it("does not navigate past first file on selectPrev", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/a.ts",
+        focusedRegion: "diff",
+      });
+
+      render(
+        <FocusProvider region="diff">
+          <DiffView />
+        </FocusProvider>
+      );
+
+      act(() => {
+        commandEmitter.emit("navigation.selectPrev");
+      });
+
+      // Should stay on first file
+      expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
+    });
+
+    it("does not navigate past last file on selectNext", () => {
+      useAppStore.setState({
+        changedFiles: [
+          makeFile("src/a.ts"),
+          makeFile("src/b.ts"),
+          makeFile("src/c.ts"),
+        ],
+        selectedFilePath: "src/c.ts",
+        focusedRegion: "diff",
+      });
+
+      render(
+        <FocusProvider region="diff">
+          <DiffView />
+        </FocusProvider>
+      );
+
+      act(() => {
+        commandEmitter.emit("navigation.selectNext");
+      });
+
+      // Should stay on last file
+      expect(useAppStore.getState().selectedFilePath).toBe("src/c.ts");
+    });
   });
 });
