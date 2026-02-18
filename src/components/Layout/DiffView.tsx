@@ -23,7 +23,7 @@ import { useFileContents } from "../../hooks/useFileContents";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useTheme } from "../../hooks/useTheme";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
-import { cn } from "../../lib/utils";
+import { cn, splitPath } from "../../lib/utils";
 import {
   useAppStore,
   useChangedFiles,
@@ -269,6 +269,25 @@ function FileNavigationButtons({
         </Portal>
       </Root>
     </div>
+  );
+}
+
+/** Display file path with muted directory */
+function DiffFilePath({ path }: { path: string | null }) {
+  if (!path) {
+    return <span className="font-semibold text-text-primary">Diff</span>;
+  }
+
+  const { dir, filename } = splitPath(path);
+  return (
+    <>
+      {dir && (
+        <span className="shrink truncate text-text-secondary">{dir}</span>
+      )}
+      <span className="shrink-0 font-semibold text-text-primary">
+        {filename}
+      </span>
+    </>
   );
 }
 
@@ -546,8 +565,8 @@ export function DiffView({ className }: DiffViewProps) {
             onPrevious={selectPreviousFile}
           />
 
-          <h2 className="min-w-0 flex-1 truncate font-semibold text-sm text-text-primary">
-            {selectedFilePath ?? "Diff"}
+          <h2 className="flex min-w-0 flex-1 overflow-hidden text-sm">
+            <DiffFilePath path={selectedFilePath} />
           </h2>
 
           <div className="flex shrink-0 items-center gap-3">

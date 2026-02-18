@@ -516,7 +516,7 @@ describe("DiffView", () => {
     );
   });
 
-  it("displays file path in header", async () => {
+  it("displays file path in header with muted directory", async () => {
     mockInvoke.mockResolvedValue({
       old_content: null,
       new_content: "content",
@@ -535,7 +535,10 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     await waitFor(() => {
-      expect(screen.getByText("src/components/Button.tsx")).toBeInTheDocument();
+      // Directory should be muted (text-text-secondary)
+      expect(screen.getByText("src/components/")).toBeInTheDocument();
+      // Filename should be prominent
+      expect(screen.getByText("Button.tsx")).toBeInTheDocument();
     });
   });
 
