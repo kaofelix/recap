@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-19
+
+### Added
+
+- **File navigation in Diff Focus** — When the diff panel is maximized, use the ↑/↓ arrow buttons in the header (or keyboard arrow keys) to move between files without leaving the focused view.
+- Diff header now shows the directory path in a muted color so the filename stands out.
+
+### Fixed
+
+- Sidebar width is now preserved when switching between History and Changes views.
+
 ## [0.2.0] - 2026-02-18
 
 ### Added
