@@ -9,6 +9,7 @@ export function UpdateNotification() {
     error,
     downloadAndInstall,
     dismissUpdate,
+    dismissError,
   } = useUpdater();
 
   // Show checking state briefly
@@ -30,7 +31,7 @@ export function UpdateNotification() {
         <button
           aria-label="Dismiss"
           className="rounded p-1 hover:bg-red-700"
-          onClick={() => dismissUpdate()}
+          onClick={dismissError}
           type="button"
         >
           <X className="h-4 w-4" />

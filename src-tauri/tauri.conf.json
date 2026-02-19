@@ -36,7 +36,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/kaofelix/recap/releases/latest/download/{{target}}-{{arch}}.json"
+        "https://github.com/kaofelix/recap/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE2NzAzMTk0RTZCNEM4MDYKUldRR3lMVG1sREZ3RmdCT0h0U2FGN1ZVVjhaTEJQT1RLc0lobXJZaWswVFZZWTFjYmQ2WVBVa2MK"
     }

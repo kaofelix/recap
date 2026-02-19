@@ -77,6 +77,10 @@ export function useUpdater() {
     setState((prev) => ({ ...prev, updateAvailable: null }));
   }, []);
 
+  const dismissError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
+
   // Check for updates on mount (after a short delay)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -91,5 +95,6 @@ export function useUpdater() {
     checkForUpdates,
     downloadAndInstall,
     dismissUpdate,
+    dismissError,
   };
 }
