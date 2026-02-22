@@ -153,6 +153,24 @@ describe("AppLayout", () => {
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 
+  it("toggles diff maximize via ] keyboard shortcut", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "]" }));
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "]" }));
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+  });
+
   it("restores previous panel sizes after maximize toggle", () => {
     // Outer layout: sidebar width is stored under "main-layout"
     localStorage.setItem(

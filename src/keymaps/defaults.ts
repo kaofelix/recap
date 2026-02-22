@@ -17,6 +17,7 @@ export const defaultKeymap: KeyBinding[] = [
   // Diff layout controls
   { key: "meta+Enter", command: "layout.toggleDiffMaximized" },
   { key: "ctrl+Enter", command: "layout.toggleDiffMaximized" },
+  { key: "]", command: "layout.toggleDiffMaximized" },
   { key: "|", command: "layout.toggleDiffDisplayMode" },
   { key: "shift+|", command: "layout.toggleDiffDisplayMode" },
 ];
