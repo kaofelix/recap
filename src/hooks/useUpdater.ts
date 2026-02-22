@@ -86,16 +86,16 @@ export function useUpdater() {
     let unlisten: null | (() => void) = null;
 
     const setup = async () => {
-      try {
-        unlisten = await listen("menu://check-for-updates", () => {
-          checkForUpdates().catch(() => undefined);
+      unlisten = await listen("menu://check-for-updates", () => {
+        checkForUpdates().catch((error) => {
+          console.error("Failed to check for updates from menu event", error);
         });
-      } catch {
-        // Ignore listener setup errors outside desktop runtime.
-      }
+      });
     };
 
-    setup().catch(() => undefined);
+    setup().catch((error) => {
+      console.error("Failed to set up check-for-updates menu listener", error);
+    });
 
     return () => {
       if (unlisten) {
@@ -107,7 +107,9 @@ export function useUpdater() {
   // Check for updates on mount (after a short delay)
   useEffect(() => {
     const timer = setTimeout(() => {
-      checkForUpdates().catch(() => undefined);
+      checkForUpdates().catch((error) => {
+        console.error("Failed to check for updates on startup", error);
+      });
     }, 3000);
 
     return () => clearTimeout(timer);
