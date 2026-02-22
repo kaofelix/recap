@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-23
+
+### Added
+
+- **Check for Updates menu action** — Added `Recap → Check for Updates…` in the app menu.
+
+### Changed
+
+- **More discreet update status UI** — Replaced the bottom-right updater toast with a subtle inline status message in the toolbar.
+- When an update is available, the toolbar now shows an underlined **Update and restart** action.
+
 ## [0.2.3] - 2026-02-22
 
 ### Added
