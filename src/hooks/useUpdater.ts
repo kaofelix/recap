@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useState } from "react";
@@ -81,10 +82,32 @@ export function useUpdater() {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
+  useEffect(() => {
+    let unlisten: null | (() => void) = null;
+
+    const setup = async () => {
+      try {
+        unlisten = await listen("menu://check-for-updates", () => {
+          checkForUpdates().catch(() => undefined);
+        });
+      } catch {
+        // Ignore listener setup errors outside desktop runtime.
+      }
+    };
+
+    setup().catch(() => undefined);
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [checkForUpdates]);
+
   // Check for updates on mount (after a short delay)
   useEffect(() => {
     const timer = setTimeout(() => {
-      checkForUpdates();
+      checkForUpdates().catch(() => undefined);
     }, 3000);
 
     return () => clearTimeout(timer);
