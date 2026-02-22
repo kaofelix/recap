@@ -6,3 +6,4 @@ export type { RepoPickerButtonProps } from "./RepoPickerButton";
 export { RepoPickerButton } from "./RepoPickerButton";
 export type { ThemeToggleButtonProps } from "./ThemeToggleButton";
 export { ThemeToggleButton } from "./ThemeToggleButton";
+export { UpdaterStatus } from "./UpdaterStatus";

@@ -4,6 +4,7 @@ import {
   BranchPickerButton,
   RepoPickerButton,
   ThemeToggleButton,
+  UpdaterStatus,
 } from "../Toolbar";
 
 export interface ToolbarProps {
@@ -38,7 +39,8 @@ export function Toolbar({ className }: ToolbarProps) {
         <BranchPickerButton />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-3">
+        <UpdaterStatus />
         <ThemeToggleButton />
       </div>
     </header>
