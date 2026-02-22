@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-02-23
+
+### Improved
+
+- **Diff viewer scroll performance** — Enabled virtualization so only visible lines are rendered, significantly improving performance when scrolling through large diffs.
+
 ## [0.2.4] - 2026-02-23
 
 ### Added
