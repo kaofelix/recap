@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-22
+
+### Added
+
+- **Keyboard shortcut to toggle Diff Focus** — Press `]` to maximize/restore the diff panel quickly.
+
+### Fixed
+
+- **Updater reliability** — Corrected updater endpoint and app permissions so update checks work reliably.
+- **Updater error notification dismissal** — The update error toast can now be dismissed correctly.
+
 ## [0.2.2] - 2026-02-19
 
 ### Added
