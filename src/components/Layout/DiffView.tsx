@@ -376,7 +376,6 @@ function DiffContent({
     <ReactDiffViewer
       compareMethod={DiffMethod.WORDS}
       hideLineNumbers={false}
-      hideSummary
       infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
       newValue={newValue}
       oldValue={oldValue}

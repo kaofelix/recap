@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-23
+
+### Fixed
+
+- **Diff viewer expand button** — Restored the expand/collapse button in diff folded context sections that was accidentally hidden when virtualization was enabled.
+
 ## [0.2.5] - 2026-02-23
 
 ### Improved
