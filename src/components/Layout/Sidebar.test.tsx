@@ -19,7 +19,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 function mockChangesOnly(changes: unknown[]) {
   mockInvoke.mockImplementation((command: unknown) => {
-    if (command === "get_working_changes") {
+    if (command === "get_working_changes_ex") {
       return Promise.resolve(changes);
     }
 
@@ -35,7 +35,7 @@ function mockChangesSequence(sequence: unknown[][]) {
   let callIndex = 0;
 
   mockInvoke.mockImplementation((command: unknown) => {
-    if (command === "get_working_changes") {
+    if (command === "get_working_changes_ex") {
       const index = Math.min(callIndex, sequence.length - 1);
       callIndex += 1;
       return Promise.resolve(sequence[index] ?? []);
@@ -57,6 +57,7 @@ describe("Sidebar", () => {
       selectedRepoId: null,
       selectedCommitId: null,
       selectedCommitIds: [],
+      selectedChangeId: null,
       viewMode: "history",
     });
   });
@@ -68,6 +69,7 @@ describe("Sidebar", () => {
         selectedRepoId: null,
         selectedCommitId: null,
         selectedCommitIds: [],
+        selectedChangeId: null,
         viewMode: "history",
       });
     });
@@ -561,7 +563,7 @@ describe("Sidebar", () => {
           return Promise.resolve([]);
         }
 
-        if (command === "get_working_changes") {
+        if (command === "get_working_changes_ex") {
           return Promise.resolve([]);
         }
 
@@ -615,7 +617,7 @@ describe("Sidebar", () => {
       fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
 
       await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith("get_working_changes", {
+        expect(mockInvoke).toHaveBeenCalledWith("get_working_changes_ex", {
           repoPath: "/test/repo",
         });
       });
@@ -653,17 +655,25 @@ describe("Sidebar", () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 10,
-          deletions: 5,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
         {
           path: "src/new-file.ts",
-          status: "Untracked",
-          additions: 20,
-          deletions: 0,
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "unstaged" as const,
         },
       ];
 
@@ -689,21 +699,314 @@ describe("Sidebar", () => {
       expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
     });
 
+    it("renders staged and unstaged sections with counts", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
+        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+      });
+    });
+
+    it("hides empty sections", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText("Unstaged Changes")).not.toBeInTheDocument();
+    });
+
+    it("shows staged section above unstaged section", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        const stagedHeader = screen.getByText("Staged Changes (1)");
+        const unstagedHeader = screen.getByText("Unstaged Changes (1)");
+
+        // Staged should come before unstaged in document order
+        expect(stagedHeader.compareDocumentPosition(unstagedHeader)).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING
+        );
+      });
+    });
+
+    it("handles same file appearing in both sections", async () => {
+      const mockChanges = [
+        {
+          path: "src/file.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 5,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+        {
+          path: "src/file.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 3,
+          unstaged_deletions: 1,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        // Both sections should show
+        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
+        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+
+        // File should appear twice (once in each section)
+        const fileItems = screen.getAllByText("file.ts");
+        expect(fileItems).toHaveLength(2);
+      });
+    });
+
+    it("selects the clicked section when the same file appears in both sections", async () => {
+      const mockChanges = [
+        {
+          path: "src/file.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 1,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+        {
+          path: "src/file.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 1,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedFilePath: "src/file.ts",
+        selectedChangeId: "src/file.ts#staged",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      const rows = await screen.findAllByText("file.ts");
+      const unstagedRow = rows[1].closest("button");
+      expect(unstagedRow).not.toBeNull();
+      if (!unstagedRow) {
+        throw new Error("Expected unstaged row button");
+      }
+
+      fireEvent.click(unstagedRow);
+
+      expect(useAppStore.getState().selectedChangeId).toBe(
+        "src/file.ts#unstaged"
+      );
+      expect(useAppStore.getState().selectedFilePath).toBe("src/file.ts");
+    });
+
+    it("navigates continuously across section boundary", async () => {
+      const mockChanges = [
+        {
+          path: "src/a.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 1,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+        {
+          path: "src/b.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 1,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedFilePath: "src/a.ts",
+        selectedChangeId: "src/a.ts#staged",
+        focusedRegion: "sidebar",
+        viewMode: "changes",
+      });
+
+      render(
+        <FocusProvider region="sidebar">
+          <Sidebar />
+        </FocusProvider>
+      );
+
+      await screen.findByText("a.ts");
+
+      act(() => {
+        commandEmitter.emit("navigation.selectNext");
+      });
+
+      expect(useAppStore.getState().selectedChangeId).toBe("src/b.ts#unstaged");
+    });
+
     it("auto-selects the first changed file when entering Changes view with no selection", async () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 10,
-          deletions: 5,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
         {
           path: "src/new-file.ts",
-          status: "Untracked",
-          additions: 20,
-          deletions: 0,
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "unstaged" as const,
         },
       ];
 
@@ -729,17 +1032,25 @@ describe("Sidebar", () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 10,
-          deletions: 5,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
         {
           path: "src/new-file.ts",
-          status: "Untracked",
-          additions: 20,
-          deletions: 0,
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "unstaged" as const,
         },
       ];
 
@@ -751,6 +1062,7 @@ describe("Sidebar", () => {
         ],
         selectedRepoId: "1",
         selectedFilePath: "src/new-file.ts",
+        selectedChangeId: "src/new-file.ts#unstaged",
         viewMode: "changes",
       });
 
@@ -758,6 +1070,9 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
+        expect(useAppStore.getState().selectedChangeId).toBe(
+          "src/new-file.ts#unstaged"
+        );
       });
     });
 
@@ -765,17 +1080,25 @@ describe("Sidebar", () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 10,
-          deletions: 5,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
         {
           path: "src/new-file.ts",
-          status: "Untracked",
-          additions: 20,
-          deletions: 0,
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "unstaged" as const,
         },
       ];
 
@@ -812,10 +1135,14 @@ describe("Sidebar", () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 10,
-          deletions: 5,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
       ];
 
@@ -852,10 +1179,14 @@ describe("Sidebar", () => {
         const mockChanges = [
           {
             path: "src/App.tsx",
-            status: "Modified",
-            additions: 10,
-            deletions: 5,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 10,
+            staged_deletions: 5,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
         ];
 
@@ -876,7 +1207,7 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
         const initialChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(initialChangesCalls).toBe(1);
 
@@ -886,7 +1217,7 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
         const firstPolledChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(firstPolledChangesCalls).toBe(2);
 
@@ -896,7 +1227,7 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
         const secondPolledChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(secondPolledChangesCalls).toBe(3);
       });
@@ -920,7 +1251,7 @@ describe("Sidebar", () => {
         });
 
         const changesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
 
         // Switch to history view
@@ -934,9 +1265,9 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
 
-        // Should not have made any more get_working_changes calls
+        // Should not have made any more get_working_changes_ex calls
         const newChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(newChangesCalls).toBe(changesCalls);
       });
@@ -959,7 +1290,7 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
         const initialChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(initialChangesCalls).toBe(1);
 
@@ -972,9 +1303,9 @@ describe("Sidebar", () => {
           await Promise.resolve();
         });
 
-        // Should not have made any more get_working_changes calls
+        // Should not have made any more get_working_changes_ex calls
         const postUnmountChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes"
+          (call) => call[0] === "get_working_changes_ex"
         ).length;
         expect(postUnmountChangesCalls).toBe(1);
       });
@@ -983,27 +1314,39 @@ describe("Sidebar", () => {
         const initialChanges = [
           {
             path: "src/App.tsx",
-            status: "Modified",
-            additions: 5,
-            deletions: 2,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 5,
+            staged_deletions: 2,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
         ];
 
         const updatedChanges = [
           {
             path: "src/App.tsx",
-            status: "Modified",
-            additions: 5,
-            deletions: 2,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 5,
+            staged_deletions: 2,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
           {
             path: "src/NewFile.tsx",
-            status: "Untracked",
-            additions: 10,
-            deletions: 0,
+            staged_status: null,
+            unstaged_status: "Untracked",
+            staged_additions: 0,
+            staged_deletions: 0,
+            unstaged_additions: 10,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "unstaged" as const,
           },
         ];
 
@@ -1042,17 +1385,25 @@ describe("Sidebar", () => {
         const initialChanges = [
           {
             path: "src/App.tsx",
-            status: "Modified",
-            additions: 5,
-            deletions: 2,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 5,
+            staged_deletions: 2,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
           {
             path: "src/Other.tsx",
-            status: "Modified",
-            additions: 3,
-            deletions: 1,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 3,
+            staged_deletions: 1,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
         ];
 
@@ -1060,10 +1411,14 @@ describe("Sidebar", () => {
         const updatedChanges = [
           {
             path: "src/Other.tsx",
-            status: "Modified",
-            additions: 3,
-            deletions: 1,
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 3,
+            staged_deletions: 1,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
         ];
 
@@ -1105,17 +1460,25 @@ describe("Sidebar", () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
-          status: "Modified",
-          additions: 5,
-          deletions: 2,
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 5,
+          staged_deletions: 2,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
         {
           path: "src/Button.tsx",
-          status: "Added",
-          additions: 10,
-          deletions: 0,
+          staged_status: "Added",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
           old_path: null,
+          section: "staged" as const,
         },
       ];
 
@@ -1139,7 +1502,7 @@ describe("Sidebar", () => {
 
     it("clears changedFiles in store when working changes fetch fails", async () => {
       mockInvoke.mockImplementation((command: unknown) => {
-        if (command === "get_working_changes") {
+        if (command === "get_working_changes_ex") {
           return Promise.reject(new Error("Failed to get working changes"));
         }
 
@@ -1159,10 +1522,14 @@ describe("Sidebar", () => {
         changedFiles: [
           {
             path: "old-file.ts",
-            status: "Modified",
-            additions: 1,
-            deletions: 1,
+            staged_status: "Modified" as const,
+            unstaged_status: null,
+            staged_additions: 1,
+            staged_deletions: 1,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
             old_path: null,
+            section: "staged" as const,
           },
         ],
       });

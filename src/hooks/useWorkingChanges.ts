@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { buildWorkingChangesListModel } from "../lib/workingChangesList";
 import { useAppStore } from "../store/appStore";
-import type { ChangedFile } from "../types/file";
+import type { WorkingFile } from "../types/file";
 import type { Repository } from "../types/repository";
 
 interface UseWorkingChangesResult {
-  changes: ChangedFile[];
+  changes: WorkingFile[];
   isLoading: boolean;
   error: string | null;
 }
@@ -19,27 +20,38 @@ const POLL_INTERVAL_MS = 2000;
  * - Clear selection when there are no changes.
  */
 function reconcileSelection(
-  changes: ChangedFile[],
-  selectFile: (path: string | null) => void
+  changes: WorkingFile[],
+  selectChange: (id: string | null) => void
 ): void {
-  const currentSelectedFile = useAppStore.getState().selectedFilePath;
+  const { selectedChangeId, selectedFilePath } = useAppStore.getState();
+  const listModel = buildWorkingChangesListModel(changes);
 
-  if (changes.length === 0) {
-    if (currentSelectedFile !== null) {
-      selectFile(null);
+  if (listModel.items.length === 0) {
+    if (selectedChangeId !== null || selectedFilePath !== null) {
+      selectChange(null);
     }
     return;
   }
 
-  const fileStillExists = changes.some(
-    (file) => file.path === currentSelectedFile
-  );
-
-  if (fileStillExists) {
+  if (
+    selectedChangeId !== null &&
+    listModel.items.some((item) => item.id === selectedChangeId)
+  ) {
     return;
   }
 
-  selectFile(changes[0].path);
+  if (selectedFilePath) {
+    const firstMatchingPathItem = listModel.items.find(
+      (item) => item.path === selectedFilePath
+    );
+
+    if (firstMatchingPathItem) {
+      selectChange(firstMatchingPathItem.id);
+      return;
+    }
+  }
+
+  selectChange(listModel.items[0].id);
 }
 
 /**
@@ -50,10 +62,10 @@ export function useWorkingChanges(
   selectedRepo: Repository | null,
   isActive: boolean
 ): UseWorkingChangesResult {
-  const [changes, setChanges] = useState<ChangedFile[]>([]);
+  const [changes, setChanges] = useState<WorkingFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const selectFile = useAppStore((state) => state.selectFile);
+  const selectChange = useAppStore((state) => state.selectChange);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
@@ -72,12 +84,12 @@ export function useWorkingChanges(
       setError(null);
 
       try {
-        const result = await invoke<ChangedFile[]>("get_working_changes", {
+        const result = await invoke<WorkingFile[]>("get_working_changes_ex", {
           repoPath: selectedRepo.path,
         });
         setChanges(result);
         setChangedFiles(result);
-        reconcileSelection(result, selectFile);
+        reconcileSelection(result, selectChange);
 
         // Trigger diff refresh for the selected file during background polling.
         if (!isInitialLoad) {
@@ -93,7 +105,7 @@ export function useWorkingChanges(
         }
       }
     },
-    [bumpWorkingChangesRevision, selectFile, selectedRepo, setChangedFiles]
+    [bumpWorkingChangesRevision, selectChange, selectedRepo, setChangedFiles]
   );
 
   useEffect(() => {

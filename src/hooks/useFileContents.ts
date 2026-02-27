@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import type { FileContents } from "../types/diff";
+import type { WorkingFileSection } from "../types/file";
 import type { Repository } from "../types/repository";
 
 interface UseFileContentsResult {
@@ -27,13 +28,16 @@ const EMPTY_RESULT: UseFileContentsResult = {
  * @param filePath - The file path to fetch
  * @param commitId - If provided, fetch from this commit. If null, fetch from working directory.
  * @param commitIds - Optional commit selection (single or range) for history mode.
+ * @param refreshKey - Optional key to force refresh.
+ * @param section - For changes mode, 'staged' or 'unstaged' to determine which diff to show.
  */
 export function useFileContents(
   repo: Repository | null,
   filePath: string | null,
   commitId: string | null,
   commitIds: string[] = EMPTY_COMMIT_IDS,
-  refreshKey = 0
+  refreshKey = 0,
+  section: WorkingFileSection | null = null
 ): UseFileContentsResult {
   const [contents, setContents] = useState<FileContents | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +93,21 @@ export function useFileContents(
         });
       }
 
+      // In changes mode, use section to determine which command to call
+      if (section === "staged") {
+        return invoke<FileContents>("get_staged_file_contents", {
+          repoPath,
+          filePath,
+        });
+      }
+
+      if (section === "unstaged") {
+        return invoke<FileContents>("get_unstaged_file_contents", {
+          repoPath,
+          filePath,
+        });
+      }
+
       return invoke<FileContents>("get_working_file_contents", {
         repoPath,
         filePath,
@@ -126,7 +145,7 @@ export function useFileContents(
         window.clearTimeout(timeoutId);
       }
     };
-  }, [repoPath, filePath, commitId, commitIds, refreshKey]);
+  }, [repoPath, filePath, commitId, commitIds, refreshKey, section]);
 
   // Return empty result when no file is selected (avoids act() warnings in tests)
   if (!(repoPath && filePath)) {

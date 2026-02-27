@@ -41,7 +41,9 @@ describe("DiffView", () => {
       selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
+      selectedChangeId: null,
       changedFiles: [],
+      viewMode: "history",
       isDiffMaximized: false,
     });
   });
@@ -54,7 +56,9 @@ describe("DiffView", () => {
         selectedCommitId: null,
         selectedCommitIds: [],
         selectedFilePath: null,
+        selectedChangeId: null,
         changedFiles: [],
+        viewMode: "history",
         isDiffMaximized: false,
       });
     });
@@ -145,6 +149,59 @@ describe("DiffView", () => {
     await waitFor(() => {
       // Check that the diff viewer is rendered
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+  });
+
+  it("uses selected change section for duplicate paths in changes view", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: "staged",
+      new_content: "working",
+      is_binary: false,
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      selectedCommitId: null,
+      selectedCommitIds: [],
+      selectedFilePath: "src/file.ts",
+      selectedChangeId: "src/file.ts#unstaged",
+      changedFiles: [
+        {
+          path: "src/file.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 1,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged",
+        },
+        {
+          path: "src/file.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 1,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged",
+        },
+      ],
+      viewMode: "changes",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_unstaged_file_contents", {
+        repoPath: "/test/repo",
+        filePath: "src/file.ts",
+      });
     });
   });
 

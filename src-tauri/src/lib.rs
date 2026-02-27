@@ -57,7 +57,12 @@ pub fn run() {
             commands::git::validate_repo,
             commands::git::get_working_changes,
             commands::git::get_working_file_diff,
-            commands::git::get_working_file_contents
+            commands::git::get_working_file_contents,
+            commands::git::get_working_changes_ex,
+            commands::git::get_staged_file_diff,
+            commands::git::get_unstaged_file_diff,
+            commands::git::get_staged_file_contents,
+            commands::git::get_unstaged_file_contents
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

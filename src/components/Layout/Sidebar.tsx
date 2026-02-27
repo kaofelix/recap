@@ -2,14 +2,17 @@ import { formatDistanceToNow } from "date-fns";
 import { type MouseEvent, useCallback, useEffect, useRef } from "react";
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommits } from "../../hooks/useCommits";
+import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
 import { useNavigableList } from "../../hooks/useNavigableList";
 import { useWorkingChanges } from "../../hooks/useWorkingChanges";
+import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import { cn } from "../../lib/utils";
+import type { WorkingChangesListModel } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
-  useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
@@ -55,14 +58,14 @@ export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
-  const selectedFilePath = useSelectedFilePath();
+  const selectedChangeId = useSelectedChangeId();
   const viewMode = useViewMode();
   const selectCommit = useAppStore((state) => state.selectCommit);
   const selectCommitRange = useAppStore((state) => state.selectCommitRange);
   const toggleCommitSelection = useAppStore(
     (state) => state.toggleCommitSelection
   );
-  const selectFile = useAppStore((state) => state.selectFile);
+  const selectChange = useAppStore((state) => state.selectChange);
   const setViewMode = useAppStore((state) => state.setViewMode);
 
   const {
@@ -113,19 +116,21 @@ export function Sidebar({ className }: SidebarProps) {
 
   const commitSelectionAnchorRef = useRef<string | null>(null);
 
+  const commitIds = commits.map((commit) => commit.id);
+  const changesListModel = useWorkingChangesListModel(changes);
+
   const handleSelectItem = useCallback(
     (id: string) => {
       if (viewMode === "history") {
         commitSelectionAnchorRef.current = id;
         selectCommit(id);
-      } else {
-        selectFile(id);
+        return;
       }
-    },
-    [viewMode, selectCommit, selectFile]
-  );
 
-  const commitIds = commits.map((commit) => commit.id);
+      selectChange(id);
+    },
+    [viewMode, selectCommit, selectChange]
+  );
 
   const handleCommitClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>, commitId: string) => {
@@ -159,16 +164,21 @@ export function Sidebar({ className }: SidebarProps) {
   );
 
   const itemIds =
-    viewMode === "history" ? commitIds : changes.map((file) => file.path);
+    viewMode === "history"
+      ? commitIds
+      : changesListModel.items.map((item) => item.id);
 
   const effectiveSelectedCommitId =
     selectedCommitIds[0] ?? selectedCommitId ?? commits[0]?.id ?? null;
-  const effectiveSelectedFilePath =
-    selectedFilePath ?? changes[0]?.path ?? null;
+  const effectiveSelectedChangeId = useEffectiveSelectedChangeId(
+    selectedChangeId,
+    changesListModel
+  );
+
   const selectedId =
     viewMode === "history"
       ? effectiveSelectedCommitId
-      : effectiveSelectedFilePath;
+      : effectiveSelectedChangeId;
 
   const { containerProps, getItemProps } = useNavigableList({
     itemIds,
@@ -285,7 +295,7 @@ export function Sidebar({ className }: SidebarProps) {
             </div>
           )}
 
-        {/* Changes mode: file list */}
+        {/* Changes mode: file list with staged/unstaged sections */}
         {viewMode === "changes" &&
           selectedRepo &&
           !isLoading &&
@@ -300,24 +310,59 @@ export function Sidebar({ className }: SidebarProps) {
           !isLoading &&
           !error &&
           changes.length > 0 && (
-            <div className="space-y-0.5">
-              {changes.map((file) => {
-                const itemProps = getItemProps(file.path);
-
-                return (
-                  <FileListItem
-                    file={file}
-                    isFocused={isFocused}
-                    isSelected={effectiveSelectedFilePath === file.path}
-                    itemId={itemProps["data-item-id"]}
-                    key={file.path}
-                    onClick={itemProps.onClick}
-                  />
-                );
-              })}
-            </div>
+            <ChangesFileList
+              getItemProps={getItemProps}
+              isFocused={isFocused}
+              model={changesListModel}
+              selectedId={effectiveSelectedChangeId}
+            />
           )}
       </div>
+    </div>
+  );
+}
+
+interface ChangesFileListProps {
+  model: WorkingChangesListModel;
+  selectedId: string | null;
+  getItemProps: (id: string) => {
+    "aria-selected": boolean;
+    "data-item-id": string;
+    onClick: () => void;
+  };
+  isFocused: boolean;
+}
+
+function ChangesFileList({
+  model,
+  selectedId,
+  getItemProps,
+  isFocused,
+}: ChangesFileListProps) {
+  return (
+    <div className="space-y-3">
+      {model.sections.map((section) => (
+        <div key={section.section}>
+          <div className="mb-1 border-panel-border/50 border-b px-2 py-1 font-medium text-text-secondary text-xs">
+            {section.title}
+          </div>
+          <div className="space-y-0.5">
+            {section.items.map((item) => {
+              const itemProps = getItemProps(item.id);
+              return (
+                <FileListItem
+                  file={item.file}
+                  isFocused={isFocused}
+                  isSelected={selectedId === item.id}
+                  itemId={itemProps["data-item-id"]}
+                  key={item.id}
+                  onClick={itemProps.onClick}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

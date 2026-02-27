@@ -91,3 +91,42 @@ pub fn get_working_file_contents(
 ) -> Result<git_service::FileContents, String> {
     git_service::get_working_file_contents(&repo_path, &file_path)
 }
+
+#[tauri::command]
+pub fn get_working_changes_ex(
+    repo_path: String,
+) -> Result<Vec<git_service::WorkingFile>, String> {
+    git_service::get_working_changes_ex(&repo_path)
+}
+
+#[tauri::command]
+pub fn get_staged_file_diff(
+    repo_path: String,
+    file_path: String,
+) -> Result<git_service::FileDiff, String> {
+    git_service::get_staged_file_diff(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn get_unstaged_file_diff(
+    repo_path: String,
+    file_path: String,
+) -> Result<git_service::FileDiff, String> {
+    git_service::get_unstaged_file_diff(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn get_staged_file_contents(
+    repo_path: String,
+    file_path: String,
+) -> Result<git_service::FileContents, String> {
+    git_service::get_staged_file_contents(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn get_unstaged_file_contents(
+    repo_path: String,
+    file_path: String,
+) -> Result<git_service::FileContents, String> {
+    git_service::get_unstaged_file_contents(&repo_path, &file_path)
+}

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChangedFile } from "../types/file";
+import { parseWorkingChangeId } from "../lib/workingChangesList";
+import type { ChangedFile, WorkingFile } from "../types/file";
 import type { FocusRegion } from "../types/focus";
 import type { Repository } from "../types/repository";
 
@@ -12,7 +13,8 @@ export interface AppState {
   selectedCommitId: string | null;
   selectedCommitIds: string[];
   selectedFilePath: string | null;
-  changedFiles: ChangedFile[];
+  selectedChangeId: string | null;
+  changedFiles: (ChangedFile | WorkingFile)[];
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
@@ -24,7 +26,8 @@ export interface AppState {
   selectCommitRange: (ids: string[]) => void;
   toggleCommitSelection: (id: string) => void;
   selectFile: (path: string | null) => void;
-  setChangedFiles: (files: ChangedFile[]) => void;
+  selectChange: (id: string | null) => void;
+  setChangedFiles: (files: (ChangedFile | WorkingFile)[]) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
   setDiffMaximized: (maximized: boolean) => void;
@@ -68,6 +71,7 @@ export const useAppStore = create<AppState>()(
       selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
+      selectedChangeId: null,
       changedFiles: [],
       viewMode: "history" as ViewMode,
       focusedRegion: null,
@@ -111,6 +115,7 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
+            selectedChangeId: null,
             changedFiles: [],
           }),
         });
@@ -127,6 +132,7 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
+            selectedChangeId: null,
             changedFiles: [],
           });
         }
@@ -138,6 +144,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitId: id,
           selectedCommitIds: id ? [id] : [],
           selectedFilePath: null,
+          selectedChangeId: null,
           changedFiles: [],
         });
       },
@@ -148,6 +155,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitId: normalized[0] ?? null,
           selectedCommitIds: normalized,
           selectedFilePath: null,
+          selectedChangeId: null,
           changedFiles: [],
         });
       },
@@ -163,16 +171,32 @@ export const useAppStore = create<AppState>()(
             selectedCommitId: selectedCommitIds[0] ?? null,
             selectedCommitIds,
             selectedFilePath: null,
+            selectedChangeId: null,
             changedFiles: [],
           };
         });
       },
 
       selectFile: (path: string | null) => {
-        set({ selectedFilePath: path });
+        set({ selectedFilePath: path, selectedChangeId: null });
       },
 
-      setChangedFiles: (files: ChangedFile[]) => {
+      selectChange: (id: string | null) => {
+        if (id === null) {
+          set({ selectedFilePath: null, selectedChangeId: null });
+          return;
+        }
+
+        const parsed = parseWorkingChangeId(id);
+        if (!parsed) {
+          set({ selectedFilePath: null, selectedChangeId: null });
+          return;
+        }
+
+        set({ selectedFilePath: parsed.path, selectedChangeId: id });
+      },
+
+      setChangedFiles: (files: (ChangedFile | WorkingFile)[]) => {
         set({ changedFiles: files });
       },
 
@@ -188,6 +212,7 @@ export const useAppStore = create<AppState>()(
           return {
             viewMode: mode,
             selectedFilePath: null,
+            selectedChangeId: null,
             changedFiles: [],
             focusedRegion,
             isDiffMaximized: false,
@@ -254,6 +279,7 @@ export const useAppStore = create<AppState>()(
           selectedCommitId: null,
           selectedCommitIds: [],
           selectedFilePath: null,
+          selectedChangeId: null,
           changedFiles: [],
           isDiffMaximized: false,
           workingChangesRevision: 0,
@@ -280,6 +306,8 @@ export const useSelectedCommitIds = () =>
   useAppStore((state) => state.selectedCommitIds);
 export const useSelectedFilePath = () =>
   useAppStore((state) => state.selectedFilePath);
+export const useSelectedChangeId = () =>
+  useAppStore((state) => state.selectedChangeId);
 export const useViewMode = () => useAppStore((state) => state.viewMode);
 export const useFocusedRegion = () =>
   useAppStore((state) => state.focusedRegion);

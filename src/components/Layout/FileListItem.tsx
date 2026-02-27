@@ -6,10 +6,10 @@ import {
   Trigger,
 } from "@radix-ui/react-tooltip";
 import { cn, splitPath } from "../../lib/utils";
-import type { ChangedFile, FileStatus } from "../../types/file";
+import type { ChangedFile, FileStatus, WorkingFile } from "../../types/file";
 
 export interface FileListItemProps {
-  file: ChangedFile;
+  file: ChangedFile | WorkingFile;
   isSelected: boolean;
   isFocused?: boolean;
   onClick: () => void;
@@ -73,6 +73,43 @@ function formatStatsTooltip(additions: number, deletions: number): string {
   return parts.length > 0 ? `  ${parts.join(" ")}` : "";
 }
 
+/**
+ * Check if file is a WorkingFile
+ */
+function isWorkingFile(file: ChangedFile | WorkingFile): file is WorkingFile {
+  return "section" in file;
+}
+
+/**
+ * Get display status for a file (handles both ChangedFile and WorkingFile)
+ */
+function getDisplayStatus(file: ChangedFile | WorkingFile): FileStatus {
+  if (isWorkingFile(file)) {
+    return file.section === "staged"
+      ? (file.staged_status ?? "Unmodified")
+      : (file.unstaged_status ?? "Unmodified");
+  }
+  return file.status;
+}
+
+/**
+ * Get display stats for a file (handles both ChangedFile and WorkingFile)
+ */
+function getDisplayStats(file: ChangedFile | WorkingFile): {
+  additions: number;
+  deletions: number;
+} {
+  if (isWorkingFile(file)) {
+    return file.section === "staged"
+      ? { additions: file.staged_additions, deletions: file.staged_deletions }
+      : {
+          additions: file.unstaged_additions,
+          deletions: file.unstaged_deletions,
+        };
+  }
+  return { additions: file.additions, deletions: file.deletions };
+}
+
 export function FileListItem({
   file,
   isSelected,
@@ -81,7 +118,9 @@ export function FileListItem({
   itemId,
 }: FileListItemProps) {
   const { dir, filename } = splitPath(file.path);
-  const tooltipText = `${file.path}${formatStatsTooltip(file.additions, file.deletions)}`;
+  const displayStatus = getDisplayStatus(file);
+  const { additions, deletions } = getDisplayStats(file);
+  const tooltipText = `${file.path}${formatStatsTooltip(additions, deletions)}`;
 
   return (
     <button
@@ -97,11 +136,11 @@ export function FileListItem({
       <span
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded font-medium text-xs",
-          getStatusBadgeClasses(file.status)
+          getStatusBadgeClasses(displayStatus)
         )}
-        title={file.status}
+        title={displayStatus}
       >
-        {getStatusLetter(file.status)}
+        {getStatusLetter(displayStatus)}
       </span>
       <Provider delayDuration={300}>
         <Root>
@@ -132,14 +171,10 @@ export function FileListItem({
           </Portal>
         </Root>
       </Provider>
-      {(file.additions > 0 || file.deletions > 0) && (
+      {(additions > 0 || deletions > 0) && (
         <span className="file-list-item-stats flex shrink-0 gap-1 text-xs">
-          {file.additions > 0 && (
-            <span className="text-success">+{file.additions}</span>
-          )}
-          {file.deletions > 0 && (
-            <span className="text-danger">-{file.deletions}</span>
-          )}
+          {additions > 0 && <span className="text-success">+{additions}</span>}
+          {deletions > 0 && <span className="text-danger">-{deletions}</span>}
         </span>
       )}
     </button>

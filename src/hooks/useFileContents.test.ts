@@ -100,6 +100,67 @@ describe("useFileContents", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("fetches staged file contents when section is 'staged'", async () => {
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const { result } = renderHook(() =>
+      useFileContents(mockRepo, mockFilePath, null, [], 0, "staged")
+    );
+
+    expect(result.current.isLoading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_staged_file_contents", {
+      repoPath: mockRepo.path,
+      filePath: mockFilePath,
+    });
+    expect(result.current.contents).toEqual(mockContents);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("fetches unstaged file contents when section is 'unstaged'", async () => {
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const { result } = renderHook(() =>
+      useFileContents(mockRepo, mockFilePath, null, [], 0, "unstaged")
+    );
+
+    expect(result.current.isLoading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_unstaged_file_contents", {
+      repoPath: mockRepo.path,
+      filePath: mockFilePath,
+    });
+    expect(result.current.contents).toEqual(mockContents);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("ignores section parameter when commitId is provided", async () => {
+    mockInvoke.mockResolvedValueOnce(mockContents);
+
+    const { result } = renderHook(() =>
+      useFileContents(mockRepo, mockFilePath, mockCommitId, [], 0, "staged")
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Should use commit command, not staged command
+    expect(mockInvoke).toHaveBeenCalledWith("get_file_contents", {
+      repoPath: mockRepo.path,
+      commitId: mockCommitId,
+      filePath: mockFilePath,
+    });
+  });
+
   it("handles errors", async () => {
     mockInvoke.mockRejectedValueOnce(new Error("Failed to fetch"));
 

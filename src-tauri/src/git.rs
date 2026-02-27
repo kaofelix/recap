@@ -41,6 +41,29 @@ pub struct ChangedFile {
     pub old_path: Option<String>,
 }
 
+/// Represents a file in the working directory with separate staged and unstaged status
+#[derive(Debug, Clone, Serialize)]
+pub struct WorkingFile {
+    /// Path to the file
+    pub path: String,
+    /// Status in the staging area (index), None if not staged
+    pub staged_status: Option<FileStatus>,
+    /// Status in the working directory, None if no unstaged changes
+    pub unstaged_status: Option<FileStatus>,
+    /// Number of staged additions
+    pub staged_additions: u32,
+    /// Number of staged deletions
+    pub staged_deletions: u32,
+    /// Number of unstaged additions
+    pub unstaged_additions: u32,
+    /// Number of unstaged deletions
+    pub unstaged_deletions: u32,
+    /// Original path for renamed files
+    pub old_path: Option<String>,
+    /// Which section this entry belongs to: "staged" or "unstaged"
+    pub section: String,
+}
+
 /// Type of diff line
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum LineType {
@@ -1072,6 +1095,147 @@ pub fn get_working_changes(repo_path: &str) -> Result<Vec<ChangedFile>, String> 
     Ok(files)
 }
 
+/// Gets the list of files changed in the working directory, split by staged/unstaged
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// A vector of WorkingFile structs, where each file can appear up to twice:
+/// once for staged changes and once for unstaged changes
+pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let statuses = repo
+        .statuses(None)
+        .map_err(|e| format!("Failed to get statuses: {}", e))?;
+
+    let mut files: Vec<WorkingFile> = Vec::new();
+
+    // Get HEAD tree for diff calculations
+    let head_tree = match repo.head() {
+        Ok(head) => head
+            .peel_to_commit()
+            .ok()
+            .and_then(|c| c.tree().ok()),
+        Err(_) => None,
+    };
+
+    for entry in statuses.iter() {
+        let status = entry.status();
+
+        // Skip files that are unchanged
+        if status.is_empty() {
+            continue;
+        }
+
+        let path = entry
+            .path()
+            .map(|p| p.to_string())
+            .unwrap_or_default();
+
+        // Determine staged (index) status
+        let staged_status = if status.is_index_new() {
+            Some(FileStatus::Added)
+        } else if status.is_index_deleted() {
+            Some(FileStatus::Deleted)
+        } else if status.is_index_modified() {
+            Some(FileStatus::Modified)
+        } else if status.is_index_renamed() {
+            Some(FileStatus::Renamed)
+        } else {
+            None
+        };
+
+        // Determine unstaged (workdir) status
+        let unstaged_status = if status.is_wt_new() {
+            Some(FileStatus::Untracked)
+        } else if status.is_wt_deleted() {
+            Some(FileStatus::Deleted)
+        } else if status.is_wt_modified() {
+            Some(FileStatus::Modified)
+        } else if status.is_wt_renamed() {
+            Some(FileStatus::Renamed)
+        } else {
+            None
+        };
+
+        // Calculate line stats for staged changes (HEAD -> index)
+        let (staged_additions, staged_deletions) = if staged_status.is_some() {
+            if let Some(ref head) = head_tree {
+                let mut diff_opts = DiffOptions::new();
+                diff_opts.pathspec(&path);
+
+                if let Ok(diff) = repo.diff_tree_to_index(Some(head), None, Some(&mut diff_opts)) {
+                    if let Ok(stats) = diff.stats() {
+                        (stats.insertions() as u32, stats.deletions() as u32)
+                    } else {
+                        (0, 0)
+                    }
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        };
+
+        // Calculate line stats for unstaged changes (index -> workdir)
+        let (unstaged_additions, unstaged_deletions) = if unstaged_status.is_some() {
+            let mut diff_opts = DiffOptions::new();
+            diff_opts.pathspec(&path);
+            diff_opts.include_untracked(true);
+
+            if let Ok(diff) = repo.diff_index_to_workdir(None, Some(&mut diff_opts)) {
+                if let Ok(stats) = diff.stats() {
+                    (stats.insertions() as u32, stats.deletions() as u32)
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        };
+
+        // Create entry for staged changes if present
+        if staged_status.is_some() {
+            files.push(WorkingFile {
+                path: path.clone(),
+                staged_status,
+                unstaged_status: None,
+                staged_additions,
+                staged_deletions,
+                unstaged_additions: 0,
+                unstaged_deletions: 0,
+                old_path: None,
+                section: "staged".to_string(),
+            });
+        }
+
+        // Create entry for unstaged changes if present
+        if unstaged_status.is_some() {
+            files.push(WorkingFile {
+                path,
+                staged_status: None,
+                unstaged_status,
+                staged_additions: 0,
+                staged_deletions: 0,
+                unstaged_additions,
+                unstaged_deletions,
+                old_path: None,
+                section: "unstaged".to_string(),
+            });
+        }
+    }
+
+    Ok(files)
+}
+
 /// Gets the diff for a specific file in the working directory (vs HEAD)
 ///
 /// # Arguments
@@ -1104,6 +1268,234 @@ pub fn get_working_file_diff(repo_path: &str, file_path: &str) -> Result<FileDif
     // Check if file exists in diff
     if diff.deltas().len() == 0 {
         return Err(format!("File '{}' has no changes", file_path));
+    }
+
+    let delta = diff.get_delta(0).expect("Delta should exist");
+
+    let new_file = delta.new_file();
+    let old_file = delta.old_file();
+
+    let new_path = new_file
+        .path()
+        .or_else(|| old_file.path())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let old_path = if delta.status() == Delta::Renamed || delta.status() == Delta::Copied {
+        old_file.path().map(|p| p.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    // Check if binary
+    let is_binary = new_file.is_binary() || old_file.is_binary();
+
+    if is_binary {
+        return Ok(FileDiff {
+            old_path,
+            new_path,
+            hunks: Vec::new(),
+            is_binary: true,
+        });
+    }
+
+    // Get patch for detailed diff
+    let patch = git2::Patch::from_diff(&diff, 0)
+        .map_err(|e| format!("Failed to create patch: {}", e))?
+        .ok_or_else(|| "Failed to create patch for file".to_string())?;
+
+    let mut hunks = Vec::new();
+
+    for hunk_idx in 0..patch.num_hunks() {
+        let (hunk, _) = patch
+            .hunk(hunk_idx)
+            .map_err(|e| format!("Failed to get hunk: {}", e))?;
+
+        let mut lines = Vec::new();
+
+        for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+            let line = patch
+                .line_in_hunk(hunk_idx, line_idx)
+                .map_err(|e| format!("Failed to get line: {}", e))?;
+
+            let line_type = match line.origin() {
+                '+' => LineType::Addition,
+                '-' => LineType::Deletion,
+                _ => LineType::Context,
+            };
+
+            let content = String::from_utf8_lossy(line.content()).to_string();
+
+            lines.push(DiffLine {
+                content,
+                line_type,
+                old_line_no: line.old_lineno(),
+                new_line_no: line.new_lineno(),
+            });
+        }
+
+        hunks.push(DiffHunk {
+            old_start: hunk.old_start(),
+            old_lines: hunk.old_lines(),
+            new_start: hunk.new_start(),
+            new_lines: hunk.new_lines(),
+            lines,
+        });
+    }
+
+    Ok(FileDiff {
+        old_path,
+        new_path,
+        hunks,
+        is_binary: false,
+    })
+}
+
+/// Gets the diff for staged changes of a file (index vs HEAD)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get diff for
+///
+/// # Returns
+/// A FileDiff struct showing staged changes, or an error if file has no staged changes
+pub fn get_staged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get HEAD tree (if it exists)
+    let head_tree = match repo.head() {
+        Ok(head) => Some(
+            head.peel_to_tree()
+                .map_err(|e| format!("Failed to get HEAD tree: {}", e))?,
+        ),
+        Err(_) => None, // No commits yet
+    };
+
+    let mut diff_opts = DiffOptions::new();
+    diff_opts.pathspec(file_path);
+
+    // Diff HEAD -> index (staged changes only)
+    let diff = repo
+        .diff_tree_to_index(head_tree.as_ref(), None, Some(&mut diff_opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    // Check if file exists in diff
+    if diff.deltas().len() == 0 {
+        return Err(format!("File '{}' has no staged changes", file_path));
+    }
+
+    let delta = diff.get_delta(0).expect("Delta should exist");
+
+    // Check if file actually has changes (not just in index with no diff)
+    if delta.status() == Delta::Unmodified {
+        return Err(format!("File '{}' has no staged changes", file_path));
+    }
+
+    let new_file = delta.new_file();
+    let old_file = delta.old_file();
+
+    let new_path = new_file
+        .path()
+        .or_else(|| old_file.path())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let old_path = if delta.status() == Delta::Renamed || delta.status() == Delta::Copied {
+        old_file.path().map(|p| p.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    // Check if binary
+    let is_binary = new_file.is_binary() || old_file.is_binary();
+
+    if is_binary {
+        return Ok(FileDiff {
+            old_path,
+            new_path,
+            hunks: Vec::new(),
+            is_binary: true,
+        });
+    }
+
+    // Get patch for detailed diff
+    let patch = git2::Patch::from_diff(&diff, 0)
+        .map_err(|e| format!("Failed to create patch: {}", e))?
+        .ok_or_else(|| "Failed to create patch for file".to_string())?;
+
+    let mut hunks = Vec::new();
+
+    for hunk_idx in 0..patch.num_hunks() {
+        let (hunk, _) = patch
+            .hunk(hunk_idx)
+            .map_err(|e| format!("Failed to get hunk: {}", e))?;
+
+        let mut lines = Vec::new();
+
+        for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+            let line = patch
+                .line_in_hunk(hunk_idx, line_idx)
+                .map_err(|e| format!("Failed to get line: {}", e))?;
+
+            let line_type = match line.origin() {
+                '+' => LineType::Addition,
+                '-' => LineType::Deletion,
+                _ => LineType::Context,
+            };
+
+            let content = String::from_utf8_lossy(line.content()).to_string();
+
+            lines.push(DiffLine {
+                content,
+                line_type,
+                old_line_no: line.old_lineno(),
+                new_line_no: line.new_lineno(),
+            });
+        }
+
+        hunks.push(DiffHunk {
+            old_start: hunk.old_start(),
+            old_lines: hunk.old_lines(),
+            new_start: hunk.new_start(),
+            new_lines: hunk.new_lines(),
+            lines,
+        });
+    }
+
+    Ok(FileDiff {
+        old_path,
+        new_path,
+        hunks,
+        is_binary: false,
+    })
+}
+
+/// Gets the diff for unstaged changes of a file (workdir vs index)
+/// Falls back to workdir vs HEAD if file has no staged changes
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get diff for
+///
+/// # Returns
+/// A FileDiff struct showing unstaged changes
+pub fn get_unstaged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut diff_opts = DiffOptions::new();
+    diff_opts.pathspec(file_path);
+    diff_opts.include_untracked(true);
+
+    // Diff index -> workdir (unstaged changes)
+    let diff = repo
+        .diff_index_to_workdir(None, Some(&mut diff_opts))
+        .map_err(|e| format!("Failed to create diff: {}", e))?;
+
+    // Check if file exists in diff
+    if diff.deltas().len() == 0 {
+        return Err(format!("File '{}' has no unstaged changes", file_path));
     }
 
     let delta = diff.get_delta(0).expect("Delta should exist");
@@ -1234,6 +1626,213 @@ pub fn get_working_file_contents(repo_path: &str, file_path: &str) -> Result<Fil
             }
         }
         Err(_) => None, // No HEAD (empty repo)
+    };
+
+    // Get new content from working directory
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory".to_string())?;
+
+    let file_full_path = workdir.join(file_path);
+
+    let new_content = if file_full_path.exists() {
+        let content = std::fs::read(&file_full_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+
+        // Check if binary (contains null bytes in first 8000 bytes)
+        let check_len = std::cmp::min(content.len(), 8000);
+        if content[..check_len].contains(&0) {
+            return Ok(FileContents {
+                old_content: None,
+                new_content: None,
+                is_binary: true,
+            });
+        }
+
+        match String::from_utf8(content) {
+            Ok(s) => Some(s),
+            Err(_) => return Err("File is not valid UTF-8".to_string()),
+        }
+    } else {
+        None // File was deleted
+    };
+
+    // Verify there's actually a change
+    if old_content.is_none() && new_content.is_none() {
+        return Err(format!("File '{}' not found", file_path));
+    }
+
+    Ok(FileContents {
+        old_content,
+        new_content,
+        is_binary: false,
+    })
+}
+
+/// Gets the file contents for a staged file (HEAD vs index/staging area)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get contents for
+///
+/// # Returns
+/// A FileContents struct with old (HEAD) and new (staged/index) content
+pub fn get_staged_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get old content from HEAD (if it exists)
+    let old_content = match repo.head() {
+        Ok(head) => {
+            let tree = head
+                .peel_to_tree()
+                .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+
+            match tree.get_path(std::path::Path::new(file_path)) {
+                Ok(entry) => {
+                    let object = entry
+                        .to_object(&repo)
+                        .map_err(|e| format!("Failed to get object: {}", e))?;
+
+                    if let Some(blob) = object.as_blob() {
+                        if blob.is_binary() {
+                            return Ok(FileContents {
+                                old_content: None,
+                                new_content: None,
+                                is_binary: true,
+                            });
+                        }
+                        match std::str::from_utf8(blob.content()) {
+                            Ok(s) => Some(s.to_string()),
+                            Err(_) => {
+                                return Err("File is not valid UTF-8".to_string());
+                            }
+                        }
+                    } else {
+                        return Err("Not a blob".to_string());
+                    }
+                }
+                Err(_) => None, // File doesn't exist in HEAD (new file)
+            }
+        }
+        Err(_) => None, // No HEAD (empty repo)
+    };
+
+    // Get new content from index (staged)
+    let new_content = match repo.index() {
+        Ok(index) => {
+            match index.get_path(std::path::Path::new(file_path), 0) {
+                Some(entry) => {
+                    match repo.find_blob(entry.id) {
+                        Ok(blob) => {
+                            if blob.is_binary() {
+                                return Ok(FileContents {
+                                    old_content: None,
+                                    new_content: None,
+                                    is_binary: true,
+                                });
+                            }
+                            match std::str::from_utf8(blob.content()) {
+                                Ok(s) => Some(s.to_string()),
+                                Err(_) => return Err("File is not valid UTF-8".to_string()),
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                }
+                None => None, // File not in index
+            }
+        }
+        Err(_) => None,
+    };
+
+    // Verify there's actually a change
+    if old_content.is_none() && new_content.is_none() {
+        return Err(format!("File '{}' not found in HEAD or index", file_path));
+    }
+
+    Ok(FileContents {
+        old_content,
+        new_content,
+        is_binary: false,
+    })
+}
+
+/// Gets the file contents for an unstaged file (index vs working directory)
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Path to the file to get contents for
+///
+/// # Returns
+/// A FileContents struct with old (index/staged) and new (working dir) content
+pub fn get_unstaged_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Get old content from index (staged)
+    let old_content = match repo.index() {
+        Ok(index) => {
+            match index.get_path(std::path::Path::new(file_path), 0) {
+                Some(entry) => {
+                    match repo.find_blob(entry.id) {
+                        Ok(blob) => {
+                            if blob.is_binary() {
+                                return Ok(FileContents {
+                                    old_content: None,
+                                    new_content: None,
+                                    is_binary: true,
+                                });
+                            }
+                            match std::str::from_utf8(blob.content()) {
+                                Ok(s) => Some(s.to_string()),
+                                Err(_) => return Err("File is not valid UTF-8".to_string()),
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                }
+                None => None, // File not in index (check HEAD as fallback)
+            }
+        }
+        Err(_) => None,
+    };
+
+    // If not in index, try HEAD (file not staged)
+    let old_content = if old_content.is_none() {
+        match repo.head() {
+            Ok(head) => {
+                let tree = head.peel_to_tree()
+                    .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+                
+                match tree.get_path(std::path::Path::new(file_path)) {
+                    Ok(entry) => {
+                        let object = entry.to_object(&repo)
+                            .map_err(|e| format!("Failed to get object: {}", e))?;
+                        
+                        if let Some(blob) = object.as_blob() {
+                            if blob.is_binary() {
+                                return Ok(FileContents {
+                                    old_content: None,
+                                    new_content: None,
+                                    is_binary: true,
+                                });
+                            }
+                            match std::str::from_utf8(blob.content()) {
+                                Ok(s) => Some(s.to_string()),
+                                Err(_) => return Err("File is not valid UTF-8".to_string()),
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        }
+    } else {
+        old_content
     };
 
     // Get new content from working directory
@@ -2293,5 +2892,328 @@ mod tests {
     fn test_checkout_branch_invalid_path() {
         let result = checkout_branch("/nonexistent/path", "main");
         assert!(result.is_err());
+    }
+
+    // Tests for get_working_changes_ex with staged/unstaged split
+
+    #[test]
+    fn test_get_working_changes_ex_returns_empty_when_no_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let changes = get_working_changes_ex(path).expect("Should return changes");
+
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_unstaged_file_appears_in_unstaged_only() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file without staging
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "file.txt");
+        assert!(changes[0].unstaged_status.is_some());
+        assert!(changes[0].staged_status.is_none());
+        assert_eq!(changes[0].unstaged_status, Some(FileStatus::Modified));
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_staged_file_appears_in_staged_only() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage file
+        std::fs::write(path.join("file.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "file.txt");
+        assert!(changes[0].staged_status.is_some());
+        assert!(changes[0].unstaged_status.is_none());
+        assert_eq!(changes[0].staged_status, Some(FileStatus::Modified));
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_file_with_both_staged_and_unstaged_appears_twice() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage file
+        std::fs::write(path.join("file.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        // Modify again (now has both staged and unstaged changes)
+        std::fs::write(path.join("file.txt"), "staged and unstaged content")
+            .expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 2);
+
+        // Find staged entry
+        let staged = changes
+            .iter()
+            .find(|c| c.staged_status.is_some())
+            .expect("Should have staged entry");
+        assert_eq!(staged.path, "file.txt");
+        assert_eq!(staged.staged_status, Some(FileStatus::Modified));
+        assert!(staged.unstaged_status.is_none());
+
+        // Find unstaged entry
+        let unstaged = changes
+            .iter()
+            .find(|c| c.unstaged_status.is_some())
+            .expect("Should have unstaged entry");
+        assert_eq!(unstaged.path, "file.txt");
+        assert_eq!(unstaged.unstaged_status, Some(FileStatus::Modified));
+        assert!(unstaged.staged_status.is_none());
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_tracks_line_counts_separately() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create file with staged changes
+        std::fs::write(path.join("file.txt"), "line1\nline2").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        // Modify with unstaged changes
+        std::fs::write(path.join("file.txt"), "line1\nline2\nline3").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 2);
+
+        let staged = changes.iter().find(|c| c.staged_status.is_some()).unwrap();
+        let unstaged = changes.iter().find(|c| c.unstaged_status.is_some()).unwrap();
+
+        // Staged should have counts for staging "line1\nline2"
+        assert!(staged.staged_additions > 0);
+        assert_eq!(staged.unstaged_additions, 0);
+
+        // Unstaged should have counts for adding "line3"
+        assert!(unstaged.unstaged_additions > 0);
+        assert_eq!(unstaged.staged_additions, 0);
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_new_file_staged_only() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and stage new file
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "newfile.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "newfile.txt");
+        assert_eq!(changes[0].staged_status, Some(FileStatus::Added));
+        assert!(changes[0].unstaged_status.is_none());
+    }
+
+    #[test]
+    fn test_get_working_changes_ex_untracked_file_appears_in_unstaged() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create new file without adding
+        std::fs::write(path.join("untracked.txt"), "untracked content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "untracked.txt");
+        assert_eq!(changes[0].unstaged_status, Some(FileStatus::Untracked));
+        assert!(changes[0].staged_status.is_none());
+    }
+
+    // Tests for get_staged_file_diff
+
+    #[test]
+    fn test_get_staged_file_diff_shows_staged_changes_only() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage the file
+        std::fs::write(path.join("file.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        // Modify again (unstaged changes)
+        std::fs::write(path.join("file.txt"), "staged and unstaged content")
+            .expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_staged_file_diff(path_str, "file.txt").expect("Should return diff");
+
+        // Staged diff should only show "staged content", not the unstaged changes
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+        assert!(!diff.hunks.is_empty());
+
+        // The diff should contain "staged content" (what was staged)
+        let content: String = diff
+            .hunks
+            .iter()
+            .flat_map(|h| &h.lines)
+            .map(|l| &l.content[..])
+            .collect();
+        assert!(content.contains("staged content"));
+        assert!(!content.contains("unstaged"));
+    }
+
+    #[test]
+    fn test_get_staged_file_diff_returns_error_for_unstaged_only_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file without staging
+        std::fs::write(path.join("file.txt"), "unstaged changes").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let result = get_staged_file_diff(path_str, "file.txt");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_staged_file_diff_new_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and stage new file
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "newfile.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_staged_file_diff(path_str, "newfile.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "newfile.txt");
+        assert!(!diff.is_binary);
+        assert!(!diff.hunks.is_empty());
+
+        // Should have at least one addition line (new file)
+        let has_addition = diff
+            .hunks
+            .iter()
+            .flat_map(|h| &h.lines)
+            .any(|l| l.line_type == LineType::Addition);
+        assert!(has_addition, "New file should have addition lines");
+    }
+
+    // Tests for get_unstaged_file_diff
+
+    #[test]
+    fn test_get_unstaged_file_diff_shows_unstaged_changes_only() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage
+        std::fs::write(path.join("file.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        // Modify again (unstaged)
+        std::fs::write(path.join("file.txt"), "staged and unstaged content")
+            .expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_unstaged_file_diff(path_str, "file.txt").expect("Should return diff");
+
+        // Unstaged diff should show the difference between staged and working
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+
+        // The diff should show the transition from "staged content" to final content
+        let has_context_or_change = diff
+            .hunks
+            .iter()
+            .flat_map(|h| &h.lines)
+            .any(|l| l.line_type == LineType::Addition || l.line_type == LineType::Context);
+        assert!(has_context_or_change);
+    }
+
+    #[test]
+    fn test_get_unstaged_file_diff_unstaged_only_shows_vs_head() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify without staging
+        std::fs::write(path.join("file.txt"), "only unstaged").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_unstaged_file_diff(path_str, "file.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "file.txt");
+        assert!(!diff.is_binary);
+    }
+
+    #[test]
+    fn test_get_unstaged_file_diff_returns_error_when_no_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // No changes to file.txt
+        let result = get_unstaged_file_diff(path, "file.txt");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_unstaged_file_diff_untracked_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create untracked file
+        std::fs::write(path.join("untracked.txt"), "new untracked").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+        let diff = get_unstaged_file_diff(path_str, "untracked.txt").expect("Should return diff");
+
+        assert_eq!(diff.new_path, "untracked.txt");
+        assert!(!diff.is_binary);
     }
 }

@@ -22,12 +22,15 @@ import { useCommand } from "../../hooks/useCommand";
 import { useFileContents } from "../../hooks/useFileContents";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useTheme } from "../../hooks/useTheme";
+import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
 import { cn, splitPath } from "../../lib/utils";
+import { parseWorkingChangeId } from "../../lib/workingChangesList";
 import {
   useAppStore,
   useChangedFiles,
   useIsDiffMaximized,
+  useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedFilePath,
@@ -35,7 +38,11 @@ import {
   useViewMode,
   useWorkingChangesRevision,
 } from "../../store/appStore";
-import type { ChangedFile } from "../../types/file";
+import type {
+  ChangedFile,
+  WorkingFile,
+  WorkingFileSection,
+} from "../../types/file";
 
 export interface DiffViewProps {
   className?: string;
@@ -149,30 +156,78 @@ function DiffPlaceholder({ message }: { message: string }) {
 
 /** Hook for file navigation logic */
 function useFileNavigation(
-  changedFiles: ChangedFile[],
-  selectedFilePath: string | null
+  changedFiles: (ChangedFile | WorkingFile)[],
+  selectedFilePath: string | null,
+  selectedChangeId: string | null,
+  viewMode: "history" | "changes"
 ) {
   const selectFile = useAppStore((s) => s.selectFile);
+  const selectChange = useAppStore((s) => s.selectChange);
 
-  const currentFileIndex = selectedFilePath
-    ? changedFiles.findIndex((f) => f.path === selectedFilePath)
-    : -1;
+  const workingChangesModel = useWorkingChangesListModel(changedFiles);
+
+  const navigationItems =
+    viewMode === "changes"
+      ? workingChangesModel.items.map((item) => ({
+          id: item.id,
+          path: item.path,
+        }))
+      : changedFiles.map((file) => ({ id: file.path, path: file.path }));
+
+  let currentFileIndex = -1;
+
+  if (viewMode === "changes") {
+    if (selectedChangeId) {
+      currentFileIndex = navigationItems.findIndex(
+        (item) => item.id === selectedChangeId
+      );
+    }
+  } else if (selectedFilePath) {
+    currentFileIndex = navigationItems.findIndex(
+      (item) => item.path === selectedFilePath
+    );
+  }
+
   const isFirstFile = currentFileIndex <= 0;
   const isLastFile =
-    currentFileIndex === -1 || currentFileIndex >= changedFiles.length - 1;
-  const canNavigate = changedFiles.length > 1;
+    currentFileIndex === -1 || currentFileIndex >= navigationItems.length - 1;
+  const canNavigate = navigationItems.length > 1;
 
   const selectPreviousFile = useCallback(() => {
     if (!isFirstFile && currentFileIndex > 0) {
-      selectFile(changedFiles[currentFileIndex - 1].path);
+      const previous = navigationItems[currentFileIndex - 1];
+      if (viewMode === "changes") {
+        selectChange(previous.id);
+      } else {
+        selectFile(previous.path);
+      }
     }
-  }, [isFirstFile, currentFileIndex, changedFiles, selectFile]);
+  }, [
+    isFirstFile,
+    currentFileIndex,
+    navigationItems,
+    viewMode,
+    selectChange,
+    selectFile,
+  ]);
 
   const selectNextFile = useCallback(() => {
-    if (!isLastFile && currentFileIndex < changedFiles.length - 1) {
-      selectFile(changedFiles[currentFileIndex + 1].path);
+    if (!isLastFile && currentFileIndex < navigationItems.length - 1) {
+      const next = navigationItems[currentFileIndex + 1];
+      if (viewMode === "changes") {
+        selectChange(next.id);
+      } else {
+        selectFile(next.path);
+      }
     }
-  }, [isLastFile, currentFileIndex, changedFiles, selectFile]);
+  }, [
+    isLastFile,
+    currentFileIndex,
+    navigationItems,
+    viewMode,
+    selectChange,
+    selectFile,
+  ]);
 
   return {
     isFirstFile,
@@ -291,6 +346,17 @@ function DiffFilePath({ path }: { path: string | null }) {
   );
 }
 
+function resolveChangesSection(
+  viewMode: "history" | "changes",
+  selectedChangeId: string | null
+): WorkingFileSection | null {
+  if (!(viewMode === "changes" && selectedChangeId)) {
+    return null;
+  }
+
+  return parseWorkingChangeId(selectedChangeId)?.section ?? null;
+}
+
 function getMaximizeLabels(isDiffMaximized: boolean) {
   if (isDiffMaximized) {
     return {
@@ -392,6 +458,7 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
+  const selectedChangeId = useSelectedChangeId();
   const viewMode = useViewMode();
   const workingChangesRevision = useWorkingChangesRevision();
   const isFocused = useIsFocused();
@@ -408,7 +475,12 @@ export function DiffView({ className }: DiffViewProps) {
     canNavigate,
     selectPreviousFile,
     selectNextFile,
-  } = useFileNavigation(changedFiles, selectedFilePath);
+  } = useFileNavigation(
+    changedFiles,
+    selectedFilePath,
+    selectedChangeId,
+    viewMode
+  );
 
   const [workingDiffPollTick, setWorkingDiffPollTick] = useState(0);
 
@@ -431,12 +503,16 @@ export function DiffView({ className }: DiffViewProps) {
   const refreshKey =
     viewMode === "changes" ? workingChangesRevision + workingDiffPollTick : 0;
 
+  // Determine the section for changes mode (staged vs unstaged)
+  const selectedFileSection = resolveChangesSection(viewMode, selectedChangeId);
+
   const { contents, isLoading, error } = useFileContents(
     selectedRepo,
     selectedFilePath,
     commitId,
     activeCommitIds,
-    refreshKey
+    refreshKey,
+    selectedFileSection
   );
 
   const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
