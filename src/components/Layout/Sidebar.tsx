@@ -333,36 +333,74 @@ interface ChangesFileListProps {
   isFocused: boolean;
 }
 
+function ChangesSectionHeader({ title }: { title: string }) {
+  return (
+    <div className="mb-1 border-panel-border/50 border-b px-2 py-1 font-medium text-text-secondary text-xs">
+      {title}
+    </div>
+  );
+}
+
 function ChangesFileList({
   model,
   selectedId,
   getItemProps,
   isFocused,
 }: ChangesFileListProps) {
+  const renderItems = (items: WorkingChangesListModel["items"]) => (
+    <div className="space-y-0.5">
+      {items.map((item) => {
+        const itemProps = getItemProps(item.id);
+        return (
+          <FileListItem
+            file={item.file}
+            isFocused={isFocused}
+            isSelected={selectedId === item.id}
+            itemId={itemProps["data-item-id"]}
+            key={item.id}
+            onClick={itemProps.onClick}
+          />
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="space-y-3">
-      {model.sections.map((section) => (
-        <div key={section.section}>
-          <div className="mb-1 border-panel-border/50 border-b px-2 py-1 font-medium text-text-secondary text-xs">
-            {section.title}
-          </div>
-          <div className="space-y-0.5">
-            {section.items.map((item) => {
-              const itemProps = getItemProps(item.id);
-              return (
-                <FileListItem
-                  file={item.file}
-                  isFocused={isFocused}
-                  isSelected={selectedId === item.id}
-                  itemId={itemProps["data-item-id"]}
-                  key={item.id}
-                  onClick={itemProps.onClick}
+      {model.sections.map((section) => {
+        if (section.section !== "unstaged") {
+          return (
+            <div key={section.section}>
+              <ChangesSectionHeader title={section.title} />
+              {renderItems(section.items)}
+            </div>
+          );
+        }
+
+        const trackedItems = section.items.filter(
+          (item) => item.file.unstaged_status !== "Untracked"
+        );
+        const untrackedItems = section.items.filter(
+          (item) => item.file.unstaged_status === "Untracked"
+        );
+
+        return (
+          <div key={section.section}>
+            <ChangesSectionHeader title={section.title} />
+
+            {trackedItems.length > 0 && renderItems(trackedItems)}
+
+            {untrackedItems.length > 0 && (
+              <div className="mt-2">
+                <ChangesSectionHeader
+                  title={`Untracked (${untrackedItems.length})`}
                 />
-              );
-            })}
+                {renderItems(untrackedItems)}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -743,6 +743,61 @@ describe("Sidebar", () => {
       });
     });
 
+    it("shows an Untracked subsection inside Unstaged Changes", async () => {
+      const mockChanges = [
+        {
+          path: "src/modified.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 2,
+          unstaged_deletions: 1,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+        {
+          path: "src/untracked.ts",
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 5,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      render(<Sidebar />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Unstaged Changes (2)")).toBeInTheDocument();
+        expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
+      });
+
+      const untrackedHeader = screen.getByText("Untracked (1)");
+      const modifiedRow = screen.getByText("modified.ts");
+
+      expect(untrackedHeader).toHaveClass("border-b");
+      expect(untrackedHeader).toHaveClass("text-text-secondary");
+      expect(untrackedHeader).not.toHaveClass("uppercase");
+
+      expect(modifiedRow.compareDocumentPosition(untrackedHeader)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    });
+
     it("hides empty sections", async () => {
       const mockChanges = [
         {

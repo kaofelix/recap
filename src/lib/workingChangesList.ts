@@ -56,9 +56,21 @@ export function buildWorkingChangesListModel(
   const stagedItems = changes
     .filter((file) => file.section === "staged")
     .map(toItem);
-  const unstagedItems = changes
-    .filter((file) => file.section === "unstaged")
+
+  const unstagedTrackedItems = changes
+    .filter(
+      (file) =>
+        file.section === "unstaged" && file.unstaged_status !== "Untracked"
+    )
     .map(toItem);
+  const unstagedUntrackedItems = changes
+    .filter(
+      (file) =>
+        file.section === "unstaged" && file.unstaged_status === "Untracked"
+    )
+    .map(toItem);
+
+  const unstagedItems = [...unstagedTrackedItems, ...unstagedUntrackedItems];
 
   const items = [...stagedItems, ...unstagedItems];
   const sections: WorkingChangeSection[] = [];
