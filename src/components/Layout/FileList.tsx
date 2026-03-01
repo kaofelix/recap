@@ -1,7 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
 import { useNavigableList } from "../../hooks/useNavigableList";
+import {
+  isContextMenuKeyboardEvent,
+  showFileContextMenu,
+} from "../../lib/contextMenuActions";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -152,6 +164,8 @@ function FileListContent({
   selectedFilePath,
   getItemProps,
   isFocused,
+  onContextMenu,
+  contextMenuTargetPath,
 }: {
   hasCommit: boolean;
   isLoading: boolean;
@@ -164,6 +178,11 @@ function FileListContent({
     "data-item-id": string;
     onClick: () => void;
   };
+  onContextMenu: (
+    event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
+    filePath: string
+  ) => void;
+  contextMenuTargetPath: string | null;
 }) {
   if (!hasCommit) {
     return (
@@ -213,11 +232,18 @@ function FileListContent({
         return (
           <FileListItem
             file={file}
+            isContextMenuTarget={contextMenuTargetPath === file.path}
             isFocused={isFocused}
             isSelected={selectedFilePath === file.path}
             itemId={itemProps["data-item-id"]}
             key={file.path}
             onClick={itemProps.onClick}
+            onContextMenu={(event) => onContextMenu(event, file.path)}
+            onKeyDown={(event) => {
+              if (isContextMenuKeyboardEvent(event)) {
+                onContextMenu(event, file.path);
+              }
+            }}
           />
         );
       })}
@@ -226,6 +252,7 @@ function FileListContent({
 }
 
 export function FileList({ className }: FileListProps) {
+  const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
@@ -249,6 +276,45 @@ export function FileList({ className }: FileListProps) {
     onSelect: selectFile,
     selectedId: effectiveSelectedFilePath,
   });
+
+  const { setOpen: setContextMenuOpen, setClosed: setContextMenuClosed } =
+    useContextMenuState();
+
+  const [contextMenuTargetPath, setContextMenuTargetPath] = useState<
+    string | null
+  >(null);
+
+  const handleContextMenu = useCallback(
+    (
+      event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
+      filePath: string
+    ) => {
+      if (!selectedRepo) {
+        return;
+      }
+      event.preventDefault();
+      setContextMenuOpen();
+      setContextMenuTargetPath(filePath);
+      const element = event.currentTarget;
+      showFileContextMenu({
+        repoPath: selectedRepo.path,
+        filePath,
+        event,
+        element,
+        onClose: () => {
+          // Only clear if this menu's target is still the active one
+          setContextMenuTargetPath((current) => {
+            if (current === filePath) {
+              setContextMenuClosed();
+              return null;
+            }
+            return current;
+          });
+        },
+      });
+    },
+    [selectedRepo, setContextMenuOpen, setContextMenuClosed]
+  );
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -277,12 +343,14 @@ export function FileList({ className }: FileListProps) {
 
       <div {...containerProps} className="flex-1 overflow-auto p-2">
         <FileListContent
+          contextMenuTargetPath={contextMenuTargetPath}
           error={error}
           files={files}
           getItemProps={getItemProps}
           hasCommit={!!selectedCommitId}
           isFocused={isFocused}
           isLoading={isLoading}
+          onContextMenu={handleContextMenu}
           selectedFilePath={effectiveSelectedFilePath}
         />
       </div>

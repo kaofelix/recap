@@ -1876,6 +1876,129 @@ pub fn get_unstaged_file_contents(repo_path: &str, file_path: &str) -> Result<Fi
     })
 }
 
+/// Unstages a file by resetting its index entry to match HEAD.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Relative path to the file within the repository
+///
+/// # Returns
+/// Ok(()) on success, or an error message
+pub fn unstage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut index = repo
+        .index()
+        .map_err(|e| format!("Failed to get index: {}", e))?;
+
+    // Get HEAD tree to reset the file to
+    let head = repo.head().map_err(|e| format!("Failed to get HEAD: {}", e))?;
+    let head_commit = head
+        .peel_to_commit()
+        .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
+    let head_tree = head_commit
+        .tree()
+        .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+
+    // Check if file exists in HEAD
+    let path = std::path::Path::new(file_path);
+    match head_tree.get_path(path) {
+        Ok(entry) => {
+            // File exists in HEAD - restore index entry to HEAD version
+            let blob = repo
+                .find_blob(entry.id())
+                .map_err(|e| format!("Failed to find blob: {}", e))?;
+
+            let index_entry = git2::IndexEntry {
+                ctime: git2::IndexTime::new(0, 0),
+                mtime: git2::IndexTime::new(0, 0),
+                dev: 0,
+                ino: 0,
+                mode: entry.filemode() as u32,
+                uid: 0,
+                gid: 0,
+                file_size: blob.size() as u32,
+                id: entry.id(),
+                flags: 0,
+                flags_extended: 0,
+                path: file_path.as_bytes().to_vec(),
+            };
+
+            index
+                .add(&index_entry)
+                .map_err(|e| format!("Failed to reset index entry: {}", e))?;
+        }
+        Err(_) => {
+            // File doesn't exist in HEAD - remove from index (was a new file)
+            index
+                .remove_path(path)
+                .map_err(|e| format!("Failed to remove from index: {}", e))?;
+        }
+    }
+
+    index
+        .write()
+        .map_err(|e| format!("Failed to write index: {}", e))?;
+
+    Ok(())
+}
+
+/// Discards changes to a file in the working directory.
+/// For tracked files: restores the file content from the index (or HEAD if not staged).
+/// For untracked files: deletes the file from the working directory.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Relative path to the file within the repository
+///
+/// # Returns
+/// Ok(()) on success, or an error message
+pub fn discard_file(repo_path: &str, file_path: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    // Check the status of the file
+    let statuses = repo
+        .statuses(None)
+        .map_err(|e| format!("Failed to get statuses: {}", e))?;
+
+    let file_status = statuses.iter().find(|entry| {
+        entry
+            .path()
+            .map(|p| p == file_path)
+            .unwrap_or(false)
+    });
+
+    let status = file_status
+        .map(|e| e.status())
+        .ok_or_else(|| format!("File '{}' has no changes to discard", file_path))?;
+
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory".to_string())?;
+    let full_path = workdir.join(file_path);
+
+    // Handle untracked files - just delete them
+    if status.is_wt_new() && !status.is_index_new() {
+        if full_path.exists() {
+            std::fs::remove_file(&full_path)
+                .map_err(|e| format!("Failed to delete file: {}", e))?;
+        }
+        return Ok(());
+    }
+
+    // For tracked files, checkout from index (which reflects staged state or HEAD)
+    let mut checkout_opts = CheckoutBuilder::new();
+    checkout_opts.force();
+    checkout_opts.path(file_path);
+
+    repo.checkout_index(None, Some(&mut checkout_opts))
+        .map_err(|e| format!("Failed to discard changes: {}", e))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3215,5 +3338,182 @@ mod tests {
 
         assert_eq!(diff.new_path, "untracked.txt");
         assert!(!diff.is_binary);
+    }
+
+    // Tests for unstage_file
+
+    #[test]
+    fn test_unstage_file_removes_staged_modification() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage
+        std::fs::write(path.join("file.txt"), "staged content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file is staged
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before.iter().any(|c| c.staged_status.is_some()));
+
+        // Unstage the file
+        unstage_file(path_str, "file.txt").expect("Should unstage file");
+
+        // Verify file is now unstaged only
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let staged_count = changes_after
+            .iter()
+            .filter(|c| c.staged_status.is_some())
+            .count();
+        assert_eq!(staged_count, 0);
+
+        // Should still have unstaged changes
+        let unstaged_count = changes_after
+            .iter()
+            .filter(|c| c.unstaged_status.is_some())
+            .count();
+        assert_eq!(unstaged_count, 1);
+    }
+
+    #[test]
+    fn test_unstage_file_removes_new_file_from_index() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and stage new file
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "newfile.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file is staged as Added
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before
+            .iter()
+            .any(|c| c.path == "newfile.txt" && c.staged_status == Some(FileStatus::Added)));
+
+        // Unstage the file
+        unstage_file(path_str, "newfile.txt").expect("Should unstage file");
+
+        // File should now be untracked
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after
+            .iter()
+            .any(|c| c.path == "newfile.txt" && c.unstaged_status == Some(FileStatus::Untracked)));
+    }
+
+    // Tests for discard_file
+
+    #[test]
+    fn test_discard_file_restores_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file (unstaged)
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file has unstaged changes
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before
+            .iter()
+            .any(|c| c.path == "file.txt" && c.unstaged_status.is_some()));
+
+        // Discard changes
+        discard_file(path_str, "file.txt").expect("Should discard changes");
+
+        // Verify file content is restored
+        let content = std::fs::read_to_string(path.join("file.txt")).expect("Should read file");
+        assert_eq!(content, "content");
+
+        // No more changes
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after.iter().all(|c| c.path != "file.txt"));
+    }
+
+    #[test]
+    fn test_discard_file_deletes_untracked_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create untracked file
+        std::fs::write(path.join("untracked.txt"), "untracked content")
+            .expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file exists and is untracked
+        assert!(path.join("untracked.txt").exists());
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before.iter().any(|c| c.path == "untracked.txt"
+            && c.unstaged_status == Some(FileStatus::Untracked)));
+
+        // Discard (delete) the file
+        discard_file(path_str, "untracked.txt").expect("Should discard file");
+
+        // Verify file is deleted
+        assert!(!path.join("untracked.txt").exists());
+
+        // No more changes for this file
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after.iter().all(|c| c.path != "untracked.txt"));
+    }
+
+    #[test]
+    fn test_discard_file_restores_to_staged_version() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage
+        std::fs::write(path.join("file.txt"), "staged version").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage file");
+
+        // Modify again (unstaged changes on top of staged)
+        std::fs::write(path.join("file.txt"), "unstaged version").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Discard unstaged changes
+        discard_file(path_str, "file.txt").expect("Should discard changes");
+
+        // File should now match staged version
+        let content = std::fs::read_to_string(path.join("file.txt")).expect("Should read file");
+        assert_eq!(content, "staged version");
+
+        // Should still have staged changes
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after
+            .iter()
+            .any(|c| c.path == "file.txt" && c.staged_status.is_some()));
+        // Should not have unstaged changes
+        assert!(changes_after
+            .iter()
+            .all(|c| c.path != "file.txt" || c.unstaged_status.is_none()));
+    }
+
+    #[test]
+    fn test_discard_file_error_when_no_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // File exists but has no changes
+        let result = discard_file(path, "file.txt");
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no changes to discard"));
     }
 }

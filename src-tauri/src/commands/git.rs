@@ -130,3 +130,13 @@ pub fn get_unstaged_file_contents(
 ) -> Result<git_service::FileContents, String> {
     git_service::get_unstaged_file_contents(&repo_path, &file_path)
 }
+
+#[tauri::command]
+pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    git_service::unstage_file(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn discard_file(repo_path: String, file_path: String) -> Result<(), String> {
+    git_service::discard_file(&repo_path, &file_path)
+}

@@ -5,6 +5,8 @@ import {
   Root,
   Trigger,
 } from "@radix-ui/react-tooltip";
+import { useState } from "react";
+import { useContextMenuState } from "../../context/ContextMenuContext";
 import { cn, splitPath } from "../../lib/utils";
 import type { ChangedFile, FileStatus, WorkingFile } from "../../types/file";
 
@@ -14,6 +16,18 @@ export interface FileListItemProps {
   isFocused?: boolean;
   onClick: () => void;
   itemId?: string;
+  onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
+  /** Whether this item has the context menu open */
+  isContextMenuTarget?: boolean;
+}
+
+/**
+ * Clear any text selection in the window.
+ * Prevents ugly selection state when right-clicking.
+ */
+function clearTextSelection(): void {
+  window.getSelection()?.removeAllRanges();
 }
 
 /**
@@ -116,21 +130,43 @@ export function FileListItem({
   isFocused = false,
   onClick,
   itemId,
+  onContextMenu,
+  onKeyDown,
+  isContextMenuTarget = false,
 }: FileListItemProps) {
   const { dir, filename } = splitPath(file.path);
   const displayStatus = getDisplayStatus(file);
   const { additions, deletions } = getDisplayStats(file);
   const tooltipText = `${file.path}${formatStatsTooltip(additions, deletions)}`;
 
+  // Global context menu state to disable tooltips when any menu is open
+  const { isOpen: isAnyContextMenuOpen } = useContextMenuState();
+
+  const handleContextMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // Clear text selection before showing context menu
+    clearTextSelection();
+    // Call the provided handler
+    onContextMenu?.(event);
+  };
+
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+
   return (
     <button
       className={cn(
-        "file-list-item flex w-full cursor-default items-center gap-2 rounded px-2 py-1.5 text-left",
+        "file-list-item flex w-full cursor-default select-none items-center gap-2 rounded px-2 py-1.5 text-left",
+        // Selected state: filled background
         isSelected &&
-          (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused")
+          (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused"),
+        // Context menu target: outline highlight (like Finder)
+        isContextMenuTarget &&
+          !isSelected &&
+          "outline outline-1 outline-[var(--color-text-secondary)] outline-offset-[-1px]"
       )}
       data-item-id={itemId}
       onClick={onClick}
+      onContextMenu={handleContextMenu}
+      onKeyDown={onKeyDown}
       type="button"
     >
       <span
@@ -142,35 +178,47 @@ export function FileListItem({
       >
         {getStatusLetter(displayStatus)}
       </span>
-      <Provider delayDuration={300}>
-        <Root>
-          <Trigger asChild>
-            <span className="flex min-w-0 flex-1 overflow-hidden text-sm">
-              {dir && (
-                <span className="shrink truncate text-text-secondary">
-                  {dir}
+      {isAnyContextMenuOpen ? (
+        // Skip tooltip entirely when context menu is open (avoids timer issues)
+        <span className="flex min-w-0 flex-1 overflow-hidden text-sm">
+          {dir && (
+            <span className="shrink truncate text-text-secondary">{dir}</span>
+          )}
+          <span className="shrink-0 font-medium text-text-primary">
+            {filename}
+          </span>
+        </span>
+      ) : (
+        <Provider delayDuration={1000}>
+          <Root onOpenChange={setTooltipOpen} open={tooltipOpen}>
+            <Trigger asChild>
+              <span className="flex min-w-0 flex-1 overflow-hidden text-sm">
+                {dir && (
+                  <span className="shrink truncate text-text-secondary">
+                    {dir}
+                  </span>
+                )}
+                <span className="shrink-0 font-medium text-text-primary">
+                  {filename}
                 </span>
-              )}
-              <span className="shrink-0 font-medium text-text-primary">
-                {filename}
               </span>
-            </span>
-          </Trigger>
-          <Portal>
-            <Content
-              className={cn(
-                "z-50 rounded px-2 py-1 text-xs",
-                "bg-bg-tertiary text-text-primary",
-                "border border-panel-border shadow-lg",
-                "fade-in-0 zoom-in-95 animate-in duration-100"
-              )}
-              sideOffset={5}
-            >
-              {tooltipText}
-            </Content>
-          </Portal>
-        </Root>
-      </Provider>
+            </Trigger>
+            <Portal>
+              <Content
+                className={cn(
+                  "z-50 rounded px-2 py-1 text-xs",
+                  "bg-bg-tertiary text-text-primary",
+                  "border border-panel-border shadow-lg",
+                  "fade-in-0 zoom-in-95 animate-in duration-100"
+                )}
+                sideOffset={5}
+              >
+                {tooltipText}
+              </Content>
+            </Portal>
+          </Root>
+        </Provider>
+      )}
       {(additions > 0 || deletions > 0) && (
         <span className="file-list-item-stats flex shrink-0 gap-1 text-xs">
           {additions > 0 && <span className="text-success">+{additions}</span>}

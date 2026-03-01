@@ -62,7 +62,9 @@ pub fn run() {
             commands::git::get_staged_file_diff,
             commands::git::get_unstaged_file_diff,
             commands::git::get_staged_file_contents,
-            commands::git::get_unstaged_file_contents
+            commands::git::get_unstaged_file_contents,
+            commands::git::unstage_file,
+            commands::git::discard_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

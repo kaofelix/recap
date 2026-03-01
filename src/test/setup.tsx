@@ -127,10 +127,49 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   open: mockOpenerOpen,
+  revealItemInDir: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: mockDialogOpen,
+}));
+
+// Mock Tauri path API
+vi.mock("@tauri-apps/api/path", () => ({
+  join: vi.fn((...paths: string[]) => Promise.resolve(paths.join("/"))),
+  sep: vi.fn(() => "/"),
+}));
+
+// Mock Tauri dpi API
+vi.mock("@tauri-apps/api/dpi", () => ({
+  LogicalPosition: class LogicalPosition {
+    x: number;
+    y: number;
+    constructor(x: number, y: number) {
+      this.x = x;
+      this.y = y;
+    }
+  },
+}));
+
+// Mock Tauri menu API
+const mockMenuPopup = vi.fn().mockResolvedValue(undefined);
+const mockMenuClose = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@tauri-apps/api/menu", () => ({
+  Menu: {
+    new: vi.fn().mockResolvedValue({
+      popup: mockMenuPopup,
+      close: mockMenuClose,
+    }),
+  },
+  MenuItem: {
+    new: vi
+      .fn()
+      .mockImplementation((opts: { id: string; text: string }) =>
+        Promise.resolve({ id: opts.id, text: opts.text })
+      ),
+  },
 }));
 
 // Export mocks for use in tests
@@ -140,6 +179,8 @@ export const tauriMocks = {
   emit: mockEmit,
   openerOpen: mockOpenerOpen,
   dialogOpen: mockDialogOpen,
+  menuPopup: mockMenuPopup,
+  menuClose: mockMenuClose,
 };
 
 // Mock react-diff-viewer-continued (has worker bundle issues in test env)

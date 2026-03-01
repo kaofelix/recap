@@ -597,7 +597,7 @@ export function DiffView({ className }: DiffViewProps) {
           isFocused && "border-l-2 border-l-accent-primary"
         )}
       >
-        <Provider delayDuration={300}>
+        <Provider delayDuration={1000}>
           <Root>
             <Trigger asChild>
               <button
