@@ -9,10 +9,8 @@ import {
 } from "react";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
-import { useCommits } from "../../hooks/useCommits";
 import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
 import { useNavigableList } from "../../hooks/useNavigableList";
-import { useWorkingChanges } from "../../hooks/useWorkingChanges";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import {
   isContextMenuKeyboardEvent,
@@ -26,11 +24,17 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useChangesError,
+  useCommits,
+  useCommitsError,
+  useIsLoadingChanges,
+  useIsLoadingCommits,
   useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedRepo,
   useViewMode,
+  useWorkingChanges,
 } from "../../store/appStore";
 import { FileListItem } from "./FileListItem";
 
@@ -92,17 +96,13 @@ export function Sidebar({ className }: SidebarProps) {
   const selectChange = useAppStore((state) => state.selectChange);
   const setViewMode = useAppStore((state) => state.setViewMode);
 
-  const {
-    commits,
-    isLoading: isLoadingCommits,
-    error: commitsError,
-  } = useCommits(selectedRepo, !!selectedRepo);
-
-  const {
-    changes,
-    isLoading: isLoadingChanges,
-    error: changesError,
-  } = useWorkingChanges(selectedRepo, viewMode === "changes");
+  // Read polling state from store (populated by useRepoPolling in AppLayout)
+  const commits = useCommits();
+  const isLoadingCommits = useIsLoadingCommits();
+  const commitsError = useCommitsError();
+  const changes = useWorkingChanges();
+  const isLoadingChanges = useIsLoadingChanges();
+  const changesError = useChangesError();
 
   const isLoading =
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;

@@ -1,11 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { parseWorkingChangeId } from "../lib/workingChangesList";
+import type { Commit } from "../types/commit";
 import type { ChangedFile, WorkingFile } from "../types/file";
 import type { FocusRegion } from "../types/focus";
 import type { Repository } from "../types/repository";
 
 export type ViewMode = "history" | "changes";
+
+export interface PollingState {
+  commits: Commit[];
+  isLoadingCommits: boolean;
+  commitsError: string | null;
+  workingChanges: WorkingFile[];
+  isLoadingChanges: boolean;
+  changesError: string | null;
+}
 
 export interface AppState {
   repos: Repository[];
@@ -19,6 +29,15 @@ export interface AppState {
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
   workingChangesRevision: number;
+
+  // Polling state (managed by useRepoPolling)
+  commits: Commit[];
+  isLoadingCommits: boolean;
+  commitsError: string | null;
+  workingChanges: WorkingFile[];
+  isLoadingChanges: boolean;
+  changesError: string | null;
+
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
@@ -36,6 +55,14 @@ export interface AppState {
   focusNextPanel: () => void;
   focusPrevPanel: () => void;
   clearRepos: () => void;
+
+  // Polling actions
+  setCommits: (commits: Commit[]) => void;
+  setCommitsLoading: (isLoading: boolean) => void;
+  setCommitsError: (error: string | null) => void;
+  setWorkingChanges: (changes: WorkingFile[]) => void;
+  setChangesLoading: (isLoading: boolean) => void;
+  setChangesError: (error: string | null) => void;
 }
 
 /**
@@ -77,6 +104,14 @@ export const useAppStore = create<AppState>()(
       focusedRegion: null,
       isDiffMaximized: false,
       workingChangesRevision: 0,
+
+      // Polling state
+      commits: [],
+      isLoadingCommits: false,
+      commitsError: null,
+      workingChanges: [],
+      isLoadingChanges: false,
+      changesError: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -283,8 +318,25 @@ export const useAppStore = create<AppState>()(
           changedFiles: [],
           isDiffMaximized: false,
           workingChangesRevision: 0,
+          commits: [],
+          isLoadingCommits: false,
+          commitsError: null,
+          workingChanges: [],
+          isLoadingChanges: false,
+          changesError: null,
         });
       },
+
+      // Polling actions
+      setCommits: (commits: Commit[]) => set({ commits }),
+      setCommitsLoading: (isLoadingCommits: boolean) =>
+        set({ isLoadingCommits }),
+      setCommitsError: (commitsError: string | null) => set({ commitsError }),
+      setWorkingChanges: (workingChanges: WorkingFile[]) =>
+        set({ workingChanges }),
+      setChangesLoading: (isLoadingChanges: boolean) =>
+        set({ isLoadingChanges }),
+      setChangesError: (changesError: string | null) => set({ changesError }),
     }),
     {
       name: "recap-storage",
@@ -316,3 +368,14 @@ export const useIsDiffMaximized = () =>
 export const useWorkingChangesRevision = () =>
   useAppStore((state) => state.workingChangesRevision);
 export const useChangedFiles = () => useAppStore((state) => state.changedFiles);
+
+// Polling state selectors
+export const useCommits = () => useAppStore((state) => state.commits);
+export const useIsLoadingCommits = () =>
+  useAppStore((state) => state.isLoadingCommits);
+export const useCommitsError = () => useAppStore((state) => state.commitsError);
+export const useWorkingChanges = () =>
+  useAppStore((state) => state.workingChanges);
+export const useIsLoadingChanges = () =>
+  useAppStore((state) => state.isLoadingChanges);
+export const useChangesError = () => useAppStore((state) => state.changesError);

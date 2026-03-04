@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-03-04
+
+### Added
+
+- **Context menus** — Right-click (or press the Menu key / Shift+F10) on commits and files for quick actions:
+  - History list: Copy Commit Hash
+  - File lists: Copy Relative Path, Copy Full Path, Reveal in Finder
+  - Changes view: Unstage (for staged files) or Discard Changes (for unstaged/untracked files)
+
+- **Untracked files subsection** — Untracked files now appear in a dedicated "Untracked" subsection within Unstaged Changes for better organization.
+
+### Improved
+
+- **Staged and unstaged selection** — When the same file has both staged and unstaged changes, each section is now independently selectable to view the correct diff.
+
+- **Update check feedback** — Added a spinner while checking for updates and a brief "Up to date!" confirmation message.
+
+- **Reduced idle CPU usage** — Consolidated multiple polling intervals into a single unified loop with visibility awareness. The app now polls every 2 seconds when focused, but slows to 30 seconds when minimized or in the background.
+
 ## [0.2.6] - 2026-02-23
 
 ### Fixed

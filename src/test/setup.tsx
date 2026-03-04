@@ -105,6 +105,20 @@ beforeEach(() => {
   localStorageMock.clear();
 });
 
+// Mock useAppVisibility to always return true in tests (app is visible/focused)
+// This ensures polling tests use the fast interval (2s) not the background interval (30s)
+vi.mock("../hooks/useAppVisibility", () => ({
+  useAppVisibility: () => true,
+}));
+
+// Mock useRepoPolling to be a no-op in component tests
+// Tests should set up store state directly instead of relying on polling
+vi.mock("../hooks/useRepoPolling", () => ({
+  useRepoPolling: () => {
+    // No-op: tests set up store state directly
+  },
+}));
+
 // Mock Tauri APIs
 const mockInvoke = vi.fn();
 const mockListen = vi.fn(() =>

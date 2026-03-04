@@ -9,13 +9,16 @@ import {
   useDefaultLayout,
 } from "react-resizable-panels";
 import { FocusProvider } from "../../context/FocusContext";
-import { useCommits } from "../../hooks/useCommits";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useKeyboardHandler } from "../../hooks/useKeyboardHandler";
+import { useRepoPolling } from "../../hooks/useRepoPolling";
 import { defaultKeymap } from "../../keymaps/defaults";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
+  useCommits,
+  useCommitsError,
+  useIsLoadingCommits,
   useSelectedCommitIds,
   useSelectedRepo,
   useViewMode,
@@ -232,14 +235,13 @@ export function AppLayout({ className }: AppLayoutProps) {
   const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
-  const shouldTrackCommitOrdering =
-    viewMode === "history" && selectedCommitIds.length > 1;
+  // Centralized polling - updates store with commits and working changes
+  useRepoPolling(selectedRepo);
 
-  const {
-    commits,
-    isLoading: isLoadingCommits,
-    error: commitsError,
-  } = useCommits(selectedRepo, shouldTrackCommitOrdering);
+  // Read polling state from store
+  const commits = useCommits();
+  const isLoadingCommits = useIsLoadingCommits();
+  const commitsError = useCommitsError();
 
   // Outer layout: sidebar | right-content — structure never changes, so
   // sidebar width is naturally preserved across History/Changes mode switches.

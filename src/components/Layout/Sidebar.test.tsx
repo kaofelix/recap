@@ -49,6 +49,45 @@ function mockChangesSequence(sequence: unknown[][]) {
   });
 }
 
+// Unmock useRepoPolling for this test file so we can test with mocked invoke
+vi.unmock("../../hooks/useRepoPolling");
+
+import type { ReactNode } from "react";
+// Import after unmocking
+import { useRepoPolling } from "../../hooks/useRepoPolling";
+import { useSelectedRepo } from "../../store/appStore";
+
+/**
+ * Wrapper component that provides polling context for Sidebar tests.
+ * This mimics what AppLayout does in the real app.
+ */
+function SidebarWithPolling({ children }: { children?: ReactNode }) {
+  const selectedRepo = useSelectedRepo();
+  useRepoPolling(selectedRepo);
+  return <>{children ?? <Sidebar />}</>;
+}
+
+/**
+ * Render Sidebar with polling context.
+ * Use this for tests that need to test the full data flow via mocked invoke.
+ */
+function renderWithPolling() {
+  return render(<SidebarWithPolling />);
+}
+
+/**
+ * Render Sidebar with polling and focus context.
+ */
+function renderWithPollingAndFocus(region: "sidebar" | "files" | "diff") {
+  return render(
+    <SidebarWithPolling>
+      <FocusProvider region={region}>
+        <Sidebar />
+      </FocusProvider>
+    </SidebarWithPolling>
+  );
+}
+
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,6 +98,14 @@ describe("Sidebar", () => {
       selectedCommitIds: [],
       selectedChangeId: null,
       viewMode: "history",
+      // Reset polling state
+      commits: [],
+      isLoadingCommits: false,
+      commitsError: null,
+      workingChanges: [],
+      isLoadingChanges: false,
+      changesError: null,
+      changedFiles: [],
     });
   });
 
@@ -71,12 +118,20 @@ describe("Sidebar", () => {
         selectedCommitIds: [],
         selectedChangeId: null,
         viewMode: "history",
+        // Reset polling state
+        commits: [],
+        isLoadingCommits: false,
+        commitsError: null,
+        workingChanges: [],
+        isLoadingChanges: false,
+        changesError: null,
+        changedFiles: [],
       });
     });
   });
 
   it("shows prompt when no repo is selected", () => {
-    render(<Sidebar />);
+    renderWithPolling();
 
     expect(
       screen.getByText("Select a repository to view commits")
@@ -84,7 +139,7 @@ describe("Sidebar", () => {
   });
 
   it("shows view mode toggle buttons", () => {
-    render(<Sidebar />);
+    renderWithPolling();
 
     expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Changes" })).toBeInTheDocument();
@@ -107,7 +162,7 @@ describe("Sidebar", () => {
         })
     );
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     expect(screen.getByText("Loading commits...")).toBeInTheDocument();
   });
@@ -139,7 +194,7 @@ describe("Sidebar", () => {
       selectedRepoId: "1",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
@@ -184,7 +239,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(screen.getByText("feat: first")).toBeInTheDocument();
@@ -234,7 +289,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(screen.getByText("feat: first")).toBeInTheDocument();
@@ -260,7 +315,7 @@ describe("Sidebar", () => {
       selectedRepoId: "1",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(
@@ -279,7 +334,7 @@ describe("Sidebar", () => {
       selectedRepoId: "1",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(screen.getByText("No commits found")).toBeInTheDocument();
@@ -301,7 +356,7 @@ describe("Sidebar", () => {
       selectedRepoId: "1",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
@@ -322,7 +377,7 @@ describe("Sidebar", () => {
       selectedRepoId: "1",
     });
 
-    const { rerender } = render(<Sidebar />);
+    const { rerender } = renderWithPolling();
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
@@ -334,8 +389,8 @@ describe("Sidebar", () => {
     // Change selected repo
     await act(async () => {
       useAppStore.setState({ selectedRepoId: "2" });
-      rerender(<Sidebar />);
     });
+    rerender(<SidebarWithPolling />);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
@@ -375,11 +430,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(
-      <FocusProvider region="sidebar">
-        <Sidebar />
-      </FocusProvider>
-    );
+    renderWithPollingAndFocus("sidebar");
 
     await waitFor(() => {
       expect(screen.getByText("feat: first")).toBeInTheDocument();
@@ -416,11 +467,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(
-      <FocusProvider region="sidebar">
-        <Sidebar />
-      </FocusProvider>
-    );
+    renderWithPollingAndFocus("sidebar");
 
     const row = await screen.findByText("feat: first");
     const rowButton = row.closest("button");
@@ -451,11 +498,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(
-      <FocusProvider region="sidebar">
-        <Sidebar />
-      </FocusProvider>
-    );
+    renderWithPollingAndFocus("sidebar");
 
     const row = await screen.findByText("feat: first");
     const rowButton = row.closest("button");
@@ -485,7 +528,7 @@ describe("Sidebar", () => {
       viewMode: "history",
     });
 
-    render(<Sidebar />);
+    renderWithPolling();
 
     const row = await screen.findByText("feat: first");
     const rowButton = row.closest("button");
@@ -539,7 +582,7 @@ describe("Sidebar", () => {
         viewMode: "history",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await act(async () => {
         await Promise.resolve();
@@ -578,7 +621,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await act(async () => {
         await Promise.resolve();
@@ -612,7 +655,7 @@ describe("Sidebar", () => {
         selectedRepoId: "1",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
 
@@ -626,7 +669,7 @@ describe("Sidebar", () => {
     it("shows changes prompt when no repo is selected in changes view", () => {
       useAppStore.setState({ viewMode: "changes" });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       expect(
         screen.getByText("Select a repository to view changes")
@@ -644,7 +687,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(screen.getByText("No changes here... ✓")).toBeInTheDocument();
@@ -687,7 +730,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         // Filename is shown separately from directory
@@ -735,7 +778,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
@@ -779,7 +822,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(screen.getByText("Unstaged Changes (2)")).toBeInTheDocument();
@@ -823,7 +866,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
@@ -868,7 +911,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         const stagedHeader = screen.getByText("Staged Changes (1)");
@@ -917,7 +960,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         // Both sections should show
@@ -968,7 +1011,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       const rows = await screen.findAllByText("file.ts");
       const unstagedRow = rows[1].closest("button");
@@ -1024,11 +1067,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(
-        <FocusProvider region="sidebar">
-          <Sidebar />
-        </FocusProvider>
-      );
+      renderWithPollingAndFocus("sidebar");
 
       await screen.findByText("a.ts");
 
@@ -1076,7 +1115,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(useAppStore.getState().selectedFilePath).toBe("src/App.tsx");
@@ -1121,7 +1160,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
@@ -1169,11 +1208,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(
-        <FocusProvider region="sidebar">
-          <Sidebar />
-        </FocusProvider>
-      );
+      renderWithPollingAndFocus("sidebar");
 
       await waitFor(() => {
         expect(screen.getByText("App.tsx")).toBeInTheDocument();
@@ -1211,7 +1246,7 @@ describe("Sidebar", () => {
         viewMode: "changes",
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(screen.getByText("+10")).toBeInTheDocument();
@@ -1255,7 +1290,7 @@ describe("Sidebar", () => {
           viewMode: "changes",
         });
 
-        render(<Sidebar />);
+        renderWithPolling();
 
         // Initial fetch happens immediately - flush the promise
         await act(async () => {
@@ -1298,7 +1333,7 @@ describe("Sidebar", () => {
           viewMode: "changes",
         });
 
-        render(<Sidebar />);
+        renderWithPolling();
 
         // Initial fetch
         await act(async () => {
@@ -1338,7 +1373,7 @@ describe("Sidebar", () => {
           viewMode: "changes",
         });
 
-        const { unmount } = render(<Sidebar />);
+        const { unmount } = renderWithPolling();
 
         // Initial fetch
         await act(async () => {
@@ -1415,7 +1450,7 @@ describe("Sidebar", () => {
           viewMode: "changes",
         });
 
-        render(<Sidebar />);
+        renderWithPolling();
 
         // Initial fetch
         await act(async () => {
@@ -1488,7 +1523,7 @@ describe("Sidebar", () => {
           viewMode: "changes",
         });
 
-        render(<Sidebar />);
+        renderWithPolling();
 
         // Initial fetch
         await act(async () => {
@@ -1548,7 +1583,7 @@ describe("Sidebar", () => {
         changedFiles: [],
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(useAppStore.getState().changedFiles).toEqual(mockChanges);
@@ -1589,7 +1624,7 @@ describe("Sidebar", () => {
         ],
       });
 
-      render(<Sidebar />);
+      renderWithPolling();
 
       await waitFor(() => {
         expect(useAppStore.getState().changedFiles).toEqual([]);
