@@ -84,6 +84,8 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   // Track if this is the initial load (for loading states)
   const isInitialCommitsLoad = useRef(true);
   const isInitialChangesLoad = useRef(true);
+  // Track previous working changes to detect actual changes
+  const prevWorkingChangesRef = useRef<string | null>(null);
 
   const fetchCommits = useCallback(async () => {
     if (!selectedRepo) {
@@ -133,10 +135,23 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setChangesError(null);
       reconcileSelection(result, selectChange);
 
-      // Trigger diff refresh for background polls
-      if (!isInitial) {
+      // Only bump revision if working changes actually changed
+      // This prevents unnecessary re-fetches of file contents
+      const fingerprint = JSON.stringify(
+        result.map((f) => ({
+          path: f.path,
+          section: f.section,
+          staged_additions: f.staged_additions,
+          staged_deletions: f.staged_deletions,
+          unstaged_additions: f.unstaged_additions,
+          unstaged_deletions: f.unstaged_deletions,
+        }))
+      );
+
+      if (!isInitial && fingerprint !== prevWorkingChangesRef.current) {
         bumpWorkingChangesRevision();
       }
+      prevWorkingChangesRef.current = fingerprint;
     } catch (err) {
       setChangesError(err instanceof Error ? err.message : String(err));
       setWorkingChanges([]);

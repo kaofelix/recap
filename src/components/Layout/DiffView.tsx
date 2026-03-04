@@ -53,6 +53,9 @@ type DiffDisplayMode = "split" | "unified";
 const NON_CONSECUTIVE_SELECTION_ERROR =
   "Unable to display diff for multiple non-consecutive commits";
 
+/** Stable empty array reference to avoid triggering useFileContents re-fetches */
+const EMPTY_COMMIT_IDS: string[] = [];
+
 /** Theme variables for the diff viewer using CSS variables */
 const themeVariables = {
   light: {
@@ -483,7 +486,9 @@ export function DiffView({ className }: DiffViewProps) {
 
   // In history mode, use selected commit(s). In changes mode, use working directory.
   const commitId = viewMode === "history" ? selectedCommitId : null;
-  const activeCommitIds = viewMode === "history" ? selectedCommitIds : [];
+  // Use stable empty array reference to avoid triggering useFileContents re-fetches
+  const activeCommitIds =
+    viewMode === "history" ? selectedCommitIds : EMPTY_COMMIT_IDS;
 
   // Refresh key triggers diff reload when working changes are updated by useWorkingChanges polling
   const refreshKey = viewMode === "changes" ? workingChangesRevision : 0;

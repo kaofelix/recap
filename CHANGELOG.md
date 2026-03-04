@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Critical CPU fix** — Fixed a bug causing ~80% CPU usage when viewing diffs in Changes mode. An unstable array reference was triggering file content re-fetches ~70 times per second instead of only when needed.
+
 ## [0.2.7] - 2026-03-04
 
 ### Added
