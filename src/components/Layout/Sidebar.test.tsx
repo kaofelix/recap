@@ -480,6 +480,195 @@ describe("Sidebar", () => {
     });
   });
 
+  describe("ahead/behind badge in History tab", () => {
+    it("shows ↑X when there are unpushed commits", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: local",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 3, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("ahead-behind-badge")).toHaveTextContent(
+          "↑3"
+        );
+      });
+
+      expect(screen.getByTestId("ahead-behind-badge")).not.toHaveTextContent(
+        "↓"
+      );
+    });
+
+    it("shows ↓Y when there are unpulled commits", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: pushed",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 0, behind: 5 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("ahead-behind-badge")).toHaveTextContent(
+          "↓5"
+        );
+      });
+
+      expect(screen.getByTestId("ahead-behind-badge")).not.toHaveTextContent(
+        "↑"
+      );
+    });
+
+    it("shows both ↑X ↓Y when ahead and behind", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: local",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 2, behind: 4 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        const badge = screen.getByTestId("ahead-behind-badge");
+        expect(badge).toHaveTextContent("↑2");
+        expect(badge).toHaveTextContent("↓4");
+      });
+    });
+
+    it("does not show badge when fully synced", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: synced",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 0, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: synced")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId("ahead-behind-badge")
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not show badge when no upstream is configured", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: no upstream",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.reject(new Error("No upstream tracking branch"));
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: no upstream")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId("ahead-behind-badge")
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("supports cmd-click multi-select in history mode", async () => {
     const mockCommits = [
       {

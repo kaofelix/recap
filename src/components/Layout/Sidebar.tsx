@@ -25,6 +25,7 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useBehindCount,
   useChangesError,
   useCommits,
   useCommitsError,
@@ -103,6 +104,7 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoadingCommits = useIsLoadingCommits();
   const commitsError = useCommitsError();
   const unpushedCount = useUnpushedCount();
+  const behindCount = useBehindCount();
   const changes = useWorkingChanges();
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
@@ -315,7 +317,7 @@ export function Sidebar({ className }: SidebarProps) {
         <button
           aria-selected={viewMode === "history"}
           className={cn(
-            "flex flex-1 items-center justify-center",
+            "flex flex-1 items-center justify-center gap-1.5",
             "border-b-2 font-medium text-xs transition-colors",
             viewMode === "history"
               ? "border-accent-primary text-text-primary"
@@ -326,6 +328,7 @@ export function Sidebar({ className }: SidebarProps) {
           type="button"
         >
           History
+          <AheadBehindBadge ahead={unpushedCount} behind={behindCount} />
         </button>
         <button
           aria-selected={viewMode === "changes"}
@@ -418,6 +421,30 @@ export function Sidebar({ className }: SidebarProps) {
           )}
       </div>
     </div>
+  );
+}
+
+interface AheadBehindBadgeProps {
+  ahead: number | null;
+  behind: number | null;
+}
+
+function AheadBehindBadge({ ahead, behind }: AheadBehindBadgeProps) {
+  const showAhead = ahead !== null && ahead > 0;
+  const showBehind = behind !== null && behind > 0;
+
+  if (!(showAhead || showBehind)) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] text-text-secondary"
+      data-testid="ahead-behind-badge"
+    >
+      {showAhead && <span>↑{ahead}</span>}
+      {showBehind && <span>↓{behind}</span>}
+    </span>
   );
 }
 

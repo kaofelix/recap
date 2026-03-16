@@ -77,6 +77,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setChangesError = useAppStore((state) => state.setChangesError);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
   const setUnpushedCount = useAppStore((state) => state.setUnpushedCount);
+  const setBehindCount = useAppStore((state) => state.setBehindCount);
   const selectChange = useAppStore((state) => state.selectChange);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
@@ -122,9 +123,11 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
         { repoPath: selectedRepo.path }
       );
       setUnpushedCount(ab.ahead);
+      setBehindCount(ab.behind);
     } catch {
       // No upstream or detached HEAD — clear the indicator
       setUnpushedCount(null);
+      setBehindCount(null);
     }
   }, [
     selectedRepo,
@@ -132,6 +135,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setCommitsLoading,
     setCommitsError,
     setUnpushedCount,
+    setBehindCount,
   ]);
 
   const fetchWorkingChanges = useCallback(async () => {
@@ -216,6 +220,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setChangesError(null);
       setChangesLoading(false);
       setUnpushedCount(null);
+      setBehindCount(null);
     }
   }, [
     selectedRepo,
@@ -227,6 +232,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setChangesError,
     setChangesLoading,
     setUnpushedCount,
+    setBehindCount,
   ]);
 
   // Reset initial changes load flag when switching to changes mode
