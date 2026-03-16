@@ -41,6 +41,8 @@ export interface AppState {
   unpushedCount: number | null;
   /** Number of upstream commits not yet merged locally, or null if unknown */
   behindCount: number | null;
+  /** Name of the currently checked-out branch, or null if unknown */
+  currentBranchName: string | null;
 
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
@@ -69,6 +71,7 @@ export interface AppState {
   setChangesError: (error: string | null) => void;
   setUnpushedCount: (count: number | null) => void;
   setBehindCount: (count: number | null) => void;
+  setCurrentBranchName: (name: string | null) => void;
 }
 
 /**
@@ -120,6 +123,7 @@ export const useAppStore = create<AppState>()(
       changesError: null,
       unpushedCount: null,
       behindCount: null,
+      currentBranchName: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -334,6 +338,7 @@ export const useAppStore = create<AppState>()(
           changesError: null,
           unpushedCount: null,
           behindCount: null,
+          currentBranchName: null,
         });
       },
 
@@ -350,6 +355,8 @@ export const useAppStore = create<AppState>()(
       setUnpushedCount: (unpushedCount: number | null) =>
         set({ unpushedCount }),
       setBehindCount: (behindCount: number | null) => set({ behindCount }),
+      setCurrentBranchName: (currentBranchName: string | null) =>
+        set({ currentBranchName }),
     }),
     {
       name: "recap-storage",
@@ -395,3 +402,5 @@ export const useChangesError = () => useAppStore((state) => state.changesError);
 export const useUnpushedCount = () =>
   useAppStore((state) => state.unpushedCount);
 export const useBehindCount = () => useAppStore((state) => state.behindCount);
+export const useCurrentBranchName = () =>
+  useAppStore((state) => state.currentBranchName);

@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   useAppStore,
+  useCurrentBranchName,
   useIsDiffMaximized,
   useRepos,
   useSelectedCommitId,
@@ -903,6 +904,46 @@ describe("appStore", () => {
 
       expect(result.current.isDiffMaximized).toBe(false);
       expect(result.current.focusedRegion).toBe("diff");
+    });
+  });
+
+  describe("currentBranchName", () => {
+    it("should default to null", () => {
+      expect(useAppStore.getState().currentBranchName).toBeNull();
+    });
+
+    it("should update via setCurrentBranchName", () => {
+      act(() => {
+        useAppStore.getState().setCurrentBranchName("main");
+      });
+
+      expect(useAppStore.getState().currentBranchName).toBe("main");
+    });
+
+    it("should be cleared by clearRepos", () => {
+      act(() => {
+        useAppStore.getState().setCurrentBranchName("feature-x");
+      });
+
+      expect(useAppStore.getState().currentBranchName).toBe("feature-x");
+
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      expect(useAppStore.getState().currentBranchName).toBeNull();
+    });
+
+    it("should expose useCurrentBranchName selector", () => {
+      const { result } = renderHook(() => useCurrentBranchName());
+
+      expect(result.current).toBeNull();
+
+      act(() => {
+        useAppStore.getState().setCurrentBranchName("develop");
+      });
+
+      expect(result.current).toBe("develop");
     });
   });
 });

@@ -324,4 +324,144 @@ describe("BranchPickerButton", () => {
       expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
     });
   });
+
+  it("should display branch name from store when available", async () => {
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/my-repo");
+      useAppStore.getState().setCurrentBranchName("develop");
+    });
+
+    // list_branches returns different current (simulate external branch change detected by polling)
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return Promise.resolve([
+          {
+            name: "develop",
+            is_current: true,
+            is_remote: false,
+            commit_id: "aaa1111111111",
+          },
+        ]);
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    render(<BranchPickerButton />);
+
+    // Should show store's currentBranchName immediately (before fetch completes)
+    expect(screen.getByText("develop")).toBeInTheDocument();
+  });
+
+  it("should show store branch name even before branches are fetched", async () => {
+    // Make list_branches hang forever
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return new Promise(() => undefined);
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/my-repo");
+      useAppStore.getState().setCurrentBranchName("my-feature");
+    });
+
+    render(<BranchPickerButton />);
+
+    // Should show the store name even though list_branches hasn't resolved
+    expect(screen.getByText("my-feature")).toBeInTheDocument();
+  });
+
+  it("should refresh branches when dropdown is opened", async () => {
+    const user = userEvent.setup();
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/my-repo");
+    });
+
+    render(<BranchPickerButton />);
+
+    // Wait for initial fetch
+    await waitFor(() => {
+      expect(screen.getByText("main")).toBeInTheDocument();
+    });
+
+    const initialCallCount = tauriMocks.invoke.mock.calls.filter(
+      ([cmd]: [string]) => cmd === "list_branches"
+    ).length;
+
+    // Open dropdown
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    // Should have fetched branches again on open
+    await waitFor(() => {
+      const newCallCount = tauriMocks.invoke.mock.calls.filter(
+        ([cmd]: [string]) => cmd === "list_branches"
+      ).length;
+      expect(newCallCount).toBeGreaterThan(initialCallCount);
+    });
+  });
+
+  it("should show newly created branch after opening dropdown", async () => {
+    const user = userEvent.setup();
+    let callCount = 0;
+
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        callCount++;
+        if (callCount === 1) {
+          // Initial fetch — only main
+          return Promise.resolve([
+            {
+              name: "main",
+              is_current: true,
+              is_remote: false,
+              commit_id: "abc1234567890",
+            },
+          ]);
+        }
+        // Subsequent fetches — new branch appeared
+        return Promise.resolve([
+          {
+            name: "main",
+            is_current: true,
+            is_remote: false,
+            commit_id: "abc1234567890",
+          },
+          {
+            name: "new-feature",
+            is_current: false,
+            is_remote: false,
+            commit_id: "xyz9876543210",
+          },
+        ]);
+      }
+      if (cmd === "checkout_branch") {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/my-repo");
+    });
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("main")).toBeInTheDocument();
+    });
+
+    // Open dropdown — triggers a refresh
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    // Should now show the new branch
+    await waitFor(() => {
+      expect(
+        screen.getByRole("menuitem", { name: /new-feature/i })
+      ).toBeInTheDocument();
+    });
+  });
 });

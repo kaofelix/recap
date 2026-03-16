@@ -9,7 +9,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
-import { useAppStore, useSelectedRepo } from "../../store";
+import {
+  useAppStore,
+  useCurrentBranchName,
+  useSelectedRepo,
+} from "../../store";
 import type { Branch } from "../../types/branch";
 
 export interface BranchPickerButtonProps {
@@ -30,33 +34,45 @@ async function checkoutBranch(
 export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   const selectedRepo = useSelectedRepo();
   const selectCommit = useAppStore((state) => state.selectCommit);
+  const currentBranchName = useCurrentBranchName();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentBranch = branches.find((b) => b.is_current);
+  // Use store's currentBranchName (polled), falling back to local branch list
+  const displayBranchName =
+    currentBranchName ?? branches.find((b) => b.is_current)?.name;
 
-  // Fetch branches when dropdown opens
-  const fetchBranches = useCallback(async () => {
-    if (!selectedRepo) {
-      return;
-    }
+  // Fetch branches list (with loading indicator for initial/explicit fetches)
+  const fetchBranches = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!selectedRepo) {
+        return;
+      }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await listBranches(selectedRepo.path);
-      setBranches(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setBranches([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedRepo]);
+      if (!silent) {
+        setIsLoading(true);
+        setError(null);
+      }
+      try {
+        const result = await listBranches(selectedRepo.path);
+        setBranches(result);
+      } catch (err) {
+        if (!silent) {
+          setError(err instanceof Error ? err.message : String(err));
+          setBranches([]);
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [selectedRepo]
+  );
 
-  // Fetch branches on repo change to get current branch name
+  // Fetch branches on repo change
   useEffect(() => {
     if (selectedRepo) {
       fetchBranches();
@@ -65,8 +81,22 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
     }
   }, [selectedRepo, fetchBranches]);
 
+  // Refresh branches when dropdown opens (silent — don't disable existing items)
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      setIsOpen(open);
+      if (open) {
+        // Defer the refresh so the dropdown is fully interactive before state updates
+        queueMicrotask(() => {
+          fetchBranches({ silent: true });
+        });
+      }
+    },
+    [fetchBranches]
+  );
+
   const handleBranchSelect = async (branchName: string) => {
-    if (!selectedRepo || branchName === currentBranch?.name) {
+    if (!selectedRepo || branchName === displayBranchName) {
       return;
     }
 
@@ -94,7 +124,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   const localBranches = branches.filter((b) => !b.is_remote);
 
   return (
-    <Root onOpenChange={setIsOpen} open={isOpen}>
+    <Root onOpenChange={handleOpenChange} open={isOpen}>
       <Trigger asChild>
         <button
           aria-label="Select branch"
@@ -110,7 +140,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
           disabled={isLoading}
           type="button"
         >
-          <span>{currentBranch?.name ?? "Select branch"}</span>
+          <span>{displayBranchName ?? "Select branch"}</span>
           <ChevronDown className="h-4 w-4 text-text-secondary" />
         </button>
       </Trigger>

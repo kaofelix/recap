@@ -1,6 +1,7 @@
 export {
   type AppState,
   useAppStore,
+  useCurrentBranchName,
   useRepos,
   useSelectedRepo,
   useSelectedRepoId,

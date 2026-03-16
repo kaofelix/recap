@@ -78,6 +78,9 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
   const setUnpushedCount = useAppStore((state) => state.setUnpushedCount);
   const setBehindCount = useAppStore((state) => state.setBehindCount);
+  const setCurrentBranchName = useAppStore(
+    (state) => state.setCurrentBranchName
+  );
   const selectChange = useAppStore((state) => state.selectChange);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
@@ -129,6 +132,16 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setUnpushedCount(null);
       setBehindCount(null);
     }
+
+    // Fetch current branch name (non-blocking — errors clear it)
+    try {
+      const branchName = await invoke<string>("get_current_branch", {
+        repoPath: selectedRepo.path,
+      });
+      setCurrentBranchName(branchName);
+    } catch {
+      setCurrentBranchName(null);
+    }
   }, [
     selectedRepo,
     setCommits,
@@ -136,6 +149,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setCommitsError,
     setUnpushedCount,
     setBehindCount,
+    setCurrentBranchName,
   ]);
 
   const fetchWorkingChanges = useCallback(async () => {
@@ -221,6 +235,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setChangesLoading(false);
       setUnpushedCount(null);
       setBehindCount(null);
+      setCurrentBranchName(null);
     }
   }, [
     selectedRepo,
@@ -233,6 +248,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setChangesLoading,
     setUnpushedCount,
     setBehindCount,
+    setCurrentBranchName,
   ]);
 
   // Reset initial changes load flag when switching to changes mode

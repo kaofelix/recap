@@ -159,6 +159,101 @@ describe("useRepoPolling", () => {
     expect(mockInvoke.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 
+  it("fetches current branch name and stores it", async () => {
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "get_current_branch") {
+        return Promise.resolve("feature-xyz");
+      }
+      return Promise.resolve([]);
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_current_branch", {
+      repoPath: "/test/repo",
+    });
+
+    expect(useAppStore.getState().currentBranchName).toBe("feature-xyz");
+  });
+
+  it("clears current branch name when get_current_branch fails", async () => {
+    useAppStore.setState({ currentBranchName: "old-branch" });
+
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "get_current_branch") {
+        return Promise.reject(new Error("detached HEAD"));
+      }
+      return Promise.resolve([]);
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useAppStore.getState().currentBranchName).toBeNull();
+  });
+
+  it("clears current branch name when repo is deselected", async () => {
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "get_current_branch") {
+        return Promise.resolve("main");
+      }
+      return Promise.resolve([]);
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+    type Repository = import("../types/repository").Repository;
+
+    const repo: Repository = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    const { rerender } = renderHook<void, { selectedRepo: Repository | null }>(
+      ({ selectedRepo }) => useRepoPolling(selectedRepo),
+      { initialProps: { selectedRepo: repo } }
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useAppStore.getState().currentBranchName).toBe("main");
+
+    rerender({ selectedRepo: null });
+
+    expect(useAppStore.getState().currentBranchName).toBeNull();
+  });
+
   it("clears data when repo is deselected", async () => {
     mockInvoke.mockResolvedValue([
       {
