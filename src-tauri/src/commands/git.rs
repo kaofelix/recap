@@ -145,3 +145,8 @@ pub fn discard_file(repo_path: String, file_path: String) -> Result<(), String> 
 pub fn get_remote_url(repo_path: String) -> Result<String, String> {
     git_service::get_remote_url(&repo_path)
 }
+
+#[tauri::command]
+pub fn get_ahead_behind(repo_path: String) -> Result<git_service::AheadBehind, String> {
+    git_service::get_ahead_behind(&repo_path)
+}

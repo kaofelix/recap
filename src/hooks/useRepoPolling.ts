@@ -76,6 +76,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setChangesLoading = useAppStore((state) => state.setChangesLoading);
   const setChangesError = useAppStore((state) => state.setChangesError);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
+  const setUnpushedCount = useAppStore((state) => state.setUnpushedCount);
   const selectChange = useAppStore((state) => state.selectChange);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
@@ -113,7 +114,25 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
         setCommitsLoading(false);
       }
     }
-  }, [selectedRepo, setCommits, setCommitsLoading, setCommitsError]);
+
+    // Fetch ahead/behind in parallel (non-blocking — errors just clear the count)
+    try {
+      const ab = await invoke<{ ahead: number; behind: number }>(
+        "get_ahead_behind",
+        { repoPath: selectedRepo.path }
+      );
+      setUnpushedCount(ab.ahead);
+    } catch {
+      // No upstream or detached HEAD — clear the indicator
+      setUnpushedCount(null);
+    }
+  }, [
+    selectedRepo,
+    setCommits,
+    setCommitsLoading,
+    setCommitsError,
+    setUnpushedCount,
+  ]);
 
   const fetchWorkingChanges = useCallback(async () => {
     if (!selectedRepo) {
@@ -196,6 +215,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setChangedFiles([]);
       setChangesError(null);
       setChangesLoading(false);
+      setUnpushedCount(null);
     }
   }, [
     selectedRepo,
@@ -206,6 +226,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setChangedFiles,
     setChangesError,
     setChangesLoading,
+    setUnpushedCount,
   ]);
 
   // Reset initial changes load flag when switching to changes mode

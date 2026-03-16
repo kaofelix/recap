@@ -27,6 +27,8 @@ export interface HistoryContextMenuOptions {
   repoPath: string;
   event: React.MouseEvent | React.KeyboardEvent;
   element: HTMLElement;
+  /** Whether this commit has not been pushed to the remote yet */
+  isUnpushed?: boolean;
   /** Called when the menu closes (regardless of action taken) */
   onClose?: () => void;
 }
@@ -34,7 +36,7 @@ export interface HistoryContextMenuOptions {
 export async function showHistoryContextMenu(
   options: HistoryContextMenuOptions
 ): Promise<void> {
-  const { commitId, repoPath, event, element, onClose } = options;
+  const { commitId, repoPath, event, element, isUnpushed, onClose } = options;
 
   // Resolve forge URL before showing the menu so we can disable if unavailable
   let forgeUrl: string | null = null;
@@ -50,7 +52,7 @@ export async function showHistoryContextMenu(
     {
       id: "open-in-forge",
       label: "Open in Forge",
-      disabled: forgeUrl === null,
+      disabled: forgeUrl === null || isUnpushed === true,
     },
   ];
 

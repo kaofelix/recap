@@ -299,6 +299,187 @@ describe("Sidebar", () => {
     expect(document.querySelector("img")).toBeNull();
   });
 
+  describe("pushed/unpushed divider", () => {
+    it("shows a divider between unpushed and pushed commits", async () => {
+      const mockCommits = [
+        {
+          id: "unpushed-1",
+          message: "feat: local change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 600,
+        },
+        {
+          id: "pushed-1",
+          message: "feat: pushed change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 3600,
+        },
+        {
+          id: "pushed-2",
+          message: "fix: older fix",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 7200,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 1, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: local change")).toBeInTheDocument();
+      });
+
+      const divider = screen.getByTestId("push-divider");
+      expect(divider).toBeInTheDocument();
+      expect(divider).toHaveTextContent("unpushed");
+    });
+
+    it("fades commit message text for unpushed commits", async () => {
+      const mockCommits = [
+        {
+          id: "unpushed-1",
+          message: "feat: local change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 600,
+        },
+        {
+          id: "pushed-1",
+          message: "feat: pushed change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 3600,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 1, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: local change")).toBeInTheDocument();
+      });
+
+      // Unpushed commit text container should be faded
+      const unpushedMessage = screen.getByText("feat: local change");
+      const unpushedTextBlock = unpushedMessage.parentElement;
+      expect(unpushedTextBlock).toHaveClass("opacity-65");
+
+      // Pushed commit text container should not be faded
+      const pushedMessage = screen.getByText("feat: pushed change");
+      const pushedTextBlock = pushedMessage.parentElement;
+      expect(pushedTextBlock).not.toHaveClass("opacity-65");
+    });
+
+    it("does not show divider when all commits are pushed", async () => {
+      const mockCommits = [
+        {
+          id: "pushed-1",
+          message: "feat: pushed change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 3600,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 0, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: pushed change")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("push-divider")).not.toBeInTheDocument();
+    });
+
+    it("does not show divider when no upstream is configured", async () => {
+      const mockCommits = [
+        {
+          id: "commit-1",
+          message: "feat: some change",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 3600,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.reject(new Error("No upstream tracking branch"));
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: some change")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("push-divider")).not.toBeInTheDocument();
+    });
+  });
+
   it("supports cmd-click multi-select in history mode", async () => {
     const mockCommits = [
       {
@@ -665,9 +846,19 @@ describe("Sidebar", () => {
         ...initialCommits,
       ];
 
-      mockInvoke
-        .mockResolvedValueOnce(initialCommits)
-        .mockResolvedValueOnce(updatedCommits);
+      let commitCallCount = 0;
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          commitCallCount++;
+          return Promise.resolve(
+            commitCallCount === 1 ? initialCommits : updatedCommits
+          );
+        }
+        if (command === "get_ahead_behind") {
+          return Promise.resolve({ ahead: 0, behind: 0 });
+        }
+        return Promise.resolve([]);
+      });
 
       useAppStore.setState({
         repos: [

@@ -34,6 +34,7 @@ import {
   useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedRepo,
+  useUnpushedCount,
   useViewMode,
   useWorkingChanges,
 } from "../../store/appStore";
@@ -101,6 +102,7 @@ export function Sidebar({ className }: SidebarProps) {
   const commits = useCommits();
   const isLoadingCommits = useIsLoadingCommits();
   const commitsError = useCommitsError();
+  const unpushedCount = useUnpushedCount();
   const changes = useWorkingChanges();
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
@@ -226,7 +228,8 @@ export function Sidebar({ className }: SidebarProps) {
   const handleCommitContextMenu = useCallback(
     (
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
-      commitId: string
+      commitId: string,
+      isUnpushed: boolean
     ) => {
       if (!selectedRepo) {
         return;
@@ -241,6 +244,7 @@ export function Sidebar({ className }: SidebarProps) {
         repoPath: selectedRepo.path,
         event,
         element,
+        isUnpushed,
         onClose: () => {
           // Only clear if this menu's target is still the active one
           // (prevents race condition when right-clicking another item)
@@ -376,23 +380,16 @@ export function Sidebar({ className }: SidebarProps) {
           !isLoading &&
           !error &&
           commits.length > 0 && (
-            <div className="space-y-1">
-              {commits.map((commit) => {
-                const itemProps = getItemProps(commit.id);
-                return (
-                  <CommitListItem
-                    commit={commit}
-                    isContextMenuTarget={contextMenuTargetId === commit.id}
-                    isFocused={isFocused}
-                    isSelected={selectedCommitIds.includes(commit.id)}
-                    itemProps={itemProps}
-                    key={commit.id}
-                    onClick={handleCommitClick}
-                    onContextMenu={handleCommitContextMenu}
-                  />
-                );
-              })}
-            </div>
+            <CommitList
+              commits={commits}
+              contextMenuTargetId={contextMenuTargetId}
+              getItemProps={getItemProps}
+              isFocused={isFocused}
+              onCommitClick={handleCommitClick}
+              onCommitContextMenu={handleCommitContextMenu}
+              selectedCommitIds={selectedCommitIds}
+              unpushedCount={unpushedCount}
+            />
           )}
 
         {/* Changes mode: file list with staged/unstaged sections */}
@@ -521,6 +518,91 @@ function ChangesFileList({
   );
 }
 
+interface CommitListProps {
+  commits: {
+    id: string;
+    message: string;
+    author: string;
+    email: string;
+    timestamp: number;
+  }[];
+  unpushedCount: number | null;
+  selectedCommitIds: string[];
+  isFocused: boolean;
+  contextMenuTargetId: string | null;
+  getItemProps: (id: string) => {
+    "aria-selected": boolean;
+    "data-item-id": string;
+    onClick: () => void;
+  };
+  onCommitClick: (
+    event: MouseEvent<HTMLButtonElement>,
+    commitId: string
+  ) => void;
+  onCommitContextMenu: (
+    event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
+    commitId: string,
+    isUnpushed: boolean
+  ) => void;
+}
+
+function CommitList({
+  commits,
+  unpushedCount,
+  selectedCommitIds,
+  isFocused,
+  contextMenuTargetId,
+  getItemProps,
+  onCommitClick,
+  onCommitContextMenu,
+}: CommitListProps) {
+  const hasDivider =
+    unpushedCount !== null &&
+    unpushedCount > 0 &&
+    unpushedCount < commits.length;
+
+  return (
+    <div className="space-y-1">
+      {commits.map((commit, index) => {
+        const isUnpushed = unpushedCount !== null && index < unpushedCount;
+        const showDivider = hasDivider && index === unpushedCount;
+        const itemProps = getItemProps(commit.id);
+
+        return (
+          <div key={commit.id}>
+            {showDivider && <PushDivider />}
+            <CommitListItem
+              commit={commit}
+              isContextMenuTarget={contextMenuTargetId === commit.id}
+              isFocused={isFocused}
+              isSelected={selectedCommitIds.includes(commit.id)}
+              isUnpushed={isUnpushed}
+              itemProps={itemProps}
+              onClick={onCommitClick}
+              onContextMenu={onCommitContextMenu}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PushDivider() {
+  return (
+    <div
+      className="my-1 flex items-center gap-2 px-2"
+      data-testid="push-divider"
+    >
+      <div className="h-px flex-1 bg-text-secondary/30" />
+      <span className="flex-shrink-0 text-[10px] text-text-secondary/60">
+        ↑ unpushed
+      </span>
+      <div className="h-px flex-1 bg-text-secondary/30" />
+    </div>
+  );
+}
+
 interface CommitListItemProps {
   commit: {
     id: string;
@@ -532,6 +614,7 @@ interface CommitListItemProps {
   isSelected: boolean;
   isFocused: boolean;
   isContextMenuTarget: boolean;
+  isUnpushed: boolean;
   itemProps: {
     "aria-selected": boolean;
     "data-item-id": string;
@@ -540,7 +623,8 @@ interface CommitListItemProps {
   onClick: (event: MouseEvent<HTMLButtonElement>, commitId: string) => void;
   onContextMenu: (
     event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
-    commitId: string
+    commitId: string,
+    isUnpushed: boolean
   ) => void;
 }
 
@@ -549,17 +633,18 @@ function CommitListItem({
   isSelected,
   isFocused,
   isContextMenuTarget,
+  isUnpushed,
   itemProps,
   onClick,
   onContextMenu,
 }: CommitListItemProps) {
   const handleContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
-    onContextMenu(event, commit.id);
+    onContextMenu(event, commit.id, isUnpushed);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (isContextMenuKeyboardEvent(event)) {
-      onContextMenu(event, commit.id);
+      onContextMenu(event, commit.id, isUnpushed);
     }
   };
 
@@ -606,7 +691,7 @@ function CommitListItem({
         </div>
 
         {/* Text content */}
-        <div className="min-w-0 flex-1">
+        <div className={cn("min-w-0 flex-1", isUnpushed && "opacity-65")}>
           <div className="truncate font-medium text-sm text-text-primary">
             {commit.message}
           </div>

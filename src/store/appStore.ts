@@ -37,6 +37,8 @@ export interface AppState {
   workingChanges: WorkingFile[];
   isLoadingChanges: boolean;
   changesError: string | null;
+  /** Number of local commits not yet pushed to the upstream branch, or null if unknown */
+  unpushedCount: number | null;
 
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
@@ -63,6 +65,7 @@ export interface AppState {
   setWorkingChanges: (changes: WorkingFile[]) => void;
   setChangesLoading: (isLoading: boolean) => void;
   setChangesError: (error: string | null) => void;
+  setUnpushedCount: (count: number | null) => void;
 }
 
 /**
@@ -112,6 +115,7 @@ export const useAppStore = create<AppState>()(
       workingChanges: [],
       isLoadingChanges: false,
       changesError: null,
+      unpushedCount: null,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -324,6 +328,7 @@ export const useAppStore = create<AppState>()(
           workingChanges: [],
           isLoadingChanges: false,
           changesError: null,
+          unpushedCount: null,
         });
       },
 
@@ -337,6 +342,8 @@ export const useAppStore = create<AppState>()(
       setChangesLoading: (isLoadingChanges: boolean) =>
         set({ isLoadingChanges }),
       setChangesError: (changesError: string | null) => set({ changesError }),
+      setUnpushedCount: (unpushedCount: number | null) =>
+        set({ unpushedCount }),
     }),
     {
       name: "recap-storage",
@@ -379,3 +386,5 @@ export const useWorkingChanges = () =>
 export const useIsLoadingChanges = () =>
   useAppStore((state) => state.isLoadingChanges);
 export const useChangesError = () => useAppStore((state) => state.changesError);
+export const useUnpushedCount = () =>
+  useAppStore((state) => state.unpushedCount);

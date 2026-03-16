@@ -1999,6 +1999,62 @@ pub fn discard_file(repo_path: &str, file_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Ahead/behind counts relative to the upstream tracking branch
+#[derive(Debug, Clone, Serialize)]
+pub struct AheadBehind {
+    /// Number of local commits not yet pushed to the upstream
+    pub ahead: usize,
+    /// Number of upstream commits not yet merged locally
+    pub behind: usize,
+}
+
+/// Gets ahead/behind counts for the current branch vs its upstream tracking branch.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// An AheadBehind struct, or an error if the branch has no upstream
+pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
+
+    if !head.is_branch() {
+        return Err("HEAD is detached".to_string());
+    }
+
+    let branch_name = head
+        .shorthand()
+        .ok_or_else(|| "Branch name is not valid UTF-8".to_string())?;
+
+    let branch = repo
+        .find_branch(branch_name, BranchType::Local)
+        .map_err(|e| format!("Failed to find branch: {}", e))?;
+
+    let upstream = branch
+        .upstream()
+        .map_err(|_| "No upstream tracking branch configured".to_string())?;
+
+    let local_oid = head
+        .target()
+        .ok_or_else(|| "HEAD has no target".to_string())?;
+
+    let upstream_oid = upstream
+        .get()
+        .target()
+        .ok_or_else(|| "Upstream has no target".to_string())?;
+
+    let (ahead, behind) = repo
+        .graph_ahead_behind(local_oid, upstream_oid)
+        .map_err(|e| format!("Failed to compute ahead/behind: {}", e))?;
+
+    Ok(AheadBehind { ahead, behind })
+}
+
 /// Gets the URL of the "origin" remote for a repository
 ///
 /// # Arguments
@@ -3536,6 +3592,131 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no changes to discard"));
+    }
+
+    fn create_test_repo_with_remote() -> (TempDir, TempDir) {
+        // Create a bare "remote" repo
+        let remote_dir = TempDir::new().expect("Failed to create remote temp directory");
+        Command::new("git")
+            .args(["init", "--bare"])
+            .current_dir(remote_dir.path())
+            .output()
+            .expect("Failed to init bare repo");
+
+        // Create a local repo and add the remote
+        let local_dir = TempDir::new().expect("Failed to create local temp directory");
+        let local_path = local_dir.path();
+
+        Command::new("git")
+            .args(["init"])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to init git repo");
+        Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to set git email");
+        Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to set git name");
+
+        let remote_url = remote_dir.path().to_str().unwrap();
+        Command::new("git")
+            .args(["remote", "add", "origin", remote_url])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to add remote");
+
+        // Create initial commit and push
+        std::fs::write(local_path.join("README.md"), "# Test").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Initial commit"])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to create commit");
+
+        // Get the branch name (could be main or master)
+        let branch_output = Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to get branch name");
+        let branch_name = String::from_utf8(branch_output.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+
+        Command::new("git")
+            .args(["push", "-u", "origin", &branch_name])
+            .current_dir(local_path)
+            .output()
+            .expect("Failed to push");
+
+        (local_dir, remote_dir)
+    }
+
+    #[test]
+    fn test_get_ahead_behind_returns_zero_when_in_sync() {
+        let (local_dir, _remote_dir) = create_test_repo_with_remote();
+        let path = local_dir.path().to_str().unwrap();
+
+        let result = get_ahead_behind(path).expect("Should return ahead/behind");
+        assert_eq!(result.ahead, 0);
+        assert_eq!(result.behind, 0);
+    }
+
+    #[test]
+    fn test_get_ahead_behind_counts_unpushed_commits() {
+        let (local_dir, _remote_dir) = create_test_repo_with_remote();
+        let path = local_dir.path();
+
+        // Create two unpushed commits
+        std::fs::write(path.join("file1.txt"), "content1").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Local commit 1"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        std::fs::write(path.join("file2.txt"), "content2").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Local commit 2"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        let path_str = path.to_str().unwrap();
+        let result = get_ahead_behind(path_str).expect("Should return ahead/behind");
+        assert_eq!(result.ahead, 2);
+        assert_eq!(result.behind, 0);
+    }
+
+    #[test]
+    fn test_get_ahead_behind_error_when_no_upstream() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_ahead_behind(path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No upstream tracking branch"));
     }
 
     #[test]

@@ -99,6 +99,60 @@ describe("showHistoryContextMenu", () => {
     expect(tauriMocks.menuPopup).toHaveBeenCalled();
     expect(tauriMocks.menuClose).toHaveBeenCalled();
   });
+
+  it("disables 'Open in Forge' for unpushed commits even when forge URL is available", async () => {
+    // Mock invoke to return a remote URL — forge URL would normally be available
+    tauriMocks.invoke.mockImplementation((command: unknown) => {
+      if (command === "get_remote_url") {
+        return Promise.resolve("https://github.com/owner/repo.git");
+      }
+      return Promise.resolve();
+    });
+
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: true,
+    };
+
+    await showHistoryContextMenu(options);
+
+    const forgeCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "open-in-forge"
+    );
+    expect(forgeCall).toBeDefined();
+    expect((forgeCall?.[0] as { enabled: boolean }).enabled).toBe(false);
+  });
+
+  it("enables 'Open in Forge' for pushed commits when forge URL is available", async () => {
+    // Mock invoke to return a remote URL
+    tauriMocks.invoke.mockImplementation((command: unknown) => {
+      if (command === "get_remote_url") {
+        return Promise.resolve("https://github.com/owner/repo.git");
+      }
+      return Promise.resolve();
+    });
+
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: false,
+    };
+
+    await showHistoryContextMenu(options);
+
+    const forgeCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "open-in-forge"
+    );
+    expect(forgeCall).toBeDefined();
+    expect((forgeCall?.[0] as { enabled: boolean }).enabled).toBe(true);
+  });
 });
 
 describe("showFileContextMenu", () => {

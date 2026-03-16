@@ -172,6 +172,15 @@ vi.mock("@tauri-apps/api/dpi", () => ({
 // Mock Tauri menu API
 const mockMenuPopup = vi.fn().mockResolvedValue(undefined);
 const mockMenuClose = vi.fn().mockResolvedValue(undefined);
+const mockMenuItemNew = vi
+  .fn()
+  .mockImplementation((opts: { id: string; text: string; enabled?: boolean }) =>
+    Promise.resolve({
+      id: opts.id,
+      text: opts.text,
+      enabled: opts.enabled,
+    })
+  );
 
 vi.mock("@tauri-apps/api/menu", () => ({
   Menu: {
@@ -181,11 +190,7 @@ vi.mock("@tauri-apps/api/menu", () => ({
     }),
   },
   MenuItem: {
-    new: vi
-      .fn()
-      .mockImplementation((opts: { id: string; text: string }) =>
-        Promise.resolve({ id: opts.id, text: opts.text })
-      ),
+    new: (...args: unknown[]) => mockMenuItemNew(...args),
   },
 }));
 
@@ -199,6 +204,7 @@ export const tauriMocks = {
   dialogOpen: mockDialogOpen,
   menuPopup: mockMenuPopup,
   menuClose: mockMenuClose,
+  menuItemNew: mockMenuItemNew,
 };
 
 // Mock react-diff-viewer-continued (has worker bundle issues in test env)

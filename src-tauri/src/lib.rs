@@ -65,7 +65,8 @@ pub fn run() {
             commands::git::get_unstaged_file_contents,
             commands::git::unstage_file,
             commands::git::discard_file,
-            commands::git::get_remote_url
+            commands::git::get_remote_url,
+            commands::git::get_ahead_behind
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
