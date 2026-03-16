@@ -89,6 +89,7 @@ describe("showHistoryContextMenu", () => {
     const event = createMockMouseEvent();
     const options: HistoryContextMenuOptions = {
       commitId: "abc123def456",
+      repoPath: "/test/repo",
       event,
       element: event.currentTarget,
     };

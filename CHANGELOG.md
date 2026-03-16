@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-16
+
+### Added
+
+- **Author avatars in history** — Commit history items now show a Gravatar avatar and the author name alongside the SHA and timestamp.
+
+- **Open in Forge** — Right-click a commit in the history list to open it in your git forge (GitHub, GitLab, Bitbucket) in the browser. Automatically detects the forge from your origin remote URL.
+
+- **Pushed / unpushed indicator** — A divider line marks where your local commits end and pushed commits begin. Unpushed commits appear slightly faded so you can tell at a glance what hasn't been pushed yet. "Open in Forge" is disabled for unpushed commits.
+
 ## [0.2.8] - 2026-03-04
 
 ### Fixed
