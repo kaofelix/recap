@@ -299,6 +299,28 @@ export function Sidebar({ className }: SidebarProps) {
     ]
   );
 
+  const handleSectionAction = useCallback(
+    async (section: "staged" | "unstaged") => {
+      if (!selectedRepo) {
+        return;
+      }
+      try {
+        if (section === "staged") {
+          await invoke("unstage_all", { repoPath: selectedRepo.path });
+        } else {
+          await invoke("stage_all", { repoPath: selectedRepo.path });
+        }
+        bumpWorkingChangesRevision();
+      } catch (err) {
+        console.error(
+          `Failed to ${section === "staged" ? "unstage" : "stage"} all:`,
+          err
+        );
+      }
+    },
+    [selectedRepo, bumpWorkingChangesRevision]
+  );
+
   const handleChangesContextMenu = useCallback(
     (
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
@@ -452,6 +474,7 @@ export function Sidebar({ className }: SidebarProps) {
               isFocused={isFocused}
               model={changesListModel}
               onContextMenu={handleChangesContextMenu}
+              onSectionAction={handleSectionAction}
               selectedId={effectiveSelectedChangeId}
             />
           )}
@@ -508,12 +531,30 @@ interface ChangesFileListProps {
     item: WorkingChangeItem
   ) => void;
   contextMenuTargetId: string | null;
+  onSectionAction?: (section: "staged" | "unstaged") => void;
 }
 
-function ChangesSectionHeader({ title }: { title: string }) {
+function ChangesSectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
-    <div className="mb-1 border-panel-border/50 border-b px-2 py-1 font-medium text-text-secondary text-xs">
-      {title}
+    <div className="mb-1 flex items-center justify-between border-panel-border/50 border-b px-2 py-1">
+      <span className="font-medium text-text-secondary text-xs">{title}</span>
+      {actionLabel && onAction && (
+        <button
+          className="text-[10px] text-text-secondary hover:text-text-primary"
+          onClick={onAction}
+          type="button"
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -525,6 +566,7 @@ function ChangesFileList({
   isFocused,
   onContextMenu,
   contextMenuTargetId,
+  onSectionAction,
 }: ChangesFileListProps) {
   const renderItems = (items: WorkingChangesListModel["items"]) => (
     <div className="space-y-0.5">
@@ -554,10 +596,20 @@ function ChangesFileList({
   return (
     <div className="space-y-3">
       {model.sections.map((section) => {
+        const actionLabel =
+          section.section === "staged" ? "Unstage All" : "Stage All";
+        const handleAction = onSectionAction
+          ? () => onSectionAction(section.section)
+          : undefined;
+
         if (section.section !== "unstaged") {
           return (
             <div key={section.section}>
-              <ChangesSectionHeader title={section.title} />
+              <ChangesSectionHeader
+                actionLabel={actionLabel}
+                onAction={handleAction}
+                title={section.title}
+              />
               {renderItems(section.items)}
             </div>
           );
@@ -575,6 +627,8 @@ function ChangesFileList({
             {trackedItems.length > 0 && (
               <>
                 <ChangesSectionHeader
+                  actionLabel={actionLabel}
+                  onAction={handleAction}
                   title={`Unstaged Changes (${trackedItems.length})`}
                 />
                 {renderItems(trackedItems)}

@@ -1304,12 +1304,13 @@ describe("Sidebar", () => {
         expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
       });
 
-      const untrackedHeader = screen.getByText("Untracked (1)");
+      const untrackedHeaderText = screen.getByText("Untracked (1)");
+      const untrackedHeader = untrackedHeaderText.closest("div");
       const modifiedRow = screen.getByText("modified.ts");
 
       expect(untrackedHeader).toHaveClass("border-b");
-      expect(untrackedHeader).toHaveClass("text-text-secondary");
-      expect(untrackedHeader).not.toHaveClass("uppercase");
+      expect(untrackedHeaderText).toHaveClass("text-text-secondary");
+      expect(untrackedHeaderText).not.toHaveClass("uppercase");
 
       expect(modifiedRow.compareDocumentPosition(untrackedHeader)).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING
@@ -2016,6 +2017,176 @@ describe("Sidebar", () => {
 
         // Selection should move to the first remaining file
         expect(useAppStore.getState().selectedFilePath).toBe("src/Other.tsx");
+      });
+    });
+  });
+
+  describe("section header actions", () => {
+    it("shows 'Unstage All' button on the staged section header", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Unstage All" })
+      ).toBeInTheDocument();
+    });
+
+    it("shows 'Stage All' button on the unstaged section header", async () => {
+      const mockChanges = [
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 5,
+          unstaged_deletions: 2,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Stage All" })
+      ).toBeInTheDocument();
+    });
+
+    it("invokes unstage_all when 'Unstage All' button is clicked", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve([
+            {
+              path: "src/staged.ts",
+              staged_status: "Modified",
+              unstaged_status: null,
+              staged_additions: 10,
+              staged_deletions: 5,
+              unstaged_additions: 0,
+              unstaged_deletions: 0,
+              old_path: null,
+              section: "staged" as const,
+            },
+          ]);
+        }
+        if (command === "list_commits") {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve();
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Unstage All" })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Unstage All" }));
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("unstage_all", {
+          repoPath: "/test/repo",
+        });
+      });
+    });
+
+    it("invokes stage_all when 'Stage All' button is clicked", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve([
+            {
+              path: "src/unstaged.ts",
+              staged_status: null,
+              unstaged_status: "Modified",
+              staged_additions: 0,
+              staged_deletions: 0,
+              unstaged_additions: 5,
+              unstaged_deletions: 2,
+              old_path: null,
+              section: "unstaged" as const,
+            },
+          ]);
+        }
+        if (command === "list_commits") {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve();
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Stage All" })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Stage All" }));
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("stage_all", {
+          repoPath: "/test/repo",
+        });
       });
     });
   });

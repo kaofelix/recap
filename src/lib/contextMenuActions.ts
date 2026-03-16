@@ -207,10 +207,11 @@ export async function showChangesContextMenu(
     { id: "reveal", label: "Reveal in Finder" },
   ];
 
-  // Add section-specific action
+  // Add section-specific actions
   if (section === "staged") {
     actions.push({ id: "unstage", label: "Unstage" });
   } else {
+    actions.push({ id: "stage", label: "Stage" });
     actions.push({ id: "discard", label: "Discard" });
   }
 
@@ -239,6 +240,10 @@ export async function showChangesContextMenu(
               await revealItemInDir(fullPath);
               break;
             }
+            case "stage":
+              await invoke("stage_file", { repoPath, filePath });
+              onWorkingChangesModified?.();
+              break;
             case "unstage":
               await invoke("unstage_file", { repoPath, filePath });
               onWorkingChangesModified?.();

@@ -308,4 +308,75 @@ describe("showChangesContextMenu", () => {
     expect(tauriMocks.menuPopup).toHaveBeenCalled();
     expect(tauriMocks.menuClose).toHaveBeenCalled();
   });
+
+  it("shows both stage and discard actions for unstaged files", async () => {
+    const event = createMockMouseEvent();
+    const options: ChangesContextMenuOptions = {
+      repoPath: "/path/to/repo",
+      filePath: "src/App.tsx",
+      section: "unstaged",
+      event,
+      element: event.currentTarget,
+    };
+
+    await showChangesContextMenu(options);
+
+    const stageCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "stage"
+    );
+    expect(stageCall).toBeDefined();
+    expect((stageCall?.[0] as { text: string }).text).toBe("Stage");
+
+    const discardCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "discard"
+    );
+    expect(discardCall).toBeDefined();
+  });
+
+  it("does not show stage action for staged files", async () => {
+    const event = createMockMouseEvent();
+    const options: ChangesContextMenuOptions = {
+      repoPath: "/path/to/repo",
+      filePath: "src/App.tsx",
+      section: "staged",
+      event,
+      element: event.currentTarget,
+    };
+
+    await showChangesContextMenu(options);
+
+    const stageCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "stage"
+    );
+    expect(stageCall).toBeUndefined();
+  });
+
+  it("invokes stage_file and calls onWorkingChangesModified when stage action is triggered", async () => {
+    const onWorkingChangesModified = vi.fn();
+    tauriMocks.invoke.mockResolvedValue(undefined);
+
+    const event = createMockMouseEvent();
+    const options: ChangesContextMenuOptions = {
+      repoPath: "/path/to/repo",
+      filePath: "src/App.tsx",
+      section: "unstaged",
+      event,
+      element: event.currentTarget,
+      onWorkingChangesModified,
+    };
+
+    await showChangesContextMenu(options);
+
+    const stageCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "stage"
+    );
+    const actionCallback = (stageCall?.[0] as { action: () => void }).action;
+    await actionCallback();
+
+    expect(tauriMocks.invoke).toHaveBeenCalledWith("stage_file", {
+      repoPath: "/path/to/repo",
+      filePath: "src/App.tsx",
+    });
+    expect(onWorkingChangesModified).toHaveBeenCalled();
+  });
 });
