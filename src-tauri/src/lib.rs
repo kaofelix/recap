@@ -67,6 +67,7 @@ pub fn run() {
             commands::git::discard_file,
             commands::git::get_remote_url,
             commands::git::get_ahead_behind,
+            commands::git::get_commit_message,
             commands::git::reword_commit
         ])
         .run(tauri::generate_context!())

@@ -101,33 +101,6 @@ describe("showHistoryContextMenu", () => {
     expect(tauriMocks.menuClose).toHaveBeenCalled();
   });
 
-  it("disables 'Open in Forge' for unpushed commits even when forge URL is available", async () => {
-    // Mock invoke to return a remote URL — forge URL would normally be available
-    tauriMocks.invoke.mockImplementation((command: unknown) => {
-      if (command === "get_remote_url") {
-        return Promise.resolve("https://github.com/owner/repo.git");
-      }
-      return Promise.resolve();
-    });
-
-    const event = createMockMouseEvent();
-    const options: HistoryContextMenuOptions = {
-      commitId: "abc123def456",
-      repoPath: "/test/repo",
-      event,
-      element: event.currentTarget,
-      isUnpushed: true,
-    };
-
-    await showHistoryContextMenu(options);
-
-    const forgeCall = tauriMocks.menuItemNew.mock.calls.find(
-      (call: unknown[]) => (call[0] as { id: string }).id === "open-in-forge"
-    );
-    expect(forgeCall).toBeDefined();
-    expect((forgeCall?.[0] as { enabled: boolean }).enabled).toBe(false);
-  });
-
   it("shows 'Rewrite Message…' enabled for unpushed commits", async () => {
     const event = createMockMouseEvent();
     const options: HistoryContextMenuOptions = {
@@ -171,10 +144,8 @@ describe("showHistoryContextMenu", () => {
     expect((rewriteCall?.[0] as { enabled: boolean }).enabled).toBe(false);
   });
 
-  it("calls reword_commit when 'Rewrite Message…' action is triggered", async () => {
-    // Mock window.prompt to return a new message
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("New message");
-    tauriMocks.invoke.mockResolvedValue(undefined);
+  it("calls onRewriteMessage callback when 'Rewrite Message…' action is triggered", async () => {
+    const onRewriteMessage = vi.fn();
 
     const event = createMockMouseEvent();
     const options: HistoryContextMenuOptions = {
@@ -184,6 +155,7 @@ describe("showHistoryContextMenu", () => {
       event,
       element: event.currentTarget,
       isUnpushed: true,
+      onRewriteMessage,
     };
 
     await showHistoryContextMenu(options);
@@ -196,24 +168,13 @@ describe("showHistoryContextMenu", () => {
     const actionCallback = (rewriteCall?.[0] as { action: () => void }).action;
     await actionCallback();
 
-    expect(promptSpy).toHaveBeenCalledWith(
-      "Rewrite commit message:",
+    expect(onRewriteMessage).toHaveBeenCalledWith(
+      "abc123def456",
       "Original message"
     );
-    expect(tauriMocks.invoke).toHaveBeenCalledWith("reword_commit", {
-      repoPath: "/test/repo",
-      commitId: "abc123def456",
-      newMessage: "New message",
-    });
-
-    promptSpy.mockRestore();
   });
 
-  it("does not call reword_commit when prompt is cancelled", async () => {
-    // Mock window.prompt to return null (cancelled)
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
-    tauriMocks.invoke.mockResolvedValue(undefined);
-
+  it("does not throw when 'Rewrite Message…' is triggered without callback", async () => {
     const event = createMockMouseEvent();
     const options: HistoryContextMenuOptions = {
       commitId: "abc123def456",
@@ -222,24 +183,44 @@ describe("showHistoryContextMenu", () => {
       event,
       element: event.currentTarget,
       isUnpushed: true,
+      // no onRewriteMessage
     };
 
     await showHistoryContextMenu(options);
 
-    // Find and trigger the rewrite-message action
+    // Find and trigger the rewrite-message action — should not throw
     const rewriteCall = tauriMocks.menuItemNew.mock.calls.find(
       (call: unknown[]) => (call[0] as { id: string }).id === "rewrite-message"
     );
     const actionCallback = (rewriteCall?.[0] as { action: () => void }).action;
-    await actionCallback();
+    await actionCallback(); // should be a no-op
+  });
 
-    expect(promptSpy).toHaveBeenCalled();
-    expect(tauriMocks.invoke).not.toHaveBeenCalledWith(
-      "reword_commit",
-      expect.anything()
+  it("disables 'Open in Forge' for unpushed commits even when forge URL is available", async () => {
+    // Mock invoke to return a remote URL — forge URL would normally be available
+    tauriMocks.invoke.mockImplementation((command: unknown) => {
+      if (command === "get_remote_url") {
+        return Promise.resolve("https://github.com/owner/repo.git");
+      }
+      return Promise.resolve();
+    });
+
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: true,
+    };
+
+    await showHistoryContextMenu(options);
+
+    const forgeCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "open-in-forge"
     );
-
-    promptSpy.mockRestore();
+    expect(forgeCall).toBeDefined();
+    expect((forgeCall?.[0] as { enabled: boolean }).enabled).toBe(false);
   });
 
   it("enables 'Open in Forge' for pushed commits when forge URL is available", async () => {

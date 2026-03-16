@@ -152,6 +152,11 @@ pub fn get_ahead_behind(repo_path: String) -> Result<git_service::AheadBehind, S
 }
 
 #[tauri::command]
+pub fn get_commit_message(repo_path: String, commit_id: String) -> Result<String, String> {
+    git_service::get_commit_message(&repo_path, &commit_id)
+}
+
+#[tauri::command]
 pub fn reword_commit(
     repo_path: String,
     commit_id: String,

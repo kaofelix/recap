@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
 import {
   type KeyboardEvent,
@@ -40,6 +41,7 @@ import {
   useWorkingChanges,
 } from "../../store/appStore";
 import { FileListItem } from "./FileListItem";
+import { RewriteMessageEditor } from "./RewriteMessageEditor";
 
 export interface SidebarProps {
   className?: string;
@@ -227,6 +229,32 @@ export function Sidebar({ className }: SidebarProps) {
     null
   );
 
+  // Rewrite message editor state
+  const [editingCommit, setEditingCommit] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
+
+  const handleRewriteMessage = useCallback(
+    async (commitId: string, _summaryHint: string) => {
+      if (!selectedRepo) {
+        return;
+      }
+      try {
+        // Fetch the full commit message (list_commits only has the summary)
+        const fullMessage = await invoke<string>("get_commit_message", {
+          repoPath: selectedRepo.path,
+          commitId,
+        });
+        setEditingCommit({ id: commitId, message: fullMessage });
+      } catch {
+        // If we can't fetch the full message, fall back to the summary
+        setEditingCommit({ id: commitId, message: _summaryHint });
+      }
+    },
+    [selectedRepo]
+  );
+
   const handleCommitContextMenu = useCallback(
     (
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
@@ -249,6 +277,7 @@ export function Sidebar({ className }: SidebarProps) {
         event,
         element,
         isUnpushed,
+        onRewriteMessage: handleRewriteMessage,
         onClose: () => {
           // Only clear if this menu's target is still the active one
           // (prevents race condition when right-clicking another item)
@@ -262,7 +291,12 @@ export function Sidebar({ className }: SidebarProps) {
         },
       });
     },
-    [selectedRepo, setContextMenuOpen, setContextMenuClosed]
+    [
+      selectedRepo,
+      setContextMenuOpen,
+      setContextMenuClosed,
+      handleRewriteMessage,
+    ]
   );
 
   const handleChangesContextMenu = useCallback(
@@ -422,6 +456,16 @@ export function Sidebar({ className }: SidebarProps) {
             />
           )}
       </div>
+
+      {/* Rewrite message editor — docked at bottom */}
+      {editingCommit && selectedRepo && viewMode === "history" && (
+        <RewriteMessageEditor
+          commitId={editingCommit.id}
+          initialMessage={editingCommit.message}
+          onClose={() => setEditingCommit(null)}
+          repoPath={selectedRepo.path}
+        />
+      )}
     </div>
   );
 }

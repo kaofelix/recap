@@ -2055,6 +2055,28 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
     Ok(AheadBehind { ahead, behind })
 }
 
+/// Gets the full commit message (summary + body) for a specific commit.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `commit_id` - SHA of the commit
+///
+/// # Returns
+/// The full commit message string, or an error message
+pub fn get_commit_message(repo_path: &str, commit_id: &str) -> Result<String, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let oid = git2::Oid::from_str(commit_id)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
+
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|e| format!("Failed to find commit: {}", e))?;
+
+    Ok(commit.message().unwrap_or("").to_string())
+}
+
 /// Rewords a commit message for a commit in the current branch.
 ///
 /// For the HEAD commit, this performs an amend. For older commits, it replays
@@ -3868,6 +3890,61 @@ mod tests {
         let result = get_remote_url(path);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("No 'origin' remote configured"));
+    }
+
+    // Tests for reword_commit
+
+    // Tests for get_commit_message
+
+    #[test]
+    fn test_get_commit_message_returns_full_message() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create a commit with a multi-line message
+        std::fs::write(path.join("multi.txt"), "content").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Summary line\n\nDetailed body paragraph.\nSecond line of body."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, None).expect("Should return commits");
+
+        let full_message = get_commit_message(path_str, &commits[0].id)
+            .expect("Should return full message");
+
+        assert!(full_message.starts_with("Summary line"));
+        assert!(full_message.contains("Detailed body paragraph."));
+        assert!(full_message.contains("Second line of body."));
+    }
+
+    #[test]
+    fn test_get_commit_message_single_line() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+
+        let message = get_commit_message(path, &commits[0].id)
+            .expect("Should return message");
+
+        assert_eq!(message.trim(), "Add file");
+    }
+
+    #[test]
+    fn test_get_commit_message_invalid_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_commit_message(path, "0000000000000000000000000000000000000000");
+        assert!(result.is_err());
     }
 
     // Tests for reword_commit

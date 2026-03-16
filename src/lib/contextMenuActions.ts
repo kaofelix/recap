@@ -31,6 +31,8 @@ export interface HistoryContextMenuOptions {
   isUnpushed?: boolean;
   /** The current commit message (used to pre-fill the rewrite prompt) */
   commitMessage?: string;
+  /** Called when the user selects "Rewrite Message…" */
+  onRewriteMessage?: (commitId: string, currentMessage: string) => void;
   /** Called when the menu closes (regardless of action taken) */
   onClose?: () => void;
 }
@@ -45,6 +47,7 @@ export async function showHistoryContextMenu(
     element,
     isUnpushed,
     commitMessage,
+    onRewriteMessage,
     onClose,
   } = options;
 
@@ -91,21 +94,9 @@ export async function showHistoryContextMenu(
                 await openUrl(forgeUrl);
               }
               break;
-            case "rewrite-message": {
-              // biome-ignore lint/suspicious/noAlert: intentional — quick inline editing of commit messages
-              const newMessage = window.prompt(
-                "Rewrite commit message:",
-                commitMessage ?? ""
-              );
-              if (newMessage !== null && newMessage.trim() !== "") {
-                await invoke("reword_commit", {
-                  repoPath,
-                  commitId,
-                  newMessage,
-                });
-              }
+            case "rewrite-message":
+              onRewriteMessage?.(commitId, commitMessage ?? "");
               break;
-            }
             default:
               break;
           }
