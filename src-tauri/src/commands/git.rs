@@ -132,8 +132,23 @@ pub fn get_unstaged_file_contents(
 }
 
 #[tauri::command]
+pub fn stage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    git_service::stage_file(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn stage_all(repo_path: String) -> Result<(), String> {
+    git_service::stage_all(&repo_path)
+}
+
+#[tauri::command]
 pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
     git_service::unstage_file(&repo_path, &file_path)
+}
+
+#[tauri::command]
+pub fn unstage_all(repo_path: String) -> Result<(), String> {
+    git_service::unstage_all(&repo_path)
 }
 
 #[tauri::command]

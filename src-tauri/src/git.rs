@@ -2008,6 +2008,123 @@ pub struct AheadBehind {
     pub behind: usize,
 }
 
+/// Stages a single file (equivalent to `git add <file>`).
+///
+/// Handles modified, new (untracked), and deleted files.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `file_path` - Relative path to the file within the repository
+pub fn stage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut index = repo
+        .index()
+        .map_err(|e| format!("Failed to get index: {}", e))?;
+
+    let path = std::path::Path::new(file_path);
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory".to_string())?;
+    let full_path = workdir.join(path);
+
+    if full_path.exists() {
+        // File exists on disk — add it (handles both new and modified)
+        index
+            .add_path(path)
+            .map_err(|e| format!("Failed to stage file: {}", e))?;
+    } else {
+        // File was deleted — remove from index
+        index
+            .remove_path(path)
+            .map_err(|e| format!("Failed to stage deleted file: {}", e))?;
+    }
+
+    index
+        .write()
+        .map_err(|e| format!("Failed to write index: {}", e))?;
+
+    Ok(())
+}
+
+/// Stages all working changes (equivalent to `git add -A`).
+///
+/// Stages modified, new, and deleted files.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+pub fn stage_all(repo_path: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut index = repo
+        .index()
+        .map_err(|e| format!("Failed to get index: {}", e))?;
+
+    index
+        .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
+        .map_err(|e| format!("Failed to stage all files: {}", e))?;
+
+    // add_all with DEFAULT doesn't handle deletions — remove index entries
+    // for files that no longer exist on disk
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory".to_string())?;
+
+    let entries: Vec<_> = index
+        .iter()
+        .filter_map(|entry| {
+            let path_bytes = &entry.path;
+            let path_str = String::from_utf8_lossy(path_bytes).to_string();
+            if !workdir.join(&path_str).exists() {
+                Some(path_str)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for path_str in entries {
+        index
+            .remove_path(std::path::Path::new(&path_str))
+            .map_err(|e| format!("Failed to stage deletion of '{}': {}", path_str, e))?;
+    }
+
+    index
+        .write()
+        .map_err(|e| format!("Failed to write index: {}", e))?;
+
+    Ok(())
+}
+
+/// Unstages all staged changes (equivalent to `git reset HEAD`).
+///
+/// Resets the index to match HEAD, leaving working directory changes intact.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+pub fn unstage_all(repo_path: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
+
+    let head_commit = head
+        .peel_to_commit()
+        .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
+
+    let head_object = head_commit
+        .as_object();
+
+    repo.reset(head_object, git2::ResetType::Mixed, None)
+        .map_err(|e| format!("Failed to unstage all: {}", e))?;
+
+    Ok(())
+}
+
 /// Gets ahead/behind counts for the current branch vs its upstream tracking branch.
 ///
 /// # Arguments
@@ -4050,5 +4167,199 @@ mod tests {
         assert_eq!(commits_after[commits_after.len() - 1].message, "Reworded root");
         // All commits should have new IDs since root was rewritten
         assert_ne!(commits_after[0].id, commits[0].id);
+    }
+
+    // Tests for stage_file
+
+    #[test]
+    fn test_stage_file_stages_modified_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify file (unstaged)
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file has unstaged changes only
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before
+            .iter()
+            .any(|c| c.path == "file.txt" && c.unstaged_status.is_some() && c.staged_status.is_none()));
+
+        // Stage the file
+        stage_file(path_str, "file.txt").expect("Should stage file");
+
+        // Verify file is now staged
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after
+            .iter()
+            .any(|c| c.path == "file.txt" && c.staged_status == Some(FileStatus::Modified)));
+        // Should have no unstaged changes for this file
+        assert!(changes_after
+            .iter()
+            .all(|c| c.path != "file.txt" || c.unstaged_status.is_none()));
+    }
+
+    #[test]
+    fn test_stage_file_stages_new_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create untracked file
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file is untracked
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before
+            .iter()
+            .any(|c| c.path == "newfile.txt" && c.unstaged_status == Some(FileStatus::Untracked)));
+
+        // Stage the file
+        stage_file(path_str, "newfile.txt").expect("Should stage file");
+
+        // Verify file is now staged as Added
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after
+            .iter()
+            .any(|c| c.path == "newfile.txt" && c.staged_status == Some(FileStatus::Added)));
+    }
+
+    #[test]
+    fn test_stage_file_stages_deleted_file() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Delete a tracked file
+        std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify file has unstaged deletion
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_before
+            .iter()
+            .any(|c| c.path == "file.txt" && c.unstaged_status == Some(FileStatus::Deleted)));
+
+        // Stage the deletion
+        stage_file(path_str, "file.txt").expect("Should stage file");
+
+        // Verify file is now staged as Deleted
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        assert!(changes_after
+            .iter()
+            .any(|c| c.path == "file.txt" && c.staged_status == Some(FileStatus::Deleted)));
+        // Should have no unstaged changes for this file
+        assert!(changes_after
+            .iter()
+            .all(|c| c.path != "file.txt" || c.unstaged_status.is_none()));
+    }
+
+    // Tests for stage_all
+
+    #[test]
+    fn test_stage_all_stages_all_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create multiple kinds of changes
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write");
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write");
+        std::fs::remove_file(path.join("README.md")).expect("Failed to delete");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify all changes are unstaged
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let unstaged_count = changes_before
+            .iter()
+            .filter(|c| c.unstaged_status.is_some())
+            .count();
+        assert_eq!(unstaged_count, 3);
+
+        // Stage all
+        stage_all(path_str).expect("Should stage all");
+
+        // Verify all changes are now staged
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let staged_count = changes_after
+            .iter()
+            .filter(|c| c.staged_status.is_some())
+            .count();
+        assert_eq!(staged_count, 3);
+
+        // No unstaged changes should remain
+        let unstaged_count = changes_after
+            .iter()
+            .filter(|c| c.unstaged_status.is_some())
+            .count();
+        assert_eq!(unstaged_count, 0);
+    }
+
+    #[test]
+    fn test_stage_all_with_no_changes_succeeds() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // No changes — should succeed without error
+        let result = stage_all(path);
+        assert!(result.is_ok());
+    }
+
+    // Tests for unstage_all
+
+    #[test]
+    fn test_unstage_all_unstages_all_staged_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Create and stage multiple changes
+        std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write");
+        std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage all");
+
+        let path_str = path.to_str().unwrap();
+
+        // Verify changes are staged
+        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let staged_count = changes_before
+            .iter()
+            .filter(|c| c.staged_status.is_some())
+            .count();
+        assert!(staged_count >= 2);
+
+        // Unstage all
+        unstage_all(path_str).expect("Should unstage all");
+
+        // Verify no changes are staged
+        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let staged_count = changes_after
+            .iter()
+            .filter(|c| c.staged_status.is_some())
+            .count();
+        assert_eq!(staged_count, 0);
+
+        // Changes should still exist as unstaged
+        let unstaged_count = changes_after
+            .iter()
+            .filter(|c| c.unstaged_status.is_some())
+            .count();
+        assert!(unstaged_count >= 2);
+    }
+
+    #[test]
+    fn test_unstage_all_with_no_staged_changes_succeeds() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // No staged changes — should succeed without error
+        let result = unstage_all(path);
+        assert!(result.is_ok());
     }
 }
