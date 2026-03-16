@@ -231,7 +231,8 @@ export function Sidebar({ className }: SidebarProps) {
     (
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
       commitId: string,
-      isUnpushed: boolean
+      isUnpushed: boolean,
+      commitMessage: string
     ) => {
       if (!selectedRepo) {
         return;
@@ -243,6 +244,7 @@ export function Sidebar({ className }: SidebarProps) {
       const element = event.currentTarget;
       showHistoryContextMenu({
         commitId,
+        commitMessage,
         repoPath: selectedRepo.path,
         event,
         element,
@@ -574,7 +576,8 @@ interface CommitListProps {
   onCommitContextMenu: (
     event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
     commitId: string,
-    isUnpushed: boolean
+    isUnpushed: boolean,
+    commitMessage: string
   ) => void;
 }
 
@@ -656,7 +659,8 @@ interface CommitListItemProps {
   onContextMenu: (
     event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
     commitId: string,
-    isUnpushed: boolean
+    isUnpushed: boolean,
+    commitMessage: string
   ) => void;
 }
 
@@ -671,12 +675,12 @@ function CommitListItem({
   onContextMenu,
 }: CommitListItemProps) {
   const handleContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
-    onContextMenu(event, commit.id, isUnpushed);
+    onContextMenu(event, commit.id, isUnpushed, commit.message);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (isContextMenuKeyboardEvent(event)) {
-      onContextMenu(event, commit.id, isUnpushed);
+      onContextMenu(event, commit.id, isUnpushed, commit.message);
     }
   };
 

@@ -2055,6 +2055,130 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
     Ok(AheadBehind { ahead, behind })
 }
 
+/// Rewords a commit message for a commit in the current branch.
+///
+/// For the HEAD commit, this performs an amend. For older commits, it replays
+/// all commits from the target to HEAD with the updated message.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `commit_id` - SHA of the commit to reword
+/// * `new_message` - The new commit message
+///
+/// # Returns
+/// Ok(()) on success, or an error message
+pub fn reword_commit(repo_path: &str, commit_id: &str, new_message: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let target_oid = git2::Oid::from_str(commit_id)
+        .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
+
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
+
+    if !head.is_branch() {
+        return Err("Cannot reword commits in detached HEAD state".to_string());
+    }
+
+    let head_commit = head
+        .peel_to_commit()
+        .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
+
+    // If it's HEAD, just amend
+    if head_commit.id() == target_oid {
+        head_commit
+            .amend(Some("HEAD"), None, None, None, Some(new_message), None)
+            .map_err(|e| format!("Failed to amend commit: {}", e))?;
+        return Ok(());
+    }
+
+    // Collect commits from HEAD to target (inclusive), walking backwards
+    let mut commits_to_replay = Vec::new();
+    let mut current = head_commit;
+    loop {
+        commits_to_replay.push(current.clone());
+        if current.id() == target_oid {
+            break;
+        }
+        if current.parent_count() == 0 {
+            return Err(format!(
+                "Commit '{}' not found in current branch history",
+                commit_id
+            ));
+        }
+        current = current
+            .parent(0)
+            .map_err(|e| format!("Failed to get parent commit: {}", e))?;
+    }
+
+    // Reverse so we replay from target (oldest) to HEAD (newest)
+    commits_to_replay.reverse();
+
+    // Determine the base parent (target's parent, if any)
+    let target_commit = &commits_to_replay[0];
+    let base_parent_id = if target_commit.parent_count() > 0 {
+        Some(
+            target_commit
+                .parent_id(0)
+                .map_err(|e| format!("Failed to get parent ID: {}", e))?,
+        )
+    } else {
+        None
+    };
+
+    // Replay each commit with the appropriate message
+    let mut parent_oid = base_parent_id;
+
+    for commit in &commits_to_replay {
+        let message = if commit.id() == target_oid {
+            new_message
+        } else {
+            commit.message().unwrap_or("")
+        };
+
+        let parents = match parent_oid {
+            Some(pid) => {
+                let parent = repo
+                    .find_commit(pid)
+                    .map_err(|e| format!("Failed to find parent commit: {}", e))?;
+                vec![parent]
+            }
+            None => vec![],
+        };
+        let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
+
+        let tree = commit
+            .tree()
+            .map_err(|e| format!("Failed to get commit tree: {}", e))?;
+
+        let new_oid = repo
+            .commit(
+                None, // Don't update any ref yet
+                &commit.author(),
+                &commit.committer(),
+                message,
+                &tree,
+                &parent_refs,
+            )
+            .map_err(|e| format!("Failed to create commit: {}", e))?;
+
+        parent_oid = Some(new_oid);
+    }
+
+    // Update the branch ref to point to the new HEAD
+    let final_oid = parent_oid.expect("Should have at least one commit");
+    let branch_ref = head
+        .name()
+        .ok_or_else(|| "HEAD is not a named reference".to_string())?;
+
+    repo.reference(branch_ref, final_oid, true, "reword commit")
+        .map_err(|e| format!("Failed to update branch reference: {}", e))?;
+
+    Ok(())
+}
+
 /// Gets the URL of the "origin" remote for a repository
 ///
 /// # Arguments
@@ -3744,5 +3868,110 @@ mod tests {
         let result = get_remote_url(path);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("No 'origin' remote configured"));
+    }
+
+    // Tests for reword_commit
+
+    #[test]
+    fn test_reword_commit_head() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let head_commit = &commits[0];
+        assert_eq!(head_commit.message, "Add file");
+
+        reword_commit(path, &head_commit.id, "Reworded message")
+            .expect("Should reword HEAD commit");
+
+        let commits_after = list_commits(path, None).expect("Should return commits");
+        assert_eq!(commits_after[0].message, "Reworded message");
+        // Other commits should be unchanged
+        assert_eq!(commits_after[1].message, "Initial commit");
+        assert_eq!(commits_after[1].id, commits[1].id);
+    }
+
+    #[test]
+    fn test_reword_commit_non_head() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Add a third commit so we can reword the middle one
+        std::fs::write(path.join("another.txt"), "another").expect("Failed to write file");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add files");
+        Command::new("git")
+            .args(["commit", "-m", "Third commit"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to create commit");
+
+        let path_str = path.to_str().unwrap();
+        let commits = list_commits(path_str, None).expect("Should return commits");
+        assert_eq!(commits.len(), 3);
+        // commits[0] = "Third commit", commits[1] = "Add file", commits[2] = "Initial commit"
+
+        let middle_commit_id = commits[1].id.clone();
+        reword_commit(path_str, &middle_commit_id, "Reworded middle")
+            .expect("Should reword non-HEAD commit");
+
+        let commits_after = list_commits(path_str, None).expect("Should return commits");
+        assert_eq!(commits_after.len(), 3);
+        assert_eq!(commits_after[0].message, "Third commit");
+        assert_eq!(commits_after[1].message, "Reworded middle");
+        assert_eq!(commits_after[2].message, "Initial commit");
+        // The initial commit should be unchanged
+        assert_eq!(commits_after[2].id, commits[2].id);
+        // The reworded commit and its descendant should have new IDs
+        assert_ne!(commits_after[1].id, commits[1].id);
+        assert_ne!(commits_after[0].id, commits[0].id);
+    }
+
+    #[test]
+    fn test_reword_commit_preserves_tree() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let files_before = get_commit_files(path, &commits[0].id).expect("Should get files");
+
+        reword_commit(path, &commits[0].id, "New message")
+            .expect("Should reword commit");
+
+        let commits_after = list_commits(path, None).expect("Should return commits");
+        let files_after = get_commit_files(path, &commits_after[0].id).expect("Should get files");
+
+        assert_eq!(files_before.len(), files_after.len());
+        assert_eq!(files_before[0].path, files_after[0].path);
+    }
+
+    #[test]
+    fn test_reword_commit_not_found() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = reword_commit(path, "0000000000000000000000000000000000000000", "New msg");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reword_commit_root_commit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path, None).expect("Should return commits");
+        let root_commit = &commits[commits.len() - 1]; // "Initial commit"
+        assert_eq!(root_commit.message, "Initial commit");
+
+        reword_commit(path, &root_commit.id, "Reworded root")
+            .expect("Should reword root commit");
+
+        let commits_after = list_commits(path, None).expect("Should return commits");
+        assert_eq!(commits_after[commits_after.len() - 1].message, "Reworded root");
+        // All commits should have new IDs since root was rewritten
+        assert_ne!(commits_after[0].id, commits[0].id);
     }
 }

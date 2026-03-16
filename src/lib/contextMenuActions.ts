@@ -29,6 +29,8 @@ export interface HistoryContextMenuOptions {
   element: HTMLElement;
   /** Whether this commit has not been pushed to the remote yet */
   isUnpushed?: boolean;
+  /** The current commit message (used to pre-fill the rewrite prompt) */
+  commitMessage?: string;
   /** Called when the menu closes (regardless of action taken) */
   onClose?: () => void;
 }
@@ -36,7 +38,15 @@ export interface HistoryContextMenuOptions {
 export async function showHistoryContextMenu(
   options: HistoryContextMenuOptions
 ): Promise<void> {
-  const { commitId, repoPath, event, element, isUnpushed, onClose } = options;
+  const {
+    commitId,
+    repoPath,
+    event,
+    element,
+    isUnpushed,
+    commitMessage,
+    onClose,
+  } = options;
 
   // Resolve forge URL before showing the menu so we can disable if unavailable
   let forgeUrl: string | null = null;
@@ -53,6 +63,11 @@ export async function showHistoryContextMenu(
       id: "open-in-forge",
       label: "Open in Forge",
       disabled: forgeUrl === null || isUnpushed === true,
+    },
+    {
+      id: "rewrite-message",
+      label: "Rewrite Message…",
+      disabled: isUnpushed !== true,
     },
   ];
 
@@ -76,6 +91,21 @@ export async function showHistoryContextMenu(
                 await openUrl(forgeUrl);
               }
               break;
+            case "rewrite-message": {
+              // biome-ignore lint/suspicious/noAlert: intentional — quick inline editing of commit messages
+              const newMessage = window.prompt(
+                "Rewrite commit message:",
+                commitMessage ?? ""
+              );
+              if (newMessage !== null && newMessage.trim() !== "") {
+                await invoke("reword_commit", {
+                  repoPath,
+                  commitId,
+                  newMessage,
+                });
+              }
+              break;
+            }
             default:
               break;
           }

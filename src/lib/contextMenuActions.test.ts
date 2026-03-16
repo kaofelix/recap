@@ -128,6 +128,120 @@ describe("showHistoryContextMenu", () => {
     expect((forgeCall?.[0] as { enabled: boolean }).enabled).toBe(false);
   });
 
+  it("shows 'Rewrite Message…' enabled for unpushed commits", async () => {
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      commitMessage: "Original message",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: true,
+    };
+
+    await showHistoryContextMenu(options);
+
+    const rewriteCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "rewrite-message"
+    );
+    expect(rewriteCall).toBeDefined();
+    expect((rewriteCall?.[0] as { text: string }).text).toBe(
+      "Rewrite Message…"
+    );
+    expect((rewriteCall?.[0] as { enabled: boolean }).enabled).toBe(true);
+  });
+
+  it("disables 'Rewrite Message…' for pushed commits", async () => {
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      commitMessage: "Original message",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: false,
+    };
+
+    await showHistoryContextMenu(options);
+
+    const rewriteCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "rewrite-message"
+    );
+    expect(rewriteCall).toBeDefined();
+    expect((rewriteCall?.[0] as { enabled: boolean }).enabled).toBe(false);
+  });
+
+  it("calls reword_commit when 'Rewrite Message…' action is triggered", async () => {
+    // Mock window.prompt to return a new message
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("New message");
+    tauriMocks.invoke.mockResolvedValue(undefined);
+
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      commitMessage: "Original message",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: true,
+    };
+
+    await showHistoryContextMenu(options);
+
+    // Find the rewrite-message action callback and trigger it
+    const rewriteCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "rewrite-message"
+    );
+    expect(rewriteCall).toBeDefined();
+    const actionCallback = (rewriteCall?.[0] as { action: () => void }).action;
+    await actionCallback();
+
+    expect(promptSpy).toHaveBeenCalledWith(
+      "Rewrite commit message:",
+      "Original message"
+    );
+    expect(tauriMocks.invoke).toHaveBeenCalledWith("reword_commit", {
+      repoPath: "/test/repo",
+      commitId: "abc123def456",
+      newMessage: "New message",
+    });
+
+    promptSpy.mockRestore();
+  });
+
+  it("does not call reword_commit when prompt is cancelled", async () => {
+    // Mock window.prompt to return null (cancelled)
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
+    tauriMocks.invoke.mockResolvedValue(undefined);
+
+    const event = createMockMouseEvent();
+    const options: HistoryContextMenuOptions = {
+      commitId: "abc123def456",
+      commitMessage: "Original message",
+      repoPath: "/test/repo",
+      event,
+      element: event.currentTarget,
+      isUnpushed: true,
+    };
+
+    await showHistoryContextMenu(options);
+
+    // Find and trigger the rewrite-message action
+    const rewriteCall = tauriMocks.menuItemNew.mock.calls.find(
+      (call: unknown[]) => (call[0] as { id: string }).id === "rewrite-message"
+    );
+    const actionCallback = (rewriteCall?.[0] as { action: () => void }).action;
+    await actionCallback();
+
+    expect(promptSpy).toHaveBeenCalled();
+    expect(tauriMocks.invoke).not.toHaveBeenCalledWith(
+      "reword_commit",
+      expect.anything()
+    );
+
+    promptSpy.mockRestore();
+  });
+
   it("enables 'Open in Forge' for pushed commits when forge URL is available", async () => {
     // Mock invoke to return a remote URL
     tauriMocks.invoke.mockImplementation((command: unknown) => {

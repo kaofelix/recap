@@ -150,3 +150,12 @@ pub fn get_remote_url(repo_path: String) -> Result<String, String> {
 pub fn get_ahead_behind(repo_path: String) -> Result<git_service::AheadBehind, String> {
     git_service::get_ahead_behind(&repo_path)
 }
+
+#[tauri::command]
+pub fn reword_commit(
+    repo_path: String,
+    commit_id: String,
+    new_message: String,
+) -> Result<(), String> {
+    git_service::reword_commit(&repo_path, &commit_id, &new_message)
+}
