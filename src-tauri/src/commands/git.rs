@@ -157,6 +157,11 @@ pub fn discard_file(repo_path: String, file_path: String) -> Result<(), String> 
 }
 
 #[tauri::command]
+pub fn create_commit(repo_path: String, message: String) -> Result<(), String> {
+    git_service::create_commit(&repo_path, &message)
+}
+
+#[tauri::command]
 pub fn get_remote_url(repo_path: String) -> Result<String, String> {
     git_service::get_remote_url(&repo_path)
 }

@@ -2125,6 +2125,65 @@ pub fn unstage_all(repo_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Creates a commit from the currently staged changes.
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+/// * `message` - Full commit message (summary + optional body)
+///
+/// # Returns
+/// Ok(()) on success, or an error if there are no staged changes or the commit fails
+pub fn create_commit(repo_path: &str, message: &str) -> Result<(), String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut index = repo
+        .index()
+        .map_err(|e| format!("Failed to get index: {}", e))?;
+
+    // Check that there are staged changes by comparing index tree to HEAD tree
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
+    let head_commit = head
+        .peel_to_commit()
+        .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
+    let head_tree = head_commit
+        .tree()
+        .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
+
+    let index_tree_oid = index
+        .write_tree()
+        .map_err(|e| format!("Failed to write index tree: {}", e))?;
+    let index_tree = repo
+        .find_tree(index_tree_oid)
+        .map_err(|e| format!("Failed to find index tree: {}", e))?;
+
+    // If index tree matches HEAD tree, there are no staged changes
+    let diff = repo
+        .diff_tree_to_tree(Some(&head_tree), Some(&index_tree), None)
+        .map_err(|e| format!("Failed to diff trees: {}", e))?;
+    if diff.deltas().len() == 0 {
+        return Err("No staged changes to commit".to_string());
+    }
+
+    let signature = repo
+        .signature()
+        .map_err(|e| format!("Failed to get signature: {}", e))?;
+
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        message,
+        &index_tree,
+        &[&head_commit],
+    )
+    .map_err(|e| format!("Failed to create commit: {}", e))?;
+
+    Ok(())
+}
+
 /// Gets ahead/behind counts for the current branch vs its upstream tracking branch.
 ///
 /// # Arguments
@@ -4361,5 +4420,68 @@ mod tests {
         // No staged changes — should succeed without error
         let result = unstage_all(path);
         assert!(result.is_ok());
+    }
+
+    // Tests for create_commit
+
+    #[test]
+    fn test_create_commit_with_staged_changes() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Modify and stage a file
+        std::fs::write(path.join("file.txt"), "committed content").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage");
+
+        let path_str = path.to_str().unwrap();
+
+        create_commit(path_str, "New commit message").expect("Should create commit");
+
+        // New HEAD should have the correct message
+        let commits = list_commits(path_str, Some(1)).expect("Should list commits");
+        assert_eq!(commits[0].message, "New commit message");
+
+        // No staged changes should remain
+        let changes = get_working_changes_ex(path_str).expect("Should get changes");
+        let staged_count = changes.iter().filter(|c| c.staged_status.is_some()).count();
+        assert_eq!(staged_count, 0);
+    }
+
+    #[test]
+    fn test_create_commit_with_no_staged_changes_fails() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = create_commit(path, "Empty commit");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No staged changes"));
+    }
+
+    #[test]
+    fn test_create_commit_preserves_multiline_message() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        std::fs::write(path.join("file.txt"), "updated").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to stage");
+
+        let path_str = path.to_str().unwrap();
+        let message = "Summary line\n\nDetailed body paragraph\nwith multiple lines.";
+
+        create_commit(path_str, message).expect("Should create commit");
+
+        // Verify the full message is preserved
+        let commits = list_commits(path_str, Some(1)).expect("Should list commits");
+        let full_message =
+            get_commit_message(path_str, &commits[0].id).expect("Should get message");
+        assert!(full_message.starts_with("Summary line\n\nDetailed body paragraph"));
     }
 }

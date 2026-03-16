@@ -68,6 +68,7 @@ pub fn run() {
             commands::git::unstage_file,
             commands::git::unstage_all,
             commands::git::discard_file,
+            commands::git::create_commit,
             commands::git::get_remote_url,
             commands::git::get_ahead_behind,
             commands::git::get_commit_message,
