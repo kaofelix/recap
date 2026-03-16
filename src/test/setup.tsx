@@ -139,8 +139,11 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: mockEmit,
 }));
 
+const mockOpenUrl = vi.fn().mockResolvedValue(undefined);
+
 vi.mock("@tauri-apps/plugin-opener", () => ({
   open: mockOpenerOpen,
+  openUrl: mockOpenUrl,
   revealItemInDir: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -192,6 +195,7 @@ export const tauriMocks = {
   listen: mockListen,
   emit: mockEmit,
   openerOpen: mockOpenerOpen,
+  openUrl: mockOpenUrl,
   dialogOpen: mockDialogOpen,
   menuPopup: mockMenuPopup,
   menuClose: mockMenuClose,

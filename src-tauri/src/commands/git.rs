@@ -140,3 +140,8 @@ pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), String> 
 pub fn discard_file(repo_path: String, file_path: String) -> Result<(), String> {
     git_service::discard_file(&repo_path, &file_path)
 }
+
+#[tauri::command]
+pub fn get_remote_url(repo_path: String) -> Result<String, String> {
+    git_service::get_remote_url(&repo_path)
+}

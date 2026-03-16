@@ -228,6 +228,9 @@ export function Sidebar({ className }: SidebarProps) {
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
       commitId: string
     ) => {
+      if (!selectedRepo) {
+        return;
+      }
       event.preventDefault();
       clearTextSelection();
       setContextMenuOpen();
@@ -235,6 +238,7 @@ export function Sidebar({ className }: SidebarProps) {
       const element = event.currentTarget;
       showHistoryContextMenu({
         commitId,
+        repoPath: selectedRepo.path,
         event,
         element,
         onClose: () => {
@@ -250,7 +254,7 @@ export function Sidebar({ className }: SidebarProps) {
         },
       });
     },
-    [setContextMenuOpen, setContextMenuClosed]
+    [selectedRepo, setContextMenuOpen, setContextMenuClosed]
   );
 
   const handleChangesContextMenu = useCallback(

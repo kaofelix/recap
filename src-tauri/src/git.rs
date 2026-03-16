@@ -1999,6 +1999,27 @@ pub fn discard_file(repo_path: &str, file_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Gets the URL of the "origin" remote for a repository
+///
+/// # Arguments
+/// * `repo_path` - Path to the git repository
+///
+/// # Returns
+/// The remote URL string, or an error if no origin remote is configured
+pub fn get_remote_url(repo_path: &str) -> Result<String, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let remote = repo
+        .find_remote("origin")
+        .map_err(|_| "No 'origin' remote configured".to_string())?;
+
+    remote
+        .url()
+        .map(|url| url.to_string())
+        .ok_or_else(|| "Remote URL is not valid UTF-8".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3515,5 +3536,32 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no changes to discard"));
+    }
+
+    #[test]
+    fn test_get_remote_url_returns_origin_url() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // Add a remote
+        Command::new("git")
+            .args(["remote", "add", "origin", "https://github.com/owner/repo.git"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add remote");
+
+        let result = get_remote_url(path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "https://github.com/owner/repo.git");
+    }
+
+    #[test]
+    fn test_get_remote_url_error_when_no_origin() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        let result = get_remote_url(path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No 'origin' remote configured"));
     }
 }

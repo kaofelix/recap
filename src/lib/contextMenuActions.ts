@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { WorkingFileSection } from "../types/file";
 import {
   type ContextMenuAction,
@@ -8,6 +8,7 @@ import {
   getMenuPositionFromMouseEvent,
   showContextMenu,
 } from "./contextMenu";
+import { getForgeCommitUrl } from "./forgeUrl";
 
 // ============================================================================
 // Clipboard utilities
@@ -23,6 +24,7 @@ async function copyToClipboard(text: string): Promise<void> {
 
 export interface HistoryContextMenuOptions {
   commitId: string;
+  repoPath: string;
   event: React.MouseEvent | React.KeyboardEvent;
   element: HTMLElement;
   /** Called when the menu closes (regardless of action taken) */
@@ -32,10 +34,24 @@ export interface HistoryContextMenuOptions {
 export async function showHistoryContextMenu(
   options: HistoryContextMenuOptions
 ): Promise<void> {
-  const { commitId, event, element, onClose } = options;
+  const { commitId, repoPath, event, element, onClose } = options;
+
+  // Resolve forge URL before showing the menu so we can disable if unavailable
+  let forgeUrl: string | null = null;
+  try {
+    const remoteUrl = await invoke<string>("get_remote_url", { repoPath });
+    forgeUrl = getForgeCommitUrl(remoteUrl, commitId);
+  } catch {
+    // No origin remote or unparseable URL — disable action
+  }
 
   const actions: ContextMenuAction[] = [
     { id: "copy-hash", label: "Copy Commit Hash" },
+    {
+      id: "open-in-forge",
+      label: "Open in Forge",
+      disabled: forgeUrl === null,
+    },
   ];
 
   const position =
@@ -48,12 +64,21 @@ export async function showHistoryContextMenu(
       actions,
       position,
       onAction: async (actionId) => {
-        if (actionId === "copy-hash") {
-          try {
-            await copyToClipboard(commitId);
-          } catch (err) {
-            console.error("Failed to copy commit hash:", err);
+        try {
+          switch (actionId) {
+            case "copy-hash":
+              await copyToClipboard(commitId);
+              break;
+            case "open-in-forge":
+              if (forgeUrl) {
+                await openUrl(forgeUrl);
+              }
+              break;
+            default:
+              break;
           }
+        } catch (err) {
+          console.error(`Failed to execute action ${actionId}:`, err);
         }
       },
     });
