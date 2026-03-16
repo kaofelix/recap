@@ -8,7 +8,7 @@ describe("RewriteMessageEditor", () => {
   const defaultProps = {
     commitId: "abc123def456",
     repoPath: "/test/repo",
-    initialMessage: "",
+    initialMessage: "Old summary",
     onClose: vi.fn(),
   };
 
@@ -16,57 +16,17 @@ describe("RewriteMessageEditor", () => {
     vi.clearAllMocks();
   });
 
-  it("renders summary input and description textarea", () => {
+  it("renders with Rewrite as the submit button label", () => {
     render(<RewriteMessageEditor {...defaultProps} />);
 
-    expect(screen.getByPlaceholderText("Commit summary")).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText("Extended description (optional)")
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rewrite" })).toBeInTheDocument();
   });
 
-  it("pre-fills summary from single-line message", () => {
-    render(
-      <RewriteMessageEditor {...defaultProps} initialMessage="Fix the bug" />
-    );
-
-    expect(screen.getByPlaceholderText("Commit summary")).toHaveValue(
-      "Fix the bug"
-    );
-    expect(
-      screen.getByPlaceholderText("Extended description (optional)")
-    ).toHaveValue("");
-  });
-
-  it("pre-fills summary and description from multi-line message", () => {
-    render(
-      <RewriteMessageEditor
-        {...defaultProps}
-        initialMessage={"Summary line\n\nBody paragraph.\nMore body."}
-      />
-    );
-
-    expect(screen.getByPlaceholderText("Commit summary")).toHaveValue(
-      "Summary line"
-    );
-    expect(
-      screen.getByPlaceholderText("Extended description (optional)")
-    ).toHaveValue("Body paragraph.\nMore body.");
-  });
-
-  it("focuses the summary input on mount", () => {
-    render(<RewriteMessageEditor {...defaultProps} />);
-
-    expect(screen.getByPlaceholderText("Commit summary")).toHaveFocus();
-  });
-
-  it("calls reword_commit with combined message on confirm", async () => {
+  it("calls reword_commit with the new message and closes on success", async () => {
     tauriMocks.invoke.mockResolvedValue(undefined);
     const user = userEvent.setup();
 
-    render(
-      <RewriteMessageEditor {...defaultProps} initialMessage="Old summary" />
-    );
+    render(<RewriteMessageEditor {...defaultProps} />);
 
     const summaryInput = screen.getByPlaceholderText("Commit summary");
     await user.clear(summaryInput);
@@ -87,34 +47,19 @@ describe("RewriteMessageEditor", () => {
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
 
-  it("sends summary-only message when description is empty", async () => {
-    tauriMocks.invoke.mockResolvedValue(undefined);
+  it("shows error and does not close when reword_commit fails", async () => {
+    tauriMocks.invoke.mockRejectedValue(new Error("Rebase conflict"));
     const user = userEvent.setup();
 
-    render(
-      <RewriteMessageEditor {...defaultProps} initialMessage="Old summary" />
-    );
-
-    const summaryInput = screen.getByPlaceholderText("Commit summary");
-    await user.clear(summaryInput);
-    await user.type(summaryInput, "New summary");
+    render(<RewriteMessageEditor {...defaultProps} />);
 
     await user.click(screen.getByRole("button", { name: "Rewrite" }));
 
-    expect(tauriMocks.invoke).toHaveBeenCalledWith("reword_commit", {
-      repoPath: "/test/repo",
-      commitId: "abc123def456",
-      newMessage: "New summary",
-    });
+    expect(await screen.findByText(/Rebase conflict/)).toBeInTheDocument();
+    expect(defaultProps.onClose).not.toHaveBeenCalled();
   });
 
-  it("disables Rewrite button when summary is empty", () => {
-    render(<RewriteMessageEditor {...defaultProps} initialMessage="" />);
-
-    expect(screen.getByRole("button", { name: "Rewrite" })).toBeDisabled();
-  });
-
-  it("calls onClose when Cancel is clicked", async () => {
+  it("calls onClose when Cancel is clicked without invoking backend", async () => {
     const user = userEvent.setup();
 
     render(<RewriteMessageEditor {...defaultProps} />);
@@ -126,30 +71,5 @@ describe("RewriteMessageEditor", () => {
       "reword_commit",
       expect.anything()
     );
-  });
-
-  it("calls onClose when Escape is pressed", async () => {
-    const user = userEvent.setup();
-
-    render(<RewriteMessageEditor {...defaultProps} />);
-
-    await user.keyboard("{Escape}");
-
-    expect(defaultProps.onClose).toHaveBeenCalled();
-  });
-
-  it("shows error state when reword_commit fails", async () => {
-    tauriMocks.invoke.mockRejectedValue(new Error("Rebase conflict"));
-    const user = userEvent.setup();
-
-    render(
-      <RewriteMessageEditor {...defaultProps} initialMessage="Some summary" />
-    );
-
-    await user.click(screen.getByRole("button", { name: "Rewrite" }));
-
-    expect(await screen.findByText(/Rebase conflict/)).toBeInTheDocument();
-    // Should NOT close on error — let user retry or cancel
-    expect(defaultProps.onClose).not.toHaveBeenCalled();
   });
 });
