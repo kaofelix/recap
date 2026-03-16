@@ -2191,6 +2191,214 @@ describe("Sidebar", () => {
     });
   });
 
+  describe("commit form", () => {
+    it("shows a 'Commit' toggle header when there are staged changes", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
+      });
+    });
+
+    it("does not show the commit toggle when there are no staged changes", async () => {
+      const mockChanges = [
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 5,
+          unstaged_deletions: 2,
+          old_path: null,
+          section: "unstaged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("unstaged.ts")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId("commit-form-toggle")
+      ).not.toBeInTheDocument();
+    });
+
+    it("expands the commit form when toggle is clicked", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
+      });
+
+      // Form should not be visible yet
+      expect(
+        screen.queryByPlaceholderText("Commit summary")
+      ).not.toBeInTheDocument();
+
+      // Click toggle to expand
+      fireEvent.click(screen.getByTestId("commit-form-toggle"));
+
+      expect(screen.getByPlaceholderText("Commit summary")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Commit" })
+      ).toBeInTheDocument();
+    });
+
+    it("collapses the commit form when Cancel is clicked", async () => {
+      const mockChanges = [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockChangesOnly(mockChanges);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "changes",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
+      });
+
+      // Expand
+      fireEvent.click(screen.getByTestId("commit-form-toggle"));
+      expect(screen.getByPlaceholderText("Commit summary")).toBeInTheDocument();
+
+      // Cancel collapses
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(
+        screen.queryByPlaceholderText("Commit summary")
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not show the commit form in history mode", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve([
+            {
+              id: "commit-1",
+              message: "feat: something",
+              author: "Test User",
+              email: "test@example.com",
+              timestamp: Math.floor(Date.now() / 1000) - 600,
+            },
+          ]);
+        }
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve([
+            {
+              path: "src/staged.ts",
+              staged_status: "Modified",
+              unstaged_status: null,
+              staged_additions: 5,
+              staged_deletions: 2,
+              unstaged_additions: 0,
+              unstaged_deletions: 0,
+              old_path: null,
+              section: "staged" as const,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: something")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId("commit-form-toggle")
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("changedFiles sync", () => {
     it("syncs working changes to changedFiles store in changes mode", async () => {
       const mockChanges = [

@@ -40,6 +40,7 @@ import {
   useViewMode,
   useWorkingChanges,
 } from "../../store/appStore";
+import { CreateCommitEditor } from "./CreateCommitEditor";
 import { FileListItem } from "./FileListItem";
 import { RewriteMessageEditor } from "./RewriteMessageEditor";
 
@@ -228,6 +229,10 @@ export function Sidebar({ className }: SidebarProps) {
   const [contextMenuTargetId, setContextMenuTargetId] = useState<string | null>(
     null
   );
+
+  // Commit form state
+  const [commitFormOpen, setCommitFormOpen] = useState(false);
+  const hasStagedChanges = changes.some((c) => c.section === "staged");
 
   // Rewrite message editor state
   const [editingCommit, setEditingCommit] = useState<{
@@ -479,6 +484,38 @@ export function Sidebar({ className }: SidebarProps) {
             />
           )}
       </div>
+
+      {/* Commit form — docked at bottom of Changes view */}
+      {viewMode === "changes" && selectedRepo && hasStagedChanges && (
+        <>
+          {!commitFormOpen && (
+            <button
+              className={cn(
+                "flex w-full items-center justify-center gap-1 py-1.5",
+                "border-panel-border border-t",
+                "bg-panel-header-bg",
+                "font-medium text-text-secondary text-xs",
+                "hover:text-text-primary"
+              )}
+              data-testid="commit-form-toggle"
+              onClick={() => setCommitFormOpen(true)}
+              type="button"
+            >
+              Commit…
+            </button>
+          )}
+          {commitFormOpen && (
+            <CreateCommitEditor
+              onCancel={() => setCommitFormOpen(false)}
+              onCommitted={() => {
+                setCommitFormOpen(false);
+                bumpWorkingChangesRevision();
+              }}
+              repoPath={selectedRepo.path}
+            />
+          )}
+        </>
+      )}
 
       {/* Rewrite message editor — docked at bottom */}
       {editingCommit && selectedRepo && viewMode === "history" && (
