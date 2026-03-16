@@ -204,6 +204,101 @@ describe("Sidebar", () => {
     expect(screen.getByText(/abc123d/)).toBeInTheDocument(); // Short SHA
   });
 
+  it("shows author name in commit metadata line", async () => {
+    const mockCommits = [
+      {
+        id: "abc123def456abc123def456abc123def456abc1",
+        message: "feat: add new feature",
+        author: "Jane Doe",
+        email: "jane@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Jane Doe/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows a Gravatar avatar image for each commit", async () => {
+    const mockCommits = [
+      {
+        id: "abc123def456abc123def456abc123def456abc1",
+        message: "feat: add new feature",
+        author: "Jane Doe",
+        email: "jane@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+    });
+
+    const img = document.querySelector("img");
+    expect(img).toBeInTheDocument();
+    expect(img?.getAttribute("src")).toContain("gravatar.com/avatar/");
+  });
+
+  it("shows initial fallback when Gravatar image fails to load", async () => {
+    const mockCommits = [
+      {
+        id: "abc123def456abc123def456abc123def456abc1",
+        message: "feat: add new feature",
+        author: "Jane Doe",
+        email: "jane@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+    });
+
+    const img = document.querySelector("img");
+    expect(img).not.toBeNull();
+    // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+    fireEvent.error(img!);
+
+    // Should show initial letter fallback
+    expect(screen.getByText("J")).toBeInTheDocument();
+    // Image should be gone
+    expect(document.querySelector("img")).toBeNull();
+  });
+
   it("supports cmd-click multi-select in history mode", async () => {
     const mockCommits = [
       {

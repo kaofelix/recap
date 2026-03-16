@@ -17,6 +17,7 @@ import {
   showChangesContextMenu,
   showHistoryContextMenu,
 } from "../../lib/contextMenuActions";
+import { gravatarUrl } from "../../lib/gravatar";
 import { cn } from "../../lib/utils";
 import type {
   WorkingChangeItem,
@@ -517,7 +518,13 @@ function ChangesFileList({
 }
 
 interface CommitListItemProps {
-  commit: { id: string; message: string; timestamp: number };
+  commit: {
+    id: string;
+    message: string;
+    author: string;
+    email: string;
+    timestamp: number;
+  };
   isSelected: boolean;
   isFocused: boolean;
   isContextMenuTarget: boolean;
@@ -552,6 +559,10 @@ function CommitListItem({
     }
   };
 
+  const [imgError, setImgError] = useState(false);
+  const avatarSrc = gravatarUrl(commit.email);
+  const initial = (commit.author[0] ?? "?").toUpperCase();
+
   return (
     <button
       className={cn(
@@ -570,11 +581,36 @@ function CommitListItem({
       onContextMenu={handleContextMenu}
       onKeyDown={handleKeyDown}
     >
-      <div className="truncate font-medium text-sm text-text-primary">
-        {commit.message}
-      </div>
-      <div className="mt-0.5 text-text-secondary text-xs">
-        {shortSha(commit.id)} · {formatRelativeTime(commit.timestamp)}
+      <div className="flex items-start gap-2">
+        {/* Avatar */}
+        <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary">
+          {imgError ? (
+            <span className="font-medium text-[10px] text-text-secondary leading-none">
+              {initial}
+            </span>
+          ) : (
+            // biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError is a lifecycle event, not user interaction — Biome doesn't distinguish these
+            <img
+              alt=""
+              className="h-5 w-5 rounded-full"
+              height={20}
+              onError={() => setImgError(true)}
+              src={avatarSrc}
+              width={20}
+            />
+          )}
+        </div>
+
+        {/* Text content */}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium text-sm text-text-primary">
+            {commit.message}
+          </div>
+          <div className="mt-0.5 truncate text-text-secondary text-xs">
+            {shortSha(commit.id)} · {commit.author} ·{" "}
+            {formatRelativeTime(commit.timestamp)}
+          </div>
+        </div>
       </div>
     </button>
   );
