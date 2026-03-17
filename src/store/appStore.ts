@@ -43,6 +43,8 @@ export interface AppState {
   behindCount: number | null;
   /** Name of the currently checked-out branch, or null if unknown */
   currentBranchName: string | null;
+  /** Author emails selected for filtering commits (empty = show all) */
+  authorFilter: string[];
 
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
@@ -72,6 +74,8 @@ export interface AppState {
   setUnpushedCount: (count: number | null) => void;
   setBehindCount: (count: number | null) => void;
   setCurrentBranchName: (name: string | null) => void;
+  toggleAuthorFilter: (email: string) => void;
+  clearAuthorFilter: () => void;
 }
 
 /**
@@ -124,6 +128,7 @@ export const useAppStore = create<AppState>()(
       unpushedCount: null,
       behindCount: null,
       currentBranchName: null,
+      authorFilter: [],
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -181,6 +186,7 @@ export const useAppStore = create<AppState>()(
             selectedFilePath: null,
             selectedChangeId: null,
             changedFiles: [],
+            authorFilter: [],
           });
         }
       },
@@ -339,6 +345,7 @@ export const useAppStore = create<AppState>()(
           unpushedCount: null,
           behindCount: null,
           currentBranchName: null,
+          authorFilter: [],
         });
       },
 
@@ -357,6 +364,16 @@ export const useAppStore = create<AppState>()(
       setBehindCount: (behindCount: number | null) => set({ behindCount }),
       setCurrentBranchName: (currentBranchName: string | null) =>
         set({ currentBranchName }),
+      toggleAuthorFilter: (email: string) =>
+        set((state) => {
+          const exists = state.authorFilter.includes(email);
+          return {
+            authorFilter: exists
+              ? state.authorFilter.filter((e) => e !== email)
+              : [...state.authorFilter, email],
+          };
+        }),
+      clearAuthorFilter: () => set({ authorFilter: [] }),
     }),
     {
       name: "recap-storage",
@@ -404,3 +421,4 @@ export const useUnpushedCount = () =>
 export const useBehindCount = () => useAppStore((state) => state.behindCount);
 export const useCurrentBranchName = () =>
   useAppStore((state) => state.currentBranchName);
+export const useAuthorFilter = () => useAppStore((state) => state.authorFilter);

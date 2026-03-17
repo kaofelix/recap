@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   useAppStore,
+  useAuthorFilter,
   useCurrentBranchName,
   useIsDiffMaximized,
   useRepos,
@@ -944,6 +945,103 @@ describe("appStore", () => {
       });
 
       expect(result.current).toBe("develop");
+    });
+  });
+
+  describe("authorFilter", () => {
+    it("should start with an empty author filter", () => {
+      expect(useAppStore.getState().authorFilter).toEqual([]);
+    });
+
+    it("should add an author email via toggleAuthorFilter", () => {
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual([
+        "alice@example.com",
+      ]);
+    });
+
+    it("should remove an author email when toggled again", () => {
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+        useAppStore.getState().toggleAuthorFilter("bob@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual([
+        "alice@example.com",
+        "bob@example.com",
+      ]);
+
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual(["bob@example.com"]);
+    });
+
+    it("should be cleared via clearAuthorFilter", () => {
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+        useAppStore.getState().toggleAuthorFilter("bob@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toHaveLength(2);
+
+      act(() => {
+        useAppStore.getState().clearAuthorFilter();
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual([]);
+    });
+
+    it("should be cleared when selecting a different repo", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/test/repo1");
+        useAppStore.getState().addRepo("/test/repo2");
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toHaveLength(1);
+
+      const repo2 = useAppStore
+        .getState()
+        .repos.find((r) => r.path === "/test/repo2");
+      expect(repo2).toBeDefined();
+
+      act(() => {
+        // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+        useAppStore.getState().selectRepo(repo2!.id);
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual([]);
+    });
+
+    it("should be cleared by clearRepos", () => {
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(useAppStore.getState().authorFilter).toHaveLength(1);
+
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      expect(useAppStore.getState().authorFilter).toEqual([]);
+    });
+
+    it("should expose useAuthorFilter selector", () => {
+      const { result } = renderHook(() => useAuthorFilter());
+
+      expect(result.current).toEqual([]);
+
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(result.current).toEqual(["alice@example.com"]);
     });
   });
 });

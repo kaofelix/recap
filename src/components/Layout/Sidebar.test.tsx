@@ -299,6 +299,143 @@ describe("Sidebar", () => {
     expect(document.querySelector("img")).toBeNull();
   });
 
+  describe("author filter", () => {
+    const multiAuthorCommits = [
+      {
+        id: "commit-a",
+        message: "feat: alice's change",
+        author: "Alice",
+        email: "alice@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 600,
+      },
+      {
+        id: "commit-b",
+        message: "fix: bob's fix",
+        author: "Bob",
+        email: "bob@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1200,
+      },
+      {
+        id: "commit-c",
+        message: "feat: alice's second change",
+        author: "Alice",
+        email: "alice@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1800,
+      },
+    ];
+
+    it("shows a filter button in history mode", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("author-filter-button")).toBeInTheDocument();
+    });
+
+    it("shows unique authors when filter button is clicked", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("author-filter-button"));
+
+      // Should show unique authors (Alice appears once despite 2 commits)
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(screen.getByText("Bob")).toBeInTheDocument();
+    });
+
+    it("filters commits when an author is selected", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      // All 3 commits visible
+      expect(screen.getByText("fix: bob's fix")).toBeInTheDocument();
+      expect(
+        screen.getByText("feat: alice's second change")
+      ).toBeInTheDocument();
+
+      // Open filter and select Alice
+      fireEvent.click(screen.getByTestId("author-filter-button"));
+      fireEvent.click(screen.getByText("Alice"));
+
+      // Only Alice's commits should be visible
+      expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      expect(
+        screen.getByText("feat: alice's second change")
+      ).toBeInTheDocument();
+      expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
+    });
+
+    it("shows all commits when filter is cleared", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+        authorFilter: ["alice@example.com"],
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      // Bob's commit should be hidden
+      expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
+
+      // Clear filter
+      act(() => {
+        useAppStore.getState().clearAuthorFilter();
+      });
+
+      // All commits visible again
+      await waitFor(() => {
+        expect(screen.getByText("fix: bob's fix")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("pushed/unpushed divider", () => {
     it("shows a divider between unpushed and pushed commits", async () => {
       const mockCommits = [

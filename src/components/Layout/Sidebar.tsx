@@ -26,6 +26,7 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useAuthorFilter,
   useBehindCount,
   useChangesError,
   useCommits,
@@ -40,6 +41,7 @@ import {
   useViewMode,
   useWorkingChanges,
 } from "../../store/appStore";
+import { AuthorFilterDropdown } from "./AuthorFilterDropdown";
 import { CreateCommitEditor } from "./CreateCommitEditor";
 import { FileListItem } from "./FileListItem";
 import { RewriteMessageEditor } from "./RewriteMessageEditor";
@@ -88,6 +90,7 @@ function getCommitRangeSelection(
   return commitIds.slice(from, to + 1);
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: component delegates to extracted sub-components; further splitting would scatter related state
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
@@ -112,33 +115,41 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
 
+  const authorFilter = useAuthorFilter();
+
+  // Filter commits by selected authors (empty filter = show all)
+  const filteredCommits =
+    authorFilter.length > 0
+      ? commits.filter((c) => authorFilter.includes(c.email))
+      : commits;
+
   const isLoading =
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;
   const error = viewMode === "history" ? commitsError : changesError;
 
   const isFocused = useIsFocused();
 
-  // Auto-select first commit when selected commit doesn't exist in the list
+  // Auto-select first commit when selected commit doesn't exist in the (filtered) list
   useEffect(() => {
     if (viewMode !== "history" || isLoadingCommits || commitsError) {
       return;
     }
-    if (commits.length === 0) {
+    if (filteredCommits.length === 0) {
       return;
     }
 
     const hasValidSelection =
       selectedCommitIds.length > 0 &&
       selectedCommitIds.every((id) =>
-        commits.some((commit) => commit.id === id)
+        filteredCommits.some((commit) => commit.id === id)
       );
 
     if (!hasValidSelection) {
-      selectCommit(commits[0].id);
-      commitSelectionAnchorRef.current = commits[0].id;
+      selectCommit(filteredCommits[0].id);
+      commitSelectionAnchorRef.current = filteredCommits[0].id;
     }
   }, [
-    commits,
+    filteredCommits,
     selectedCommitIds,
     selectCommit,
     viewMode,
@@ -148,7 +159,7 @@ export function Sidebar({ className }: SidebarProps) {
 
   const commitSelectionAnchorRef = useRef<string | null>(null);
 
-  const commitIds = commits.map((commit) => commit.id);
+  const commitIds = filteredCommits.map((commit) => commit.id);
   const changesListModel = useWorkingChangesListModel(changes);
 
   const handleSelectItem = useCallback(
@@ -393,6 +404,11 @@ export function Sidebar({ className }: SidebarProps) {
           History
           <AheadBehindBadge ahead={unpushedCount} behind={behindCount} />
         </button>
+        {viewMode === "history" && commits.length > 0 && (
+          <div className="flex items-center pr-1.5">
+            <AuthorFilterDropdown commits={commits} />
+          </div>
+        )}
         <button
           aria-selected={viewMode === "changes"}
           className={cn(
@@ -445,9 +461,9 @@ export function Sidebar({ className }: SidebarProps) {
         {viewMode === "history" &&
           !isLoading &&
           !error &&
-          commits.length > 0 && (
+          filteredCommits.length > 0 && (
             <CommitList
-              commits={commits}
+              commits={filteredCommits}
               contextMenuTargetId={contextMenuTargetId}
               getItemProps={getItemProps}
               isFocused={isFocused}
