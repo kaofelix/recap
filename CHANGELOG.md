@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-18
+
+### Fixed
+
+- Fixed empty "Unstaged Changes" section header appearing when all unstaged files are untracked.
+
 ## [0.3.0] - 2026-03-16
 
 ### Added

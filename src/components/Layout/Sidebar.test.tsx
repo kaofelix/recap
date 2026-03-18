@@ -1068,7 +1068,7 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+        expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
       });
     });
 
@@ -1111,7 +1111,7 @@ describe("Sidebar", () => {
       renderWithPolling();
 
       await waitFor(() => {
-        expect(screen.getByText("Unstaged Changes (2)")).toBeInTheDocument();
+        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
         expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
       });
 
@@ -1201,10 +1201,10 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const stagedHeader = screen.getByText("Staged Changes (1)");
-        const unstagedHeader = screen.getByText("Unstaged Changes (1)");
+        const untrackedHeader = screen.getByText("Untracked (1)");
 
-        // Staged should come before unstaged in document order
-        expect(stagedHeader.compareDocumentPosition(unstagedHeader)).toBe(
+        // Staged should come before untracked in document order
+        expect(stagedHeader.compareDocumentPosition(untrackedHeader)).toBe(
           Node.DOCUMENT_POSITION_FOLLOWING
         );
       });
