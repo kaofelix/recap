@@ -27,6 +27,7 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useAuthorFilter,
   useBehindCount,
   useChangesError,
   useCommits,
@@ -115,6 +116,7 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
 
+  const authorFilter = useAuthorFilter();
   const hasMoreCommits = useAppStore((state) => state.hasMoreCommits);
   const loadMoreCommits = useAppStore((state) => state.loadMoreCommits);
 
@@ -465,7 +467,7 @@ export function Sidebar({ className }: SidebarProps) {
               onCommitClick={handleCommitClick}
               onCommitContextMenu={handleCommitContextMenu}
               selectedCommitIds={selectedCommitIds}
-              unpushedCount={unpushedCount}
+              unpushedCount={authorFilter.length > 0 ? null : unpushedCount}
             />
           )}
 

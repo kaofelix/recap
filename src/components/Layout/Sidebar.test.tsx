@@ -512,6 +512,45 @@ describe("Sidebar", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("does not show pushed/unpushed indicators when author filter is active", async () => {
+      const aliceCommits = multiAuthorCommits.filter(
+        (c) => c.email === "alice@example.com"
+      );
+
+      mockInvoke.mockImplementation(
+        (command: unknown, args: Record<string, unknown>) => {
+          if (command === "list_commits") {
+            if (args.authorEmails) {
+              return Promise.resolve(aliceCommits);
+            }
+            return Promise.resolve(multiAuthorCommits);
+          }
+          if (command === "get_ahead_behind") {
+            return Promise.resolve({ ahead: 1, behind: 0 });
+          }
+          return Promise.resolve([]);
+        }
+      );
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+        authorFilter: ["alice@example.com"],
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      // Divider should not appear even though unpushedCount is 1
+      expect(screen.queryByTestId("push-divider")).not.toBeInTheDocument();
+    });
+
     it("shows all commits when filter is cleared", async () => {
       const aliceCommits = multiAuthorCommits.filter(
         (c) => c.email === "alice@example.com"
