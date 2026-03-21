@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../../commands";
 import { FocusProvider } from "../../context/FocusContext";
@@ -346,6 +347,7 @@ describe("Sidebar", () => {
 
     it("shows unique authors when filter button is clicked", async () => {
       mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const user = userEvent.setup();
 
       useAppStore.setState({
         repos: [
@@ -361,15 +363,22 @@ describe("Sidebar", () => {
         expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByTestId("author-filter-button"));
+      await user.click(screen.getByTestId("author-filter-button"));
 
-      // Should show unique authors (Alice appears once despite 2 commits)
-      expect(screen.getByText("Alice")).toBeInTheDocument();
-      expect(screen.getByText("Bob")).toBeInTheDocument();
+      // Should show unique authors as menuitemcheckbox (Radix CheckboxItem)
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Alice/ })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Bob/ })
+        ).toBeInTheDocument();
+      });
     });
 
     it("filters commits when an author is selected", async () => {
       mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const user = userEvent.setup();
 
       useAppStore.setState({
         repos: [
@@ -392,8 +401,13 @@ describe("Sidebar", () => {
       ).toBeInTheDocument();
 
       // Open filter and select Alice
-      fireEvent.click(screen.getByTestId("author-filter-button"));
-      fireEvent.click(screen.getByText("Alice"));
+      await user.click(screen.getByTestId("author-filter-button"));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Alice/ })
+        ).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("menuitemcheckbox", { name: /Alice/ }));
 
       // Only Alice's commits should be visible
       expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
