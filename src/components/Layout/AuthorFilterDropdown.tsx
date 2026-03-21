@@ -123,7 +123,12 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
                     <Check className="h-4 w-4 text-accent-primary" />
                   </ItemIndicator>
                 </span>
-                <span className="flex-1 truncate">{author.name}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{author.name}</span>
+                  <span className="truncate text-[10px] text-text-secondary">
+                    {author.email}
+                  </span>
+                </span>
               </CheckboxItem>
             );
           })}
