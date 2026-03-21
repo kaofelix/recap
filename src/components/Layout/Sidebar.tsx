@@ -11,6 +11,7 @@ import {
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
 import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
+import { useInView } from "../../hooks/useInView";
 import { useNavigableList } from "../../hooks/useNavigableList";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import {
@@ -116,6 +117,8 @@ export function Sidebar({ className }: SidebarProps) {
   const changesError = useChangesError();
 
   const authorFilter = useAuthorFilter();
+  const hasMoreCommits = useAppStore((state) => state.hasMoreCommits);
+  const loadMoreCommits = useAppStore((state) => state.loadMoreCommits);
 
   // Filter commits by selected authors (empty filter = show all)
   const filteredCommits =
@@ -474,6 +477,14 @@ export function Sidebar({ className }: SidebarProps) {
             />
           )}
 
+        {viewMode === "history" &&
+          !isLoading &&
+          !error &&
+          hasMoreCommits &&
+          authorFilter.length === 0 && (
+            <LoadMoreSentinel onLoadMore={loadMoreCommits} />
+          )}
+
         {/* Changes mode: file list with staged/unstaged sections */}
         {viewMode === "changes" &&
           selectedRepo &&
@@ -699,6 +710,20 @@ function ChangesFileList({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function LoadMoreSentinel({ onLoadMore }: { onLoadMore: () => void }) {
+  const sentinelRef = useInView(onLoadMore);
+
+  return (
+    <div
+      className="py-4 text-center text-text-secondary text-xs"
+      data-testid="load-more-commits"
+      ref={sentinelRef}
+    >
+      Loading more…
     </div>
   );
 }

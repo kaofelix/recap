@@ -3,6 +3,14 @@ import { act, cleanup } from "@testing-library/react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 
+// Mock IntersectionObserver (not available in jsdom)
+class MockIntersectionObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+
 // Cleanup after each test - wrap in act() to avoid warnings from pending state updates
 afterEach(async () => {
   await act(async () => {

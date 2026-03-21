@@ -1044,4 +1044,110 @@ describe("appStore", () => {
       expect(result.current).toEqual(["alice@example.com"]);
     });
   });
+
+  describe("commitLimit", () => {
+    it("should start with a default limit of 50", () => {
+      expect(useAppStore.getState().commitLimit).toBe(50);
+    });
+
+    it("should increase limit by 50 via loadMoreCommits", () => {
+      act(() => {
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(100);
+
+      act(() => {
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(150);
+    });
+
+    it("should reset to 50 when selecting a different repo", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/test/repo1");
+        useAppStore.getState().addRepo("/test/repo2");
+        useAppStore.getState().loadMoreCommits();
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(150);
+
+      const repo2 = useAppStore
+        .getState()
+        .repos.find((r) => r.path === "/test/repo2");
+      expect(repo2).toBeDefined();
+
+      act(() => {
+        // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+        useAppStore.getState().selectRepo(repo2!.id);
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(50);
+    });
+
+    it("should reset to 50 via clearRepos", () => {
+      act(() => {
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(100);
+
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(50);
+    });
+
+    it("should not load more when hasMoreCommits is false", () => {
+      act(() => {
+        useAppStore.setState({ hasMoreCommits: false });
+      });
+
+      act(() => {
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      // Should stay at 50, not increase
+      expect(useAppStore.getState().commitLimit).toBe(50);
+    });
+  });
+
+  describe("hasMoreCommits", () => {
+    it("should default to true", () => {
+      expect(useAppStore.getState().hasMoreCommits).toBe(true);
+    });
+
+    it("should be settable via setHasMoreCommits", () => {
+      act(() => {
+        useAppStore.getState().setHasMoreCommits(false);
+      });
+
+      expect(useAppStore.getState().hasMoreCommits).toBe(false);
+    });
+
+    it("should reset to true when selecting a different repo", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/test/repo1");
+        useAppStore.getState().addRepo("/test/repo2");
+        useAppStore.getState().setHasMoreCommits(false);
+      });
+
+      expect(useAppStore.getState().hasMoreCommits).toBe(false);
+
+      const repo2 = useAppStore
+        .getState()
+        .repos.find((r) => r.path === "/test/repo2");
+      expect(repo2).toBeDefined();
+
+      act(() => {
+        // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+        useAppStore.getState().selectRepo(repo2!.id);
+      });
+
+      expect(useAppStore.getState().hasMoreCommits).toBe(true);
+    });
+  });
 });

@@ -529,6 +529,80 @@ describe("Sidebar", () => {
     });
   });
 
+  describe("infinite scroll", () => {
+    it("shows a 'Load more' indicator when there are more commits", async () => {
+      const commits = Array.from({ length: 50 }, (_, i) => ({
+        id: `commit-${i}`,
+        message: `Commit ${i}`,
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - i * 60,
+      }));
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(commits);
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("Commit 0")).toBeInTheDocument();
+      });
+
+      // hasMoreCommits should be true (50 returned === 50 limit)
+      expect(useAppStore.getState().hasMoreCommits).toBe(true);
+      expect(screen.getByTestId("load-more-commits")).toBeInTheDocument();
+    });
+
+    it("does not show load more indicator when all commits are loaded", async () => {
+      const commits = [
+        {
+          id: "commit-1",
+          message: "Only commit",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(commits);
+        }
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("Only commit")).toBeInTheDocument();
+      });
+
+      // hasMoreCommits should be false (1 returned < 50 limit)
+      expect(useAppStore.getState().hasMoreCommits).toBe(false);
+      expect(screen.queryByTestId("load-more-commits")).not.toBeInTheDocument();
+    });
+  });
+
   describe("pushed/unpushed divider", () => {
     it("shows a divider between unpushed and pushed commits", async () => {
       const mockCommits = [

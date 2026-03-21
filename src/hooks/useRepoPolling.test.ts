@@ -291,4 +291,104 @@ describe("useRepoPolling", () => {
 
     expect(useAppStore.getState().commits).toEqual([]);
   });
+
+  it("uses commitLimit from store when fetching commits", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({ commitLimit: 100 });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
+      repoPath: "/test/repo",
+      limit: 100,
+    });
+  });
+
+  it("sets hasMoreCommits to false when returned commits are fewer than limit", async () => {
+    const fewCommits = Array.from({ length: 30 }, (_, i) => ({
+      id: `commit-${i}`,
+      message: `Commit ${i}`,
+      author: "Test",
+      email: "test@test.com",
+      timestamp: Date.now() / 1000 - i,
+    }));
+
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "list_commits") {
+        return Promise.resolve(fewCommits);
+      }
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({ commitLimit: 50, hasMoreCommits: true });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // 30 returned < 50 limit → no more commits
+    expect(useAppStore.getState().hasMoreCommits).toBe(false);
+  });
+
+  it("keeps hasMoreCommits true when returned commits equal the limit", async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      id: `commit-${i}`,
+      message: `Commit ${i}`,
+      author: "Test",
+      email: "test@test.com",
+      timestamp: Date.now() / 1000 - i,
+    }));
+
+    mockInvoke.mockImplementation((command: string) => {
+      if (command === "list_commits") {
+        return Promise.resolve(fullPage);
+      }
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({ commitLimit: 50, hasMoreCommits: true });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // 50 returned === 50 limit → might be more
+    expect(useAppStore.getState().hasMoreCommits).toBe(true);
+  });
 });

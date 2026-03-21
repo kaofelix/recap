@@ -67,6 +67,7 @@ function reconcileSelection(
 export function useRepoPolling(selectedRepo: Repository | null): void {
   const isAppVisible = useAppVisibility();
   const viewMode = useAppStore((state) => state.viewMode);
+  const commitLimit = useAppStore((state) => state.commitLimit);
 
   // Store actions
   const setCommits = useAppStore((state) => state.setCommits);
@@ -81,6 +82,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setCurrentBranchName = useAppStore(
     (state) => state.setCurrentBranchName
   );
+  const setHasMoreCommits = useAppStore((state) => state.setHasMoreCommits);
   const selectChange = useAppStore((state) => state.selectChange);
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
@@ -106,10 +108,11 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     try {
       const result = await invoke<Commit[]>("list_commits", {
         repoPath: selectedRepo.path,
-        limit: 50,
+        limit: commitLimit,
       });
       setCommits(result);
       setCommitsError(null);
+      setHasMoreCommits(result.length >= commitLimit);
     } catch (err) {
       setCommitsError(err instanceof Error ? err.message : String(err));
       setCommits([]);
@@ -144,12 +147,14 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     }
   }, [
     selectedRepo,
+    commitLimit,
     setCommits,
     setCommitsLoading,
     setCommitsError,
     setUnpushedCount,
     setBehindCount,
     setCurrentBranchName,
+    setHasMoreCommits,
   ]);
 
   const fetchWorkingChanges = useCallback(async () => {

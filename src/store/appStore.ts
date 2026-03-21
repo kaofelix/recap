@@ -45,6 +45,10 @@ export interface AppState {
   currentBranchName: string | null;
   /** Author emails selected for filtering commits (empty = show all) */
   authorFilter: string[];
+  /** Number of commits to fetch from the backend */
+  commitLimit: number;
+  /** Whether there are more commits to load beyond the current limit */
+  hasMoreCommits: boolean;
 
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
@@ -76,6 +80,8 @@ export interface AppState {
   setCurrentBranchName: (name: string | null) => void;
   toggleAuthorFilter: (email: string) => void;
   clearAuthorFilter: () => void;
+  loadMoreCommits: () => void;
+  setHasMoreCommits: (hasMore: boolean) => void;
 }
 
 /**
@@ -129,6 +135,8 @@ export const useAppStore = create<AppState>()(
       behindCount: null,
       currentBranchName: null,
       authorFilter: [],
+      commitLimit: 50,
+      hasMoreCommits: true,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -187,6 +195,8 @@ export const useAppStore = create<AppState>()(
             selectedChangeId: null,
             changedFiles: [],
             authorFilter: [],
+            commitLimit: 50,
+            hasMoreCommits: true,
           });
         }
       },
@@ -346,6 +356,8 @@ export const useAppStore = create<AppState>()(
           behindCount: null,
           currentBranchName: null,
           authorFilter: [],
+          commitLimit: 50,
+          hasMoreCommits: true,
         });
       },
 
@@ -374,6 +386,14 @@ export const useAppStore = create<AppState>()(
           };
         }),
       clearAuthorFilter: () => set({ authorFilter: [] }),
+      loadMoreCommits: () =>
+        set((state) => {
+          if (!state.hasMoreCommits) {
+            return {};
+          }
+          return { commitLimit: state.commitLimit + 50 };
+        }),
+      setHasMoreCommits: (hasMoreCommits: boolean) => set({ hasMoreCommits }),
     }),
     {
       name: "recap-storage",
