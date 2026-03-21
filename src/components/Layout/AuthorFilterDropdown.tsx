@@ -124,7 +124,9 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
                   </ItemIndicator>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{author.name}</span>
+                  <span className="truncate text-text-primary">
+                    {author.name}
+                  </span>
                   <span className="truncate text-[10px] text-text-secondary">
                     {author.email}
                   </span>
