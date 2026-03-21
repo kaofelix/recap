@@ -1449,7 +1449,9 @@ describe("Sidebar", () => {
       expect(untrackedHeaderText).toHaveClass("text-text-secondary");
       expect(untrackedHeaderText).not.toHaveClass("uppercase");
 
-      expect(modifiedRow.compareDocumentPosition(untrackedHeader)).toBe(
+      expect(untrackedHeader).not.toBeNull();
+      // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+      expect(modifiedRow.compareDocumentPosition(untrackedHeader!)).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING
       );
     });

@@ -387,7 +387,7 @@ describe("BranchPickerButton", () => {
     });
 
     const initialCallCount = tauriMocks.invoke.mock.calls.filter(
-      ([cmd]: [string]) => cmd === "list_branches"
+      ([cmd]) => cmd === "list_branches"
     ).length;
 
     // Open dropdown
@@ -397,7 +397,7 @@ describe("BranchPickerButton", () => {
     // Should have fetched branches again on open
     await waitFor(() => {
       const newCallCount = tauriMocks.invoke.mock.calls.filter(
-        ([cmd]: [string]) => cmd === "list_branches"
+        ([cmd]) => cmd === "list_branches"
       ).length;
       expect(newCallCount).toBeGreaterThan(initialCallCount);
     });
