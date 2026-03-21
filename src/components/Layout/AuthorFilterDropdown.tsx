@@ -7,7 +7,7 @@ import {
   Separator,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
-import { Check } from "lucide-react";
+import { Check, Filter } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore, useAuthorFilter } from "../../store/appStore";
@@ -66,7 +66,12 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
           title="Filter by author"
           type="button"
         >
-          {hasActiveFilter ? `✦ ${authorFilter.length}` : "✦"}
+          <Filter className="h-3 w-3" />
+          {hasActiveFilter && (
+            <span className="text-[10px] leading-none">
+              {authorFilter.length}
+            </span>
+          )}
         </button>
       </Trigger>
 
