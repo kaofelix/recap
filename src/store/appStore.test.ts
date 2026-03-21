@@ -1032,6 +1032,39 @@ describe("appStore", () => {
       expect(useAppStore.getState().authorFilter).toEqual([]);
     });
 
+    it("should reset commitLimit when toggling author filter", () => {
+      act(() => {
+        useAppStore.getState().loadMoreCommits();
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(150);
+
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(50);
+      expect(useAppStore.getState().hasMoreCommits).toBe(true);
+    });
+
+    it("should reset commitLimit when clearing author filter", () => {
+      act(() => {
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+        useAppStore.getState().loadMoreCommits();
+        useAppStore.getState().loadMoreCommits();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(150);
+
+      act(() => {
+        useAppStore.getState().clearAuthorFilter();
+      });
+
+      expect(useAppStore.getState().commitLimit).toBe(50);
+      expect(useAppStore.getState().hasMoreCommits).toBe(true);
+    });
+
     it("should expose useAuthorFilter selector", () => {
       const { result } = renderHook(() => useAuthorFilter());
 

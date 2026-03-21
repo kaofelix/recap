@@ -171,19 +171,30 @@ pub struct Commit {
 ///
 /// # Returns
 /// A vector of Commit structs or an error message
-pub fn list_commits(repo_path: &str, limit: Option<usize>) -> Result<Vec<Commit>, String> {
-    let repo = Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn list_commits(
+    repo_path: &str,
+    limit: Option<usize>,
+    author_emails: Option<Vec<String>>,
+) -> Result<Vec<Commit>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
 
-    let mut revwalk = repo.revwalk().map_err(|e| format!("Failed to create revwalk: {}", e))?;
+    let mut revwalk =
+        repo.revwalk()
+            .map_err(|e| format!("Failed to create revwalk: {}", e))?;
 
     // Start from HEAD
-    revwalk.push_head().map_err(|e| format!("Failed to push HEAD: {}", e))?;
+    revwalk
+        .push_head()
+        .map_err(|e| format!("Failed to push HEAD: {}", e))?;
 
     let limit = limit.unwrap_or(100);
+    // Treat empty vec as no filter
+    let filter_emails = author_emails.filter(|v| !v.is_empty());
     let mut commits = Vec::new();
 
-    for (count, oid_result) in revwalk.enumerate() {
-        if count >= limit {
+    for oid_result in revwalk {
+        if commits.len() >= limit {
             break;
         }
 
@@ -193,6 +204,15 @@ pub fn list_commits(repo_path: &str, limit: Option<usize>) -> Result<Vec<Commit>
             .map_err(|e| format!("Failed to find commit: {}", e))?;
 
         let author = commit.author();
+        let email = author.email().unwrap_or("").to_string();
+
+        // Skip commits that don't match the author filter
+        if let Some(ref emails) = filter_emails {
+            if !emails.iter().any(|e| e == &email) {
+                continue;
+            }
+        }
+
         let message = commit
             .message()
             .unwrap_or("")
@@ -205,7 +225,7 @@ pub fn list_commits(repo_path: &str, limit: Option<usize>) -> Result<Vec<Commit>
             id: oid.to_string(),
             message,
             author: author.name().unwrap_or("Unknown").to_string(),
-            email: author.email().unwrap_or("").to_string(),
+            email,
             timestamp: author.when().seconds(),
         });
     }
@@ -2462,7 +2482,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         assert_eq!(commits.len(), 2);
         assert_eq!(commits[0].message, "Add file");
@@ -2474,7 +2494,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, Some(1)).expect("Should return commits");
+        let commits = list_commits(path, Some(1), None).expect("Should return commits");
 
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].message, "Add file");
@@ -2485,7 +2505,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         assert_eq!(commits[0].author, "Test User");
         assert_eq!(commits[0].email, "test@example.com");
@@ -2493,7 +2513,7 @@ mod tests {
 
     #[test]
     fn test_list_commits_invalid_path() {
-        let result = list_commits("/nonexistent/path", None);
+        let result = list_commits("/nonexistent/path", None, None);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to open repository"));
     }
@@ -2503,8 +2523,90 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let path = temp_dir.path().to_str().unwrap();
 
-        let result = list_commits(path, None);
+        let result = list_commits(path, None, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_commits_filters_by_author_email() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        // Add a commit by a different author
+        Command::new("git")
+            .args(["config", "user.email", "alice@example.com"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set git email");
+        Command::new("git")
+            .args(["config", "user.name", "Alice"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set git name");
+        std::fs::write(path.join("alice.txt"), "alice's file").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Alice's commit"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        let path_str = path.to_str().unwrap();
+
+        // Without filter: 3 commits (Alice + 2 from Test User)
+        let all = list_commits(path_str, None, None).expect("Should return commits");
+        assert_eq!(all.len(), 3);
+
+        // Filter to alice only
+        let alice_only = list_commits(
+            path_str,
+            None,
+            Some(vec!["alice@example.com".to_string()]),
+        )
+        .expect("Should return commits");
+        assert_eq!(alice_only.len(), 1);
+        assert_eq!(alice_only[0].message, "Alice's commit");
+        assert_eq!(alice_only[0].email, "alice@example.com");
+
+        // Filter to test@example.com only
+        let test_only = list_commits(
+            path_str,
+            None,
+            Some(vec!["test@example.com".to_string()]),
+        )
+        .expect("Should return commits");
+        assert_eq!(test_only.len(), 2);
+    }
+
+    #[test]
+    fn test_list_commits_author_filter_respects_limit() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // Both existing commits are by test@example.com — limit to 1
+        let result = list_commits(
+            path,
+            Some(1),
+            Some(vec!["test@example.com".to_string()]),
+        )
+        .expect("Should return commits");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message, "Add file");
+    }
+
+    #[test]
+    fn test_list_commits_author_filter_empty_vec_returns_all() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // Empty filter should behave like no filter
+        let result = list_commits(path, None, Some(vec![]))
+            .expect("Should return commits");
+        assert_eq!(result.len(), 2);
     }
 
     #[test]
@@ -2512,7 +2614,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         // SHA should be 40 hex characters
         assert_eq!(commits[0].id.len(), 40);
@@ -2524,7 +2626,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         // Timestamp should be a reasonable Unix timestamp (after 2020)
         assert!(commits[0].timestamp > 1577836800); // 2020-01-01
@@ -2537,7 +2639,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let latest_commit = &commits[0]; // "Add file" commit
 
         let files =
@@ -2554,7 +2656,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let initial_commit = &commits[1]; // "Initial commit"
 
         let files =
@@ -2584,7 +2686,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
         let modify_commit = &commits[0];
 
         let files =
@@ -2614,7 +2716,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
         let delete_commit = &commits[0];
 
         let files =
@@ -2650,7 +2752,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let commit_ids = vec![commits[1].id.clone(), commits[0].id.clone()];
 
         let files = get_commit_range_files(path, &commit_ids).expect("Should return changed files");
@@ -2678,7 +2780,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None).expect("Should return commits");
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
         let non_consecutive_ids = vec![commits[0].id.clone(), commits[2].id.clone()];
 
         let result = get_commit_range_files(path_str, &non_consecutive_ids);
@@ -2696,7 +2798,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let latest_commit = &commits[0]; // "Add file" commit
 
         let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
@@ -2737,7 +2839,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
 
         let diff =
             get_file_diff(path_str, &commits[0].id, "file.txt").expect("Should return diff");
@@ -2763,7 +2865,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let latest_commit = &commits[0];
 
         let result = get_file_diff(path, &latest_commit.id, "nonexistent.txt");
@@ -2776,7 +2878,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let latest_commit = &commits[0];
 
         let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
@@ -2828,7 +2930,7 @@ mod tests {
         let path = temp_dir.path();
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None).expect("Should return commits");
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
 
         // Checkout specific commit (detached HEAD)
         Command::new("git")
@@ -2898,7 +3000,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let add_commit = &commits[0]; // "Add file" commit
 
         let contents =
@@ -2928,7 +3030,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
 
         let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
             .expect("Should return contents");
@@ -2957,7 +3059,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1)).expect("Should return commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
 
         let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
             .expect("Should return contents");
@@ -2972,7 +3074,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         let result = get_file_contents(path, &commits[0].id, "nonexistent.txt");
         assert!(result.is_err());
@@ -4091,7 +4193,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None).expect("Should return commits");
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
 
         let full_message = get_commit_message(path_str, &commits[0].id)
             .expect("Should return full message");
@@ -4106,7 +4208,7 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
 
         let message = get_commit_message(path, &commits[0].id)
             .expect("Should return message");
@@ -4130,14 +4232,14 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let head_commit = &commits[0];
         assert_eq!(head_commit.message, "Add file");
 
         reword_commit(path, &head_commit.id, "Reworded message")
             .expect("Should reword HEAD commit");
 
-        let commits_after = list_commits(path, None).expect("Should return commits");
+        let commits_after = list_commits(path, None, None).expect("Should return commits");
         assert_eq!(commits_after[0].message, "Reworded message");
         // Other commits should be unchanged
         assert_eq!(commits_after[1].message, "Initial commit");
@@ -4163,7 +4265,7 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None).expect("Should return commits");
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 3);
         // commits[0] = "Third commit", commits[1] = "Add file", commits[2] = "Initial commit"
 
@@ -4171,7 +4273,7 @@ mod tests {
         reword_commit(path_str, &middle_commit_id, "Reworded middle")
             .expect("Should reword non-HEAD commit");
 
-        let commits_after = list_commits(path_str, None).expect("Should return commits");
+        let commits_after = list_commits(path_str, None, None).expect("Should return commits");
         assert_eq!(commits_after.len(), 3);
         assert_eq!(commits_after[0].message, "Third commit");
         assert_eq!(commits_after[1].message, "Reworded middle");
@@ -4188,13 +4290,13 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let files_before = get_commit_files(path, &commits[0].id).expect("Should get files");
 
         reword_commit(path, &commits[0].id, "New message")
             .expect("Should reword commit");
 
-        let commits_after = list_commits(path, None).expect("Should return commits");
+        let commits_after = list_commits(path, None, None).expect("Should return commits");
         let files_after = get_commit_files(path, &commits_after[0].id).expect("Should get files");
 
         assert_eq!(files_before.len(), files_after.len());
@@ -4215,14 +4317,14 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
 
-        let commits = list_commits(path, None).expect("Should return commits");
+        let commits = list_commits(path, None, None).expect("Should return commits");
         let root_commit = &commits[commits.len() - 1]; // "Initial commit"
         assert_eq!(root_commit.message, "Initial commit");
 
         reword_commit(path, &root_commit.id, "Reworded root")
             .expect("Should reword root commit");
 
-        let commits_after = list_commits(path, None).expect("Should return commits");
+        let commits_after = list_commits(path, None, None).expect("Should return commits");
         assert_eq!(commits_after[commits_after.len() - 1].message, "Reworded root");
         // All commits should have new IDs since root was rewritten
         assert_ne!(commits_after[0].id, commits[0].id);
@@ -4442,7 +4544,7 @@ mod tests {
         create_commit(path_str, "New commit message").expect("Should create commit");
 
         // New HEAD should have the correct message
-        let commits = list_commits(path_str, Some(1)).expect("Should list commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should list commits");
         assert_eq!(commits[0].message, "New commit message");
 
         // No staged changes should remain
@@ -4479,7 +4581,7 @@ mod tests {
         create_commit(path_str, message).expect("Should create commit");
 
         // Verify the full message is preserved
-        let commits = list_commits(path_str, Some(1)).expect("Should list commits");
+        let commits = list_commits(path_str, Some(1), None).expect("Should list commits");
         let full_message =
             get_commit_message(path_str, &commits[0].id).expect("Should get message");
         assert!(full_message.starts_with("Summary line\n\nDetailed body paragraph"));

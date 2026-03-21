@@ -27,7 +27,6 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
-  useAuthorFilter,
   useBehindCount,
   useChangesError,
   useCommits,
@@ -116,15 +115,8 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
 
-  const authorFilter = useAuthorFilter();
   const hasMoreCommits = useAppStore((state) => state.hasMoreCommits);
   const loadMoreCommits = useAppStore((state) => state.loadMoreCommits);
-
-  // Filter commits by selected authors (empty filter = show all)
-  const filteredCommits =
-    authorFilter.length > 0
-      ? commits.filter((c) => authorFilter.includes(c.email))
-      : commits;
 
   const isLoading =
     viewMode === "history" ? isLoadingCommits : isLoadingChanges;
@@ -137,22 +129,22 @@ export function Sidebar({ className }: SidebarProps) {
     if (viewMode !== "history" || isLoadingCommits || commitsError) {
       return;
     }
-    if (filteredCommits.length === 0) {
+    if (commits.length === 0) {
       return;
     }
 
     const hasValidSelection =
       selectedCommitIds.length > 0 &&
       selectedCommitIds.every((id) =>
-        filteredCommits.some((commit) => commit.id === id)
+        commits.some((commit) => commit.id === id)
       );
 
     if (!hasValidSelection) {
-      selectCommit(filteredCommits[0].id);
-      commitSelectionAnchorRef.current = filteredCommits[0].id;
+      selectCommit(commits[0].id);
+      commitSelectionAnchorRef.current = commits[0].id;
     }
   }, [
-    filteredCommits,
+    commits,
     selectedCommitIds,
     selectCommit,
     viewMode,
@@ -162,7 +154,7 @@ export function Sidebar({ className }: SidebarProps) {
 
   const commitSelectionAnchorRef = useRef<string | null>(null);
 
-  const commitIds = filteredCommits.map((commit) => commit.id);
+  const commitIds = commits.map((commit) => commit.id);
   const changesListModel = useWorkingChangesListModel(changes);
 
   const handleSelectItem = useCallback(
@@ -464,9 +456,9 @@ export function Sidebar({ className }: SidebarProps) {
         {viewMode === "history" &&
           !isLoading &&
           !error &&
-          filteredCommits.length > 0 && (
+          commits.length > 0 && (
             <CommitList
-              commits={filteredCommits}
+              commits={commits}
               contextMenuTargetId={contextMenuTargetId}
               getItemProps={getItemProps}
               isFocused={isFocused}
@@ -477,13 +469,9 @@ export function Sidebar({ className }: SidebarProps) {
             />
           )}
 
-        {viewMode === "history" &&
-          !isLoading &&
-          !error &&
-          hasMoreCommits &&
-          authorFilter.length === 0 && (
-            <LoadMoreSentinel onLoadMore={loadMoreCommits} />
-          )}
+        {viewMode === "history" && !isLoading && !error && hasMoreCommits && (
+          <LoadMoreSentinel onLoadMore={loadMoreCommits} />
+        )}
 
         {/* Changes mode: file list with staged/unstaged sections */}
         {viewMode === "changes" &&

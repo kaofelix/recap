@@ -4,8 +4,9 @@ use crate::git as git_service;
 pub fn list_commits(
     repo_path: String,
     limit: Option<usize>,
+    author_emails: Option<Vec<String>>,
 ) -> Result<Vec<git_service::Commit>, String> {
-    git_service::list_commits(&repo_path, limit)
+    git_service::list_commits(&repo_path, limit, author_emails)
 }
 
 #[tauri::command]

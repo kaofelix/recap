@@ -377,7 +377,21 @@ describe("Sidebar", () => {
     });
 
     it("filters commits when an author is selected", async () => {
-      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const aliceCommits = multiAuthorCommits.filter(
+        (c) => c.email === "alice@example.com"
+      );
+
+      mockInvoke.mockImplementation(
+        (command: unknown, args: Record<string, unknown>) => {
+          if (command === "list_commits") {
+            if (args.authorEmails) {
+              return Promise.resolve(aliceCommits);
+            }
+            return Promise.resolve(multiAuthorCommits);
+          }
+          return Promise.resolve([]);
+        }
+      );
       const user = userEvent.setup();
 
       useAppStore.setState({
@@ -409,12 +423,14 @@ describe("Sidebar", () => {
       });
       await user.click(screen.getByRole("menuitemcheckbox", { name: /Alice/ }));
 
-      // Only Alice's commits should be visible
+      // Backend re-fetches with filter — only Alice's commits
+      await waitFor(() => {
+        expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
+      });
       expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
       expect(
         screen.getByText("feat: alice's second change")
       ).toBeInTheDocument();
-      expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
     });
 
     it("filters author list by search input", async () => {
@@ -497,7 +513,21 @@ describe("Sidebar", () => {
     });
 
     it("shows all commits when filter is cleared", async () => {
-      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const aliceCommits = multiAuthorCommits.filter(
+        (c) => c.email === "alice@example.com"
+      );
+
+      mockInvoke.mockImplementation(
+        (command: unknown, args: Record<string, unknown>) => {
+          if (command === "list_commits") {
+            if (args.authorEmails) {
+              return Promise.resolve(aliceCommits);
+            }
+            return Promise.resolve(multiAuthorCommits);
+          }
+          return Promise.resolve([]);
+        }
+      );
 
       useAppStore.setState({
         repos: [
@@ -514,7 +544,7 @@ describe("Sidebar", () => {
         expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
       });
 
-      // Bob's commit should be hidden
+      // Bob's commit should be hidden (backend filtered)
       expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
 
       // Clear filter
@@ -522,7 +552,7 @@ describe("Sidebar", () => {
         useAppStore.getState().clearAuthorFilter();
       });
 
-      // All commits visible again
+      // All commits visible again (backend re-fetches without filter)
       await waitFor(() => {
         expect(screen.getByText("fix: bob's fix")).toBeInTheDocument();
       });

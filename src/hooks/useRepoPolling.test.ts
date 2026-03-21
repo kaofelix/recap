@@ -391,4 +391,59 @@ describe("useRepoPolling", () => {
     // 50 returned === 50 limit → might be more
     expect(useAppStore.getState().hasMoreCommits).toBe(true);
   });
+
+  it("passes authorFilter to list_commits when set", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      authorFilter: ["alice@example.com", "bob@example.com"],
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
+      repoPath: "/test/repo",
+      limit: 50,
+      authorEmails: ["alice@example.com", "bob@example.com"],
+    });
+  });
+
+  it("does not pass authorEmails when authorFilter is empty", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({ authorFilter: [] });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+
+    const repo = {
+      id: "1",
+      path: "/test/repo",
+      name: "repo",
+      addedAt: Date.now(),
+    };
+
+    renderHook(() => useRepoPolling(repo));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
+      repoPath: "/test/repo",
+      limit: 50,
+    });
+  });
 });

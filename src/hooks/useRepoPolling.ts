@@ -68,6 +68,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const isAppVisible = useAppVisibility();
   const viewMode = useAppStore((state) => state.viewMode);
   const commitLimit = useAppStore((state) => state.commitLimit);
+  const authorFilter = useAppStore((state) => state.authorFilter);
 
   // Store actions
   const setCommits = useAppStore((state) => state.setCommits);
@@ -105,11 +106,16 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       isInitialCommitsLoad.current = false;
     }
 
+    const listCommitsArgs: Record<string, unknown> = {
+      repoPath: selectedRepo.path,
+      limit: commitLimit,
+    };
+    if (authorFilter.length > 0) {
+      listCommitsArgs.authorEmails = authorFilter;
+    }
+
     try {
-      const result = await invoke<Commit[]>("list_commits", {
-        repoPath: selectedRepo.path,
-        limit: commitLimit,
-      });
+      const result = await invoke<Commit[]>("list_commits", listCommitsArgs);
       setCommits(result);
       setCommitsError(null);
       setHasMoreCommits(result.length >= commitLimit);
@@ -148,6 +154,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   }, [
     selectedRepo,
     commitLimit,
+    authorFilter,
     setCommits,
     setCommitsLoading,
     setCommitsError,

@@ -383,9 +383,12 @@ export const useAppStore = create<AppState>()(
             authorFilter: exists
               ? state.authorFilter.filter((e) => e !== email)
               : [...state.authorFilter, email],
+            commitLimit: 50,
+            hasMoreCommits: true,
           };
         }),
-      clearAuthorFilter: () => set({ authorFilter: [] }),
+      clearAuthorFilter: () =>
+        set({ authorFilter: [], commitLimit: 50, hasMoreCommits: true }),
       loadMoreCommits: () =>
         set((state) => {
           if (!state.hasMoreCommits) {
