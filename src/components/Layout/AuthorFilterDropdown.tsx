@@ -8,7 +8,7 @@ import {
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
 import { Check, Filter } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore, useAuthorFilter } from "../../store/appStore";
 import type { Commit } from "../../types/commit";
@@ -40,8 +40,22 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
   const toggleAuthorFilter = useAppStore((state) => state.toggleAuthorFilter);
   const clearAuthorFilter = useAppStore((state) => state.clearAuthorFilter);
 
+  const [search, setSearch] = useState("");
+
   const uniqueAuthors = useMemo(() => getUniqueAuthors(commits), [commits]);
   const hasActiveFilter = authorFilter.length > 0;
+
+  const filteredAuthors = useMemo(() => {
+    if (!search.trim()) {
+      return uniqueAuthors;
+    }
+    const query = search.toLowerCase();
+    return uniqueAuthors.filter(
+      (a) =>
+        a.name.toLowerCase().includes(query) ||
+        a.email.toLowerCase().includes(query)
+    );
+  }, [uniqueAuthors, search]);
 
   const handleClear = useCallback(
     (e: Event) => {
@@ -52,7 +66,13 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
   );
 
   return (
-    <Root>
+    <Root
+      onOpenChange={(open) => {
+        if (!open) {
+          setSearch("");
+        }
+      }}
+    >
       <Trigger asChild>
         <button
           className={cn(
@@ -86,6 +106,22 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
           )}
           sideOffset={4}
         >
+          <div className="px-2 py-1.5">
+            <input
+              className={cn(
+                "w-full rounded border border-panel-border bg-bg-primary px-2 py-1",
+                "text-text-primary text-xs placeholder:text-text-secondary/50",
+                "focus:border-accent-primary focus:outline-none"
+              )}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search authors…"
+              type="text"
+              value={search}
+            />
+          </div>
+          <Separator className="my-0.5 h-px bg-border-primary" />
+
           {hasActiveFilter && (
             <>
               <CheckboxItem
@@ -105,7 +141,7 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
             </>
           )}
 
-          {uniqueAuthors.map((author) => {
+          {filteredAuthors.map((author) => {
             const isSelected = authorFilter.includes(author.email);
             return (
               <CheckboxItem

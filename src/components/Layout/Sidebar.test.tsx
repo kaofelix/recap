@@ -417,6 +417,85 @@ describe("Sidebar", () => {
       expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
     });
 
+    it("filters author list by search input", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const user = userEvent.setup();
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("author-filter-button"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Alice/ })
+        ).toBeInTheDocument();
+      });
+
+      // Both authors visible
+      expect(
+        screen.getByRole("menuitemcheckbox", { name: /Bob/ })
+      ).toBeInTheDocument();
+
+      // Type in search
+      await user.type(screen.getByPlaceholderText("Search authors…"), "bob");
+
+      // Only Bob visible
+      expect(
+        screen.getByRole("menuitemcheckbox", { name: /Bob/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("menuitemcheckbox", { name: /Alice/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it("searches authors by email", async () => {
+      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      const user = userEvent.setup();
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("author-filter-button"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Alice/ })
+        ).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByPlaceholderText("Search authors…"), "alice@");
+
+      expect(
+        screen.getByRole("menuitemcheckbox", { name: /Alice/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("menuitemcheckbox", { name: /Bob/ })
+      ).not.toBeInTheDocument();
+    });
+
     it("shows all commits when filter is cleared", async () => {
       mockInvoke.mockResolvedValue(multiAuthorCommits);
 
