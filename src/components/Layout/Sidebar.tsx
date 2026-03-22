@@ -27,7 +27,6 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
-  useAuthorFilter,
   useBehindCount,
   useChangesError,
   useCommits,
@@ -116,7 +115,6 @@ export function Sidebar({ className }: SidebarProps) {
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
 
-  const authorFilter = useAuthorFilter();
   const hasMoreCommits = useAppStore((state) => state.hasMoreCommits);
   const loadMoreCommits = useAppStore((state) => state.loadMoreCommits);
 
@@ -467,7 +465,6 @@ export function Sidebar({ className }: SidebarProps) {
               onCommitClick={handleCommitClick}
               onCommitContextMenu={handleCommitContextMenu}
               selectedCommitIds={selectedCommitIds}
-              unpushedCount={authorFilter.length > 0 ? null : unpushedCount}
             />
           )}
 
@@ -725,8 +722,8 @@ interface CommitListProps {
     author: string;
     email: string;
     timestamp: number;
+    is_pushed: boolean;
   }[];
-  unpushedCount: number | null;
   selectedCommitIds: string[];
   isFocused: boolean;
   contextMenuTargetId: string | null;
@@ -749,7 +746,6 @@ interface CommitListProps {
 
 function CommitList({
   commits,
-  unpushedCount,
   selectedCommitIds,
   isFocused,
   contextMenuTargetId,
@@ -757,16 +753,13 @@ function CommitList({
   onCommitClick,
   onCommitContextMenu,
 }: CommitListProps) {
-  const hasDivider =
-    unpushedCount !== null &&
-    unpushedCount > 0 &&
-    unpushedCount < commits.length;
-
   return (
     <div className="space-y-1">
       {commits.map((commit, index) => {
-        const isUnpushed = unpushedCount !== null && index < unpushedCount;
-        const showDivider = hasDivider && index === unpushedCount;
+        const isUnpushed = !commit.is_pushed;
+        const prevCommit = index > 0 ? commits[index - 1] : null;
+        const showDivider =
+          commit.is_pushed && prevCommit !== null && !prevCommit.is_pushed;
         const itemProps = getItemProps(commit.id);
 
         return (

@@ -161,6 +161,8 @@ pub struct Commit {
     pub email: String,
     /// Unix timestamp of when the commit was authored
     pub timestamp: i64,
+    /// Whether this commit has been pushed to the upstream tracking branch
+    pub is_pushed: bool,
 }
 
 /// Lists commits from a git repository
@@ -191,6 +193,17 @@ pub fn list_commits(
     let limit = limit.unwrap_or(100);
     // Treat empty vec as no filter
     let filter_emails = author_emails.filter(|v| !v.is_empty());
+
+    // Resolve upstream OID to determine pushed/unpushed status
+    let upstream_oid = repo
+        .head()
+        .ok()
+        .filter(|h| h.is_branch())
+        .and_then(|h| h.shorthand().map(|s| s.to_string()))
+        .and_then(|name| repo.find_branch(&name, BranchType::Local).ok())
+        .and_then(|branch| branch.upstream().ok())
+        .and_then(|upstream| upstream.get().target());
+
     let mut commits = Vec::new();
 
     for oid_result in revwalk {
@@ -221,12 +234,23 @@ pub fn list_commits(
             .unwrap_or("")
             .to_string();
 
+        // A commit is pushed if it's an ancestor of (or equal to) the upstream tip
+        let is_pushed = upstream_oid
+            .map(|upstream| {
+                if oid == upstream {
+                    return true;
+                }
+                repo.graph_descendant_of(upstream, oid).unwrap_or(false)
+            })
+            .unwrap_or(false);
+
         commits.push(Commit {
             id: oid.to_string(),
             message,
             author: author.name().unwrap_or("Unknown").to_string(),
             email,
             timestamp: author.when().seconds(),
+            is_pushed,
         });
     }
 
@@ -2607,6 +2631,101 @@ mod tests {
         let result = list_commits(path, None, Some(vec![]))
             .expect("Should return commits");
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_list_commits_marks_unpushed_commits() {
+        let (local_dir, _remote_dir) = create_test_repo_with_remote();
+        let path = local_dir.path();
+        let path_str = path.to_str().unwrap();
+
+        // Add an unpushed commit
+        std::fs::write(path.join("unpushed.txt"), "local only").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Unpushed commit"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        assert_eq!(commits.len(), 2);
+
+        // First commit (most recent) is unpushed
+        assert_eq!(commits[0].message, "Unpushed commit");
+        assert_eq!(commits[0].is_pushed, false);
+
+        // Second commit (initial) is pushed
+        assert_eq!(commits[1].message, "Initial commit");
+        assert_eq!(commits[1].is_pushed, true);
+    }
+
+    #[test]
+    fn test_list_commits_all_pushed() {
+        let (local_dir, _remote_dir) = create_test_repo_with_remote();
+        let path_str = local_dir.path().to_str().unwrap();
+
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].is_pushed, true);
+    }
+
+    #[test]
+    fn test_list_commits_no_upstream_marks_all_unpushed() {
+        let temp_dir = create_test_repo();
+        let path_str = temp_dir.path().to_str().unwrap();
+
+        // No remote configured — all commits should be marked as not pushed
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        for commit in &commits {
+            assert_eq!(commit.is_pushed, false, "Commit '{}' should not be marked pushed without upstream", commit.message);
+        }
+    }
+
+    #[test]
+    fn test_list_commits_is_pushed_works_with_author_filter() {
+        let (local_dir, _remote_dir) = create_test_repo_with_remote();
+        let path = local_dir.path();
+        let path_str = path.to_str().unwrap();
+
+        // Add unpushed commit by a different author
+        Command::new("git")
+            .args(["config", "user.email", "alice@example.com"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set email");
+        Command::new("git")
+            .args(["config", "user.name", "Alice"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set name");
+        std::fs::write(path.join("alice.txt"), "alice's file").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Alice unpushed"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        // Add a pushed commit by alice (push everything, then add another unpushed one by test user)
+        // Actually simpler: just verify that alice's filtered commit has is_pushed = false
+        let alice_commits = list_commits(
+            path_str,
+            None,
+            Some(vec!["alice@example.com".to_string()]),
+        )
+        .expect("Should return commits");
+        assert_eq!(alice_commits.len(), 1);
+        assert_eq!(alice_commits[0].message, "Alice unpushed");
+        assert_eq!(alice_commits[0].is_pushed, false);
     }
 
     #[test]

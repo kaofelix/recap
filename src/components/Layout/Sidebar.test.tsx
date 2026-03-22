@@ -512,16 +512,31 @@ describe("Sidebar", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("does not show pushed/unpushed indicators when author filter is active", async () => {
-      const aliceCommits = multiAuthorCommits.filter(
-        (c) => c.email === "alice@example.com"
-      );
+    it("shows pushed/unpushed indicators correctly with author filter", async () => {
+      const aliceCommitsWithPushStatus = [
+        {
+          id: "commit-a",
+          message: "feat: alice's unpushed change",
+          author: "Alice",
+          email: "alice@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 600,
+          is_pushed: false,
+        },
+        {
+          id: "commit-c",
+          message: "feat: alice's pushed change",
+          author: "Alice",
+          email: "alice@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 1800,
+          is_pushed: true,
+        },
+      ];
 
       mockInvoke.mockImplementation(
         (command: unknown, args: Record<string, unknown>) => {
           if (command === "list_commits") {
             if (args.authorEmails) {
-              return Promise.resolve(aliceCommits);
+              return Promise.resolve(aliceCommitsWithPushStatus);
             }
             return Promise.resolve(multiAuthorCommits);
           }
@@ -544,11 +559,21 @@ describe("Sidebar", () => {
       renderWithPolling();
 
       await waitFor(() => {
-        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+        expect(
+          screen.getByText("feat: alice's unpushed change")
+        ).toBeInTheDocument();
       });
 
-      // Divider should not appear even though unpushedCount is 1
-      expect(screen.queryByTestId("push-divider")).not.toBeInTheDocument();
+      // Divider should appear between unpushed and pushed
+      expect(screen.getByTestId("push-divider")).toBeInTheDocument();
+
+      // Unpushed commit should be faded
+      const unpushedText = screen.getByText("feat: alice's unpushed change");
+      expect(unpushedText.parentElement).toHaveClass("opacity-65");
+
+      // Pushed commit should not be faded
+      const pushedText = screen.getByText("feat: alice's pushed change");
+      expect(pushedText.parentElement).not.toHaveClass("opacity-65");
     });
 
     it("shows all commits when filter is cleared", async () => {
@@ -681,6 +706,7 @@ describe("Sidebar", () => {
           author: "Test User",
           email: "test@example.com",
           timestamp: Math.floor(Date.now() / 1000) - 600,
+          is_pushed: false,
         },
         {
           id: "pushed-1",
@@ -688,6 +714,7 @@ describe("Sidebar", () => {
           author: "Test User",
           email: "test@example.com",
           timestamp: Math.floor(Date.now() / 1000) - 3600,
+          is_pushed: true,
         },
         {
           id: "pushed-2",
@@ -695,6 +722,7 @@ describe("Sidebar", () => {
           author: "Test User",
           email: "test@example.com",
           timestamp: Math.floor(Date.now() / 1000) - 7200,
+          is_pushed: true,
         },
       ];
 
@@ -734,6 +762,7 @@ describe("Sidebar", () => {
           author: "Test User",
           email: "test@example.com",
           timestamp: Math.floor(Date.now() / 1000) - 600,
+          is_pushed: false,
         },
         {
           id: "pushed-1",
@@ -741,6 +770,7 @@ describe("Sidebar", () => {
           author: "Test User",
           email: "test@example.com",
           timestamp: Math.floor(Date.now() / 1000) - 3600,
+          is_pushed: true,
         },
       ];
 

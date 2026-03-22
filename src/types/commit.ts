@@ -13,4 +13,6 @@ export interface Commit {
   email: string;
   /** Unix timestamp of when the commit was authored */
   timestamp: number;
+  /** Whether this commit has been pushed to the upstream tracking branch */
+  is_pushed: boolean;
 }
