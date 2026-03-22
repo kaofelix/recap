@@ -202,9 +202,11 @@ pub fn list_commits(
         .and_then(|h| h.shorthand().map(|s| s.to_string()))
         .and_then(|name| repo.find_branch(&name, BranchType::Local).ok())
         .and_then(|branch| branch.upstream().ok())
-        .and_then(|upstream| upstream.get().target());
+        .and_then(|upstream| upstream.into_reference().peel_to_commit().ok())
+        .map(|commit| commit.id());
 
     let mut commits = Vec::new();
+
     // Once we've seen the upstream OID, all subsequent commits in the revwalk
     // are ancestors of upstream and therefore pushed. This avoids calling
     // graph_descendant_of for every commit.
