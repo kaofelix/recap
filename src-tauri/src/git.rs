@@ -205,6 +205,11 @@ pub fn list_commits(
         .and_then(|upstream| upstream.get().target());
 
     let mut commits = Vec::new();
+    // Once we've seen the upstream OID, all subsequent commits in the revwalk
+    // are ancestors of upstream and therefore pushed. This avoids calling
+    // graph_descendant_of for every commit.
+    // No upstream → nothing is pushed (reached_upstream stays false).
+    let mut reached_upstream = false;
 
     for oid_result in revwalk {
         if commits.len() >= limit {
@@ -212,6 +217,15 @@ pub fn list_commits(
         }
 
         let oid = oid_result.map_err(|e| format!("Failed to get commit oid: {}", e))?;
+
+        if !reached_upstream {
+            if let Some(upstream) = upstream_oid {
+                if oid == upstream {
+                    reached_upstream = true;
+                }
+            }
+        }
+
         let commit = repo
             .find_commit(oid)
             .map_err(|e| format!("Failed to find commit: {}", e))?;
@@ -234,23 +248,13 @@ pub fn list_commits(
             .unwrap_or("")
             .to_string();
 
-        // A commit is pushed if it's an ancestor of (or equal to) the upstream tip
-        let is_pushed = upstream_oid
-            .map(|upstream| {
-                if oid == upstream {
-                    return true;
-                }
-                repo.graph_descendant_of(upstream, oid).unwrap_or(false)
-            })
-            .unwrap_or(false);
-
         commits.push(Commit {
             id: oid.to_string(),
             message,
             author: author.name().unwrap_or("Unknown").to_string(),
             email,
             timestamp: author.when().seconds(),
-            is_pushed,
+            is_pushed: reached_upstream,
         });
     }
 
