@@ -194,16 +194,22 @@ pub fn list_commits(
     // Treat empty vec as no filter
     let filter_emails = author_emails.filter(|v| !v.is_empty());
 
-    // Resolve upstream OID to determine pushed/unpushed status
-    let upstream_oid = repo
+    // Resolve the merge base between HEAD and upstream to determine pushed/unpushed.
+    // Using the merge base (instead of the upstream OID directly) handles diverged
+    // histories: the merge base is always in the local revwalk, even when the
+    // upstream has moved ahead with commits not in local history.
+    let pushed_boundary_oid = repo
         .head()
         .ok()
         .filter(|h| h.is_branch())
-        .and_then(|h| h.shorthand().map(|s| s.to_string()))
-        .and_then(|name| repo.find_branch(&name, BranchType::Local).ok())
-        .and_then(|branch| branch.upstream().ok())
-        .and_then(|upstream| upstream.into_reference().peel_to_commit().ok())
-        .map(|commit| commit.id());
+        .and_then(|head_ref| {
+            let head_oid = head_ref.target()?;
+            let branch_name = head_ref.shorthand()?.to_string();
+            let branch = repo.find_branch(&branch_name, BranchType::Local).ok()?;
+            let upstream = branch.upstream().ok()?;
+            let upstream_oid = upstream.into_reference().peel_to_commit().ok()?.id();
+            repo.merge_base(head_oid, upstream_oid).ok()
+        });
 
     let mut commits = Vec::new();
 
@@ -221,8 +227,8 @@ pub fn list_commits(
         let oid = oid_result.map_err(|e| format!("Failed to get commit oid: {}", e))?;
 
         if !reached_upstream {
-            if let Some(upstream) = upstream_oid {
-                if oid == upstream {
+            if let Some(boundary) = pushed_boundary_oid {
+                if oid == boundary {
                     reached_upstream = true;
                 }
             }
@@ -2678,6 +2684,79 @@ mod tests {
         let commits = list_commits(path_str, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].is_pushed, true);
+    }
+
+    #[test]
+    fn test_list_commits_marks_pushed_when_diverged() {
+        let (local_dir, remote_dir) = create_test_repo_with_remote();
+        let path = local_dir.path();
+        let path_str = path.to_str().unwrap();
+
+        // Add a local unpushed commit
+        std::fs::write(path.join("local.txt"), "local change").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Local unpushed"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        // Simulate a remote commit by pushing from a separate clone
+        let other_dir = TempDir::new().expect("Failed to create temp dir");
+        let remote_url = remote_dir.path().to_str().unwrap();
+        Command::new("git")
+            .args(["clone", remote_url, other_dir.path().to_str().unwrap()])
+            .output()
+            .expect("Failed to clone");
+        Command::new("git")
+            .args(["config", "user.email", "other@example.com"])
+            .current_dir(other_dir.path())
+            .output()
+            .expect("Failed to set email");
+        Command::new("git")
+            .args(["config", "user.name", "Other"])
+            .current_dir(other_dir.path())
+            .output()
+            .expect("Failed to set name");
+        std::fs::write(other_dir.path().join("remote.txt"), "remote change")
+            .expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(other_dir.path())
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Remote commit"])
+            .current_dir(other_dir.path())
+            .output()
+            .expect("Failed to commit");
+        Command::new("git")
+            .args(["push"])
+            .current_dir(other_dir.path())
+            .output()
+            .expect("Failed to push from other clone");
+
+        // Fetch in original repo so origin/main moves ahead
+        Command::new("git")
+            .args(["fetch"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to fetch");
+
+        // Now local is diverged: 1 local commit, 1 remote-only commit
+        // The merge base (Initial commit) should be marked pushed
+        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        assert_eq!(commits.len(), 2); // Local unpushed + Initial commit
+
+        assert_eq!(commits[0].message, "Local unpushed");
+        assert_eq!(commits[0].is_pushed, false);
+
+        assert_eq!(commits[1].message, "Initial commit");
+        assert_eq!(commits[1].is_pushed, true);
     }
 
     #[test]
