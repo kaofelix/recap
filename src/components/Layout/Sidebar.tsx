@@ -469,7 +469,10 @@ export function Sidebar({ className }: SidebarProps) {
           )}
 
         {viewMode === "history" && !isLoading && !error && hasMoreCommits && (
-          <LoadMoreSentinel onLoadMore={loadMoreCommits} />
+          <LoadMoreSentinel
+            currentCount={commits.length}
+            onLoadMore={loadMoreCommits}
+          />
         )}
 
         {/* Changes mode: file list with staged/unstaged sections */}
@@ -701,8 +704,25 @@ function ChangesFileList({
   );
 }
 
-function LoadMoreSentinel({ onLoadMore }: { onLoadMore: () => void }) {
-  const sentinelRef = useInView(onLoadMore);
+function LoadMoreSentinel({
+  onLoadMore,
+  currentCount,
+}: {
+  onLoadMore: () => void;
+  currentCount: number;
+}) {
+  const triggeredAtCountRef = useRef<number | null>(null);
+
+  const handleInView = useCallback(() => {
+    // Only trigger once per batch — wait until commit count changes
+    if (triggeredAtCountRef.current === currentCount) {
+      return;
+    }
+    triggeredAtCountRef.current = currentCount;
+    onLoadMore();
+  }, [onLoadMore, currentCount]);
+
+  const sentinelRef = useInView(handleInView);
 
   return (
     <div
