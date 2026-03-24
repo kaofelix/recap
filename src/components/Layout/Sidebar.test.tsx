@@ -635,8 +635,18 @@ describe("Sidebar", () => {
       },
     ];
     const uniqueAuthors = [
-      { name: "Alice", email: "alice@example.com" },
-      { name: "Bob", email: "bob@example.com" },
+      {
+        name: "Alice",
+        email: "alice@example.com",
+        commit_count: 2,
+        last_commit_timestamp: Math.floor(Date.now() / 1000) - 60,
+      },
+      {
+        name: "Bob",
+        email: "bob@example.com",
+        commit_count: 1,
+        last_commit_timestamp: Math.floor(Date.now() / 1000) - 120,
+      },
     ];
 
     it("shows a filter button in history mode", async () => {
@@ -754,6 +764,66 @@ describe("Sidebar", () => {
           screen.getByRole("menuitemcheckbox", { name: /Bob/ })
         ).toBeInTheDocument();
       });
+    });
+
+    it("groups recent contributors ahead of older contributors", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(multiAuthorCommits);
+        }
+        if (command === "list_authors") {
+          return Promise.resolve([
+            {
+              name: "Zelda",
+              email: "zelda@example.com",
+              commit_count: 50,
+              last_commit_timestamp:
+                Math.floor(Date.now() / 1000) - 45 * 24 * 60 * 60,
+            },
+            {
+              name: "Alice",
+              email: "alice@example.com",
+              commit_count: 2,
+              last_commit_timestamp: Math.floor(Date.now() / 1000) - 60,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const user = userEvent.setup();
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("author-filter-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Recent contributors")).toBeInTheDocument();
+        expect(screen.getByText("Older contributors")).toBeInTheDocument();
+      });
+
+      const items = screen.getAllByRole("menuitemcheckbox");
+      const aliceIndex = items.findIndex((item) =>
+        item.textContent?.includes("Alice")
+      );
+      const zeldaIndex = items.findIndex((item) =>
+        item.textContent?.includes("Zelda")
+      );
+
+      expect(aliceIndex).toBeGreaterThanOrEqual(0);
+      expect(zeldaIndex).toBeGreaterThanOrEqual(0);
+      expect(aliceIndex).toBeLessThan(zeldaIndex);
     });
 
     it("filters commits when an author is selected", async () => {

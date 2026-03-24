@@ -172,6 +172,10 @@ pub struct Author {
     pub name: String,
     /// The author's email
     pub email: String,
+    /// Total number of commits by this author in the current history
+    pub commit_count: usize,
+    /// Unix timestamp of this author's most recent commit
+    pub last_commit_timestamp: i64,
 }
 
 /// Lists unique authors from a git repository
@@ -196,18 +200,29 @@ pub fn list_authors(repo_path: &str) -> Result<Vec<Author>, String> {
             .map_err(|e| format!("Failed to find commit: {}", e))?;
         let author = commit.author();
         let email = author.email().unwrap_or("").to_string();
+        let timestamp = author.when().seconds();
 
-        authors.entry(email.clone()).or_insert_with(|| Author {
-            name: author.name().unwrap_or("Unknown").to_string(),
-            email,
-        });
+        authors
+            .entry(email.clone())
+            .and_modify(|existing| {
+                existing.commit_count += 1;
+                existing.last_commit_timestamp =
+                    existing.last_commit_timestamp.max(timestamp);
+            })
+            .or_insert_with(|| Author {
+                name: author.name().unwrap_or("Unknown").to_string(),
+                email,
+                commit_count: 1,
+                last_commit_timestamp: timestamp,
+            });
     }
 
     let mut authors: Vec<_> = authors.into_values().collect();
     authors.sort_by(|a, b| {
-        a.name
-            .to_lowercase()
-            .cmp(&b.name.to_lowercase())
+        b.last_commit_timestamp
+            .cmp(&a.last_commit_timestamp)
+            .then_with(|| b.commit_count.cmp(&a.commit_count))
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
             .then_with(|| a.email.to_lowercase().cmp(&b.email.to_lowercase()))
     });
 
@@ -2695,7 +2710,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_authors_returns_unique_authors_sorted_by_name() {
+    fn test_list_authors_returns_unique_authors_with_metadata() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path();
 
@@ -2721,13 +2736,46 @@ mod tests {
             .output()
             .expect("Failed to commit");
 
+        Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to reset git email");
+        Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to reset git name");
+        std::fs::write(path.join("follow-up.txt"), "follow up").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Follow-up commit"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
         let authors = list_authors(path.to_str().unwrap()).expect("Should return authors");
 
         assert_eq!(authors.len(), 2);
-        assert_eq!(authors[0].name, "Alice");
-        assert_eq!(authors[0].email, "alice@example.com");
-        assert_eq!(authors[1].name, "Test User");
-        assert_eq!(authors[1].email, "test@example.com");
+
+        let alice = authors
+            .iter()
+            .find(|author| author.email == "alice@example.com")
+            .expect("Alice should be present");
+        assert_eq!(alice.name, "Alice");
+        assert_eq!(alice.commit_count, 1);
+
+        let test_user = authors
+            .iter()
+            .find(|author| author.email == "test@example.com")
+            .expect("Test User should be present");
+        assert_eq!(test_user.name, "Test User");
+        assert_eq!(test_user.commit_count, 3);
+        assert!(test_user.last_commit_timestamp >= alice.last_commit_timestamp);
     }
 
     #[test]

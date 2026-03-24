@@ -20,6 +20,38 @@ import {
 interface AuthorOption {
   name: string;
   email: string;
+  commit_count: number;
+  last_commit_timestamp: number;
+}
+
+const RECENT_CONTRIBUTOR_DAYS = 30;
+const RECENT_CONTRIBUTOR_WINDOW_SECONDS =
+  RECENT_CONTRIBUTOR_DAYS * 24 * 60 * 60;
+
+function sortAuthors(authors: AuthorOption[]): AuthorOption[] {
+  return [...authors].sort((a, b) => {
+    if (a.last_commit_timestamp !== b.last_commit_timestamp) {
+      return b.last_commit_timestamp - a.last_commit_timestamp;
+    }
+    if (a.commit_count !== b.commit_count) {
+      return b.commit_count - a.commit_count;
+    }
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+}
+
+function isRecentContributor(author: AuthorOption, now: number): boolean {
+  return (
+    now - author.last_commit_timestamp <= RECENT_CONTRIBUTOR_WINDOW_SECONDS
+  );
+}
+
+function AuthorGroupLabel({ children }: { children: string }) {
+  return (
+    <div className="px-3 pt-2 pb-1 font-semibold text-[10px] text-text-secondary/70 uppercase tracking-wide">
+      {children}
+    </div>
+  );
 }
 
 export function AuthorFilterDropdown() {
@@ -64,16 +96,32 @@ export function AuthorFilterDropdown() {
 
   const hasActiveFilter = authorFilter.length > 0;
 
-  const filteredAuthors = useMemo(() => {
-    if (!search.trim()) {
-      return authors;
+  const { recentAuthors, olderAuthors } = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const matchingAuthors = query
+      ? authors.filter(
+          (author) =>
+            author.name.toLowerCase().includes(query) ||
+            author.email.toLowerCase().includes(query)
+        )
+      : authors;
+
+    const now = Math.floor(Date.now() / 1000);
+    const recent: AuthorOption[] = [];
+    const older: AuthorOption[] = [];
+
+    for (const author of matchingAuthors) {
+      if (isRecentContributor(author, now)) {
+        recent.push(author);
+      } else {
+        older.push(author);
+      }
     }
-    const query = search.toLowerCase();
-    return authors.filter(
-      (a) =>
-        a.name.toLowerCase().includes(query) ||
-        a.email.toLowerCase().includes(query)
-    );
+
+    return {
+      recentAuthors: sortAuthors(recent),
+      olderAuthors: sortAuthors(older),
+    };
   }, [authors, search]);
 
   const handleClear = useCallback(
@@ -83,6 +131,39 @@ export function AuthorFilterDropdown() {
     },
     [clearAuthorFilter]
   );
+
+  const renderAuthor = (author: AuthorOption) => {
+    const isSelected = authorFilter.includes(author.email);
+    return (
+      <CheckboxItem
+        checked={isSelected}
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 text-sm",
+          "cursor-pointer outline-none",
+          "hover:bg-bg-hover focus:bg-bg-hover",
+          "transition-colors",
+          isSelected ? "text-text-primary" : "text-text-secondary"
+        )}
+        key={author.email}
+        onSelect={(e) => {
+          e.preventDefault();
+          toggleAuthorFilter(author.email);
+        }}
+      >
+        <span className="flex h-4 w-4 items-center justify-center">
+          <ItemIndicator>
+            <Check className="h-4 w-4 text-accent-primary" />
+          </ItemIndicator>
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-text-primary">{author.name}</span>
+          <span className="truncate text-[10px] text-text-secondary">
+            {author.email}
+          </span>
+        </span>
+      </CheckboxItem>
+    );
+  };
 
   return (
     <Root
@@ -120,7 +201,7 @@ export function AuthorFilterDropdown() {
         <Content
           align="end"
           className={cn(
-            "max-h-[300px] min-w-[180px] overflow-y-auto rounded-md py-1 shadow-lg",
+            "max-h-[300px] min-w-[220px] overflow-y-auto rounded-md py-1 shadow-lg",
             "border border-border-primary bg-bg-primary",
             "fade-in-0 zoom-in-95 animate-in",
             "z-50"
@@ -162,40 +243,23 @@ export function AuthorFilterDropdown() {
             </>
           )}
 
-          {filteredAuthors.map((author) => {
-            const isSelected = authorFilter.includes(author.email);
-            return (
-              <CheckboxItem
-                checked={isSelected}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 text-sm",
-                  "cursor-pointer outline-none",
-                  "hover:bg-bg-hover focus:bg-bg-hover",
-                  "transition-colors",
-                  isSelected ? "text-text-primary" : "text-text-secondary"
-                )}
-                key={author.email}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  toggleAuthorFilter(author.email);
-                }}
-              >
-                <span className="flex h-4 w-4 items-center justify-center">
-                  <ItemIndicator>
-                    <Check className="h-4 w-4 text-accent-primary" />
-                  </ItemIndicator>
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-text-primary">
-                    {author.name}
-                  </span>
-                  <span className="truncate text-[10px] text-text-secondary">
-                    {author.email}
-                  </span>
-                </span>
-              </CheckboxItem>
-            );
-          })}
+          {recentAuthors.length > 0 && (
+            <>
+              <AuthorGroupLabel>Recent contributors</AuthorGroupLabel>
+              {recentAuthors.map(renderAuthor)}
+            </>
+          )}
+
+          {recentAuthors.length > 0 && olderAuthors.length > 0 && (
+            <Separator className="my-1 h-px bg-border-primary" />
+          )}
+
+          {olderAuthors.length > 0 && (
+            <>
+              <AuthorGroupLabel>Older contributors</AuthorGroupLabel>
+              {olderAuthors.map(renderAuthor)}
+            </>
+          )}
         </Content>
       </Portal>
     </Root>
