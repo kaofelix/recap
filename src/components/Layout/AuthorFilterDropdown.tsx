@@ -96,7 +96,7 @@ export function AuthorFilterDropdown() {
 
   const hasActiveFilter = authorFilter.length > 0;
 
-  const { recentAuthors, olderAuthors } = useMemo(() => {
+  const { selectedAuthors, recentAuthors, olderAuthors } = useMemo(() => {
     const query = search.trim().toLowerCase();
     const matchingAuthors = query
       ? authors.filter(
@@ -107,11 +107,14 @@ export function AuthorFilterDropdown() {
       : authors;
 
     const now = Math.floor(Date.now() / 1000);
+    const selected: AuthorOption[] = [];
     const recent: AuthorOption[] = [];
     const older: AuthorOption[] = [];
 
     for (const author of matchingAuthors) {
-      if (isRecentContributor(author, now)) {
+      if (authorFilter.includes(author.email)) {
+        selected.push(author);
+      } else if (isRecentContributor(author, now)) {
         recent.push(author);
       } else {
         older.push(author);
@@ -119,10 +122,11 @@ export function AuthorFilterDropdown() {
     }
 
     return {
+      selectedAuthors: sortAuthors(selected),
       recentAuthors: sortAuthors(recent),
       olderAuthors: sortAuthors(older),
     };
-  }, [authors, search]);
+  }, [authors, search, authorFilter]);
 
   const handleClear = useCallback(
     (e: Event) => {
@@ -242,6 +246,18 @@ export function AuthorFilterDropdown() {
               <Separator className="my-1 h-px bg-border-primary" />
             </>
           )}
+
+          {selectedAuthors.length > 0 && (
+            <>
+              <AuthorGroupLabel>Selected</AuthorGroupLabel>
+              {selectedAuthors.map(renderAuthor)}
+            </>
+          )}
+
+          {selectedAuthors.length > 0 &&
+            (recentAuthors.length > 0 || olderAuthors.length > 0) && (
+              <Separator className="my-1 h-px bg-border-primary" />
+            )}
 
           {recentAuthors.length > 0 && (
             <>

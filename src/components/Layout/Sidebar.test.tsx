@@ -826,6 +826,52 @@ describe("Sidebar", () => {
       expect(aliceIndex).toBeLessThan(zeldaIndex);
     });
 
+    it("pins selected authors above unselected authors", async () => {
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(multiAuthorCommits);
+        }
+        if (command === "list_authors") {
+          return Promise.resolve(uniqueAuthors);
+        }
+        return Promise.resolve([]);
+      });
+      const user = userEvent.setup();
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+        authorFilter: ["bob@example.com"],
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("author-filter-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Selected")).toBeInTheDocument();
+      });
+
+      const items = screen.getAllByRole("menuitemcheckbox");
+      const bobIndex = items.findIndex((item) =>
+        item.textContent?.includes("Bob")
+      );
+      const aliceIndex = items.findIndex((item) =>
+        item.textContent?.includes("Alice")
+      );
+
+      expect(bobIndex).toBeGreaterThanOrEqual(0);
+      expect(aliceIndex).toBeGreaterThanOrEqual(0);
+      expect(bobIndex).toBeLessThan(aliceIndex);
+    });
+
     it("filters commits when an author is selected", async () => {
       const aliceCommits = multiAuthorCommits.filter(
         (c) => c.email === "alice@example.com"
