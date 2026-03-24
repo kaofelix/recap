@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-24
+
+### Fixed
+
+- **More reliable commit avatars** — Commit history now resolves each author avatar once and reuses that result across matching commits, avoiding inconsistent cases where the same author showed an avatar in some rows and initials in others.
+
 ## [0.4.1] - 2026-03-24
 
 ### Fixed
