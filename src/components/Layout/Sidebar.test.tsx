@@ -22,6 +22,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.unmock("../../hooks/useRepoPolling");
 
 import type { ReactNode } from "react";
+import { __testing as gravatarTesting } from "../../hooks/useGravatar";
 // Import after unmocking
 import { useRepoPolling } from "../../hooks/useRepoPolling";
 import { useSelectedRepo } from "../../store/appStore";
@@ -60,6 +61,7 @@ function renderWithPollingAndFocus(region: "sidebar" | "files" | "diff") {
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    gravatarTesting.resetAvatarCache();
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
@@ -453,6 +455,22 @@ describe("Sidebar", () => {
   });
 
   it("shows a Gravatar avatar image for each commit", async () => {
+    const originalImage = globalThis.Image;
+
+    class SuccessfulImage {
+      onerror: null | (() => void) = null;
+      onload: null | (() => void) = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+    }
+
+    // @ts-expect-error test stub
+    globalThis.Image = SuccessfulImage;
+
     const mockCommits = [
       {
         id: "abc123def456abc123def456abc123def456abc1",
@@ -476,14 +494,31 @@ describe("Sidebar", () => {
 
     await waitFor(() => {
       expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+      const img = document.querySelector("img");
+      expect(img).toBeInTheDocument();
+      expect(img?.getAttribute("src")).toContain("gravatar.com/avatar/");
     });
 
-    const img = document.querySelector("img");
-    expect(img).toBeInTheDocument();
-    expect(img?.getAttribute("src")).toContain("gravatar.com/avatar/");
+    globalThis.Image = originalImage;
   });
 
   it("shows initial fallback when Gravatar image fails to load", async () => {
+    const originalImage = globalThis.Image;
+
+    class FailingImage {
+      onerror: null | (() => void) = null;
+      onload: null | (() => void) = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => {
+          this.onerror?.();
+        });
+      }
+    }
+
+    // @ts-expect-error test stub
+    globalThis.Image = FailingImage;
+
     const mockCommits = [
       {
         id: "abc123def456abc123def456abc123def456abc1",
@@ -507,17 +542,70 @@ describe("Sidebar", () => {
 
     await waitFor(() => {
       expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+      expect(screen.getByText("J")).toBeInTheDocument();
     });
 
-    const img = document.querySelector("img");
-    expect(img).not.toBeNull();
-    // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
-    fireEvent.error(img!);
-
-    // Should show initial letter fallback
-    expect(screen.getByText("J")).toBeInTheDocument();
-    // Image should be gone
     expect(document.querySelector("img")).toBeNull();
+
+    globalThis.Image = originalImage;
+  });
+
+  it("loads a shared avatar once for repeated commit authors", async () => {
+    const originalImage = globalThis.Image;
+    let imageLoadCount = 0;
+
+    class SuccessfulImage {
+      onerror: null | (() => void) = null;
+      onload: null | (() => void) = null;
+
+      set src(_value: string) {
+        imageLoadCount += 1;
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+    }
+
+    // @ts-expect-error test stub
+    globalThis.Image = SuccessfulImage;
+
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: first",
+        author: "Jane Doe",
+        email: "jane@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      },
+      {
+        id: "commit-b",
+        message: "feat: second",
+        author: "Jane Doe",
+        email: "jane@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 1800,
+      },
+    ];
+
+    mockInvoke.mockResolvedValue(mockCommits);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    await waitFor(() => {
+      expect(screen.getByText("feat: first")).toBeInTheDocument();
+      expect(screen.getByText("feat: second")).toBeInTheDocument();
+      expect(document.querySelectorAll("img")).toHaveLength(2);
+    });
+
+    expect(imageLoadCount).toBe(1);
+
+    globalThis.Image = originalImage;
   });
 
   describe("author filter", () => {

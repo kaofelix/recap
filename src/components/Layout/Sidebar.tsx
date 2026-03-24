@@ -11,13 +11,13 @@ import {
 } from "react";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
+import { useGravatar } from "../../hooks/useGravatar";
 import { useInView } from "../../hooks/useInView";
 import { useNavigableList } from "../../hooks/useNavigableList";
 import {
   isContextMenuKeyboardEvent,
   showHistoryContextMenu,
 } from "../../lib/contextMenuActions";
-import { gravatarUrl } from "../../lib/gravatar";
 import {
   buildSidebarHistoryItems,
   isUncommittedChangesItemId,
@@ -601,8 +601,9 @@ function CommitListItem({
     }
   };
 
-  const [imgError, setImgError] = useState(false);
-  const avatarSrc = gravatarUrl(commit.email);
+  const { isLoaded: hasLoadedAvatar, src: avatarSrc } = useGravatar(
+    commit.email
+  );
   const initial = (commit.author[0] ?? "?").toUpperCase();
 
   return (
@@ -623,20 +624,18 @@ function CommitListItem({
     >
       <div className="flex items-start gap-2">
         <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary">
-          {imgError ? (
-            <span className="font-medium text-[10px] text-text-secondary leading-none">
-              {initial}
-            </span>
-          ) : (
-            // biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError is a lifecycle event, not user interaction — Biome doesn't distinguish these
+          {hasLoadedAvatar ? (
             <img
               alt=""
               className="h-5 w-5 rounded-full"
               height={20}
-              onError={() => setImgError(true)}
               src={avatarSrc}
               width={20}
             />
+          ) : (
+            <span className="font-medium text-[10px] text-text-secondary leading-none">
+              {initial}
+            </span>
           )}
         </div>
 
