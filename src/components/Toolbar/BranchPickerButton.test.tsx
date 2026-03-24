@@ -350,6 +350,12 @@ describe("BranchPickerButton", () => {
 
     // Should show store's currentBranchName immediately (before fetch completes)
     expect(screen.getByText("develop")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(tauriMocks.invoke).toHaveBeenCalledWith("list_branches", {
+        repoPath: "/path/to/my-repo",
+      });
+    });
   });
 
   it("should show store branch name even before branches are fetched", async () => {
