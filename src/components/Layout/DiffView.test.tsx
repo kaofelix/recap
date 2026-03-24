@@ -852,17 +852,20 @@ describe("DiffView", () => {
         "data-split-view",
         "false"
       );
+      expect(localStorage.getItem("diff-view-mode")).toBe("split");
     });
 
     act(() => {
       commandEmitter.emit("layout.toggleDiffDisplayMode");
     });
 
-    expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
-      "data-split-view",
-      "false"
-    );
-    expect(localStorage.getItem("diff-view-mode")).toBe("split");
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+        "data-split-view",
+        "false"
+      );
+      expect(localStorage.getItem("diff-view-mode")).toBe("split");
+    });
   });
 
   it("disables view mode toggle for deleted files", async () => {
