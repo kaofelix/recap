@@ -77,6 +77,7 @@ describe("Sidebar", () => {
       isLoadingChanges: false,
       changesError: null,
       changedFiles: [],
+      authorFilter: [],
     });
   });
 
@@ -97,6 +98,7 @@ describe("Sidebar", () => {
         isLoadingChanges: false,
         changesError: null,
         changedFiles: [],
+        authorFilter: [],
       });
     });
   });
@@ -632,6 +634,10 @@ describe("Sidebar", () => {
         timestamp: Math.floor(Date.now() / 1000) - 1800,
       },
     ];
+    const uniqueAuthors = [
+      { name: "Alice", email: "alice@example.com" },
+      { name: "Bob", email: "bob@example.com" },
+    ];
 
     it("shows a filter button in history mode", async () => {
       mockInvoke.mockResolvedValue(multiAuthorCommits);
@@ -654,7 +660,15 @@ describe("Sidebar", () => {
     });
 
     it("shows unique authors when filter button is clicked", async () => {
-      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(multiAuthorCommits);
+        }
+        if (command === "list_authors") {
+          return Promise.resolve(uniqueAuthors);
+        }
+        return Promise.resolve([]);
+      });
       const user = userEvent.setup();
 
       useAppStore.setState({
@@ -684,6 +698,64 @@ describe("Sidebar", () => {
       });
     });
 
+    it("keeps the full author list available after filtering commits", async () => {
+      const aliceCommits = multiAuthorCommits.filter(
+        (c) => c.email === "alice@example.com"
+      );
+
+      mockInvoke.mockImplementation(
+        (command: unknown, args: Record<string, unknown>) => {
+          if (command === "list_commits") {
+            if (args.authorEmails) {
+              return Promise.resolve(aliceCommits);
+            }
+            return Promise.resolve(multiAuthorCommits);
+          }
+          if (command === "list_authors") {
+            return Promise.resolve(uniqueAuthors);
+          }
+          return Promise.resolve([]);
+        }
+      );
+      const user = userEvent.setup();
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        viewMode: "history",
+      });
+
+      renderWithPolling();
+
+      await waitFor(() => {
+        expect(screen.getByText("feat: alice's change")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("author-filter-button"));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Bob/ })
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("menuitemcheckbox", { name: /Alice/ }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("fix: bob's fix")).not.toBeInTheDocument();
+      });
+
+      await user.keyboard("{Escape}");
+      await user.click(screen.getByTestId("author-filter-button"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemcheckbox", { name: /Bob/ })
+        ).toBeInTheDocument();
+      });
+    });
+
     it("filters commits when an author is selected", async () => {
       const aliceCommits = multiAuthorCommits.filter(
         (c) => c.email === "alice@example.com"
@@ -696,6 +768,9 @@ describe("Sidebar", () => {
               return Promise.resolve(aliceCommits);
             }
             return Promise.resolve(multiAuthorCommits);
+          }
+          if (command === "list_authors") {
+            return Promise.resolve(uniqueAuthors);
           }
           return Promise.resolve([]);
         }
@@ -742,7 +817,15 @@ describe("Sidebar", () => {
     });
 
     it("filters author list by search input", async () => {
-      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(multiAuthorCommits);
+        }
+        if (command === "list_authors") {
+          return Promise.resolve(uniqueAuthors);
+        }
+        return Promise.resolve([]);
+      });
       const user = userEvent.setup();
 
       useAppStore.setState({
@@ -785,7 +868,15 @@ describe("Sidebar", () => {
     });
 
     it("searches authors by email", async () => {
-      mockInvoke.mockResolvedValue(multiAuthorCommits);
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(multiAuthorCommits);
+        }
+        if (command === "list_authors") {
+          return Promise.resolve(uniqueAuthors);
+        }
+        return Promise.resolve([]);
+      });
       const user = userEvent.setup();
 
       useAppStore.setState({

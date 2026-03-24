@@ -10,6 +10,11 @@ pub fn list_commits(
 }
 
 #[tauri::command]
+pub fn list_authors(repo_path: String) -> Result<Vec<git_service::Author>, String> {
+    git_service::list_authors(&repo_path)
+}
+
+#[tauri::command]
 pub fn get_commit_files(
     repo_path: String,
     commit_id: String,

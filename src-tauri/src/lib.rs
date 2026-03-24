@@ -46,6 +46,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::errors::report_frontend_error,
             commands::git::list_commits,
+            commands::git::list_authors,
             commands::git::get_commit_files,
             commands::git::get_commit_range_files,
             commands::git::get_file_diff,

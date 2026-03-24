@@ -290,7 +290,9 @@ export function Sidebar({ className }: SidebarProps) {
           <h2 className="font-semibold text-sm text-text-primary">History</h2>
           <AheadBehindBadge ahead={unpushedCount} behind={behindCount} />
         </div>
-        {commits.length > 0 && <AuthorFilterDropdown commits={commits} />}
+        {commits.length > 0 && (
+          <AuthorFilterDropdown key={selectedRepo?.path ?? "no-repo"} />
+        )}
       </div>
 
       <div {...containerProps} className="flex-1 overflow-auto p-2">

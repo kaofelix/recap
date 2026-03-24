@@ -165,6 +165,55 @@ pub struct Commit {
     pub is_pushed: bool,
 }
 
+/// Represents a unique commit author
+#[derive(Debug, Clone, Serialize)]
+pub struct Author {
+    /// The author's name
+    pub name: String,
+    /// The author's email
+    pub email: String,
+}
+
+/// Lists unique authors from a git repository
+pub fn list_authors(repo_path: &str) -> Result<Vec<Author>, String> {
+    let repo =
+        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+
+    let mut revwalk =
+        repo.revwalk()
+            .map_err(|e| format!("Failed to create revwalk: {}", e))?;
+
+    revwalk
+        .push_head()
+        .map_err(|e| format!("Failed to push HEAD: {}", e))?;
+
+    let mut authors = std::collections::HashMap::<String, Author>::new();
+
+    for oid_result in revwalk {
+        let oid = oid_result.map_err(|e| format!("Failed to get commit oid: {}", e))?;
+        let commit = repo
+            .find_commit(oid)
+            .map_err(|e| format!("Failed to find commit: {}", e))?;
+        let author = commit.author();
+        let email = author.email().unwrap_or("").to_string();
+
+        authors.entry(email.clone()).or_insert_with(|| Author {
+            name: author.name().unwrap_or("Unknown").to_string(),
+            email,
+        });
+    }
+
+    let mut authors: Vec<_> = authors.into_values().collect();
+    authors.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then_with(|| a.email.to_lowercase().cmp(&b.email.to_lowercase()))
+    });
+
+    Ok(authors)
+}
+
 /// Lists commits from a git repository
 ///
 /// # Arguments
@@ -2643,6 +2692,42 @@ mod tests {
         let result = list_commits(path, None, Some(vec![]))
             .expect("Should return commits");
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_list_authors_returns_unique_authors_sorted_by_name() {
+        let temp_dir = create_test_repo();
+        let path = temp_dir.path();
+
+        Command::new("git")
+            .args(["config", "user.email", "alice@example.com"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set git email");
+        Command::new("git")
+            .args(["config", "user.name", "Alice"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to set git name");
+        std::fs::write(path.join("alice.txt"), "alice's file").expect("Failed to write");
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()
+            .expect("Failed to add");
+        Command::new("git")
+            .args(["commit", "-m", "Alice's commit"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to commit");
+
+        let authors = list_authors(path.to_str().unwrap()).expect("Should return authors");
+
+        assert_eq!(authors.len(), 2);
+        assert_eq!(authors[0].name, "Alice");
+        assert_eq!(authors[0].email, "alice@example.com");
+        assert_eq!(authors[1].name, "Test User");
+        assert_eq!(authors[1].email, "test@example.com");
     }
 
     #[test]

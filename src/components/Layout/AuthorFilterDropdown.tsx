@@ -7,55 +7,74 @@ import {
   Separator,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
+import { invoke } from "@tauri-apps/api/core";
 import { Check, Filter } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
-import { useAppStore, useAuthorFilter } from "../../store/appStore";
-import type { Commit } from "../../types/commit";
+import {
+  useAppStore,
+  useAuthorFilter,
+  useSelectedRepo,
+} from "../../store/appStore";
 
-export interface AuthorFilterDropdownProps {
-  commits: Commit[];
-}
-
-interface UniqueAuthor {
+interface AuthorOption {
   name: string;
   email: string;
 }
 
-function getUniqueAuthors(commits: Commit[]): UniqueAuthor[] {
-  const seen = new Map<string, UniqueAuthor>();
-  for (const commit of commits) {
-    if (!seen.has(commit.email)) {
-      seen.set(commit.email, { name: commit.author, email: commit.email });
-    }
-  }
-  // Sort alphabetically by name
-  return [...seen.values()].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-  );
-}
-
-export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
+export function AuthorFilterDropdown() {
+  const selectedRepo = useSelectedRepo();
+  const selectedRepoPath = selectedRepo?.path ?? null;
   const authorFilter = useAuthorFilter();
   const toggleAuthorFilter = useAppStore((state) => state.toggleAuthorFilter);
   const clearAuthorFilter = useAppStore((state) => state.clearAuthorFilter);
 
+  const [authors, setAuthors] = useState<AuthorOption[]>([]);
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const uniqueAuthors = useMemo(() => getUniqueAuthors(commits), [commits]);
+  useEffect(() => {
+    if (!(open && selectedRepoPath)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAuthors = async () => {
+      try {
+        const result = await invoke<AuthorOption[]>("list_authors", {
+          repoPath: selectedRepoPath,
+        });
+        if (!cancelled) {
+          setAuthors(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthors([]);
+        }
+      }
+    };
+
+    loadAuthors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedRepoPath]);
+
   const hasActiveFilter = authorFilter.length > 0;
 
   const filteredAuthors = useMemo(() => {
     if (!search.trim()) {
-      return uniqueAuthors;
+      return authors;
     }
     const query = search.toLowerCase();
-    return uniqueAuthors.filter(
+    return authors.filter(
       (a) =>
         a.name.toLowerCase().includes(query) ||
         a.email.toLowerCase().includes(query)
     );
-  }, [uniqueAuthors, search]);
+  }, [authors, search]);
 
   const handleClear = useCallback(
     (e: Event) => {
@@ -67,11 +86,13 @@ export function AuthorFilterDropdown({ commits }: AuthorFilterDropdownProps) {
 
   return (
     <Root
-      onOpenChange={(open) => {
-        if (!open) {
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
           setSearch("");
         }
       }}
+      open={open}
     >
       <Trigger asChild>
         <button
