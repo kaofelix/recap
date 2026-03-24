@@ -22,6 +22,13 @@ describe("FileList", () => {
       selectedRepoId: null,
       selectedCommitId: null,
       selectedCommitIds: [],
+      selectedFilePath: null,
+      selectedChangeId: null,
+      viewMode: "history",
+      workingChanges: [],
+      isLoadingChanges: false,
+      changesError: null,
+      changedFiles: [],
     });
   });
 
@@ -33,6 +40,13 @@ describe("FileList", () => {
         selectedRepoId: null,
         selectedCommitId: null,
         selectedCommitIds: [],
+        selectedFilePath: null,
+        selectedChangeId: null,
+        viewMode: "history",
+        workingChanges: [],
+        isLoadingChanges: false,
+        changesError: null,
+        changedFiles: [],
       });
     });
   });
@@ -65,6 +79,79 @@ describe("FileList", () => {
     render(<FileList />);
 
     expect(screen.getByText("Loading files...")).toBeInTheDocument();
+  });
+
+  it("keeps the files title when showing uncommitted changes", async () => {
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      viewMode: "changes",
+      workingChanges: [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged",
+        },
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged",
+        },
+      ],
+      changedFiles: [
+        {
+          path: "src/staged.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged",
+        },
+        {
+          path: "src/unstaged.ts",
+          staged_status: null,
+          unstaged_status: "Untracked",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 20,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged",
+        },
+      ],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
+      expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Uncommitted changes" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("staged.ts")).toBeInTheDocument();
+    expect(screen.getByText("unstaged.ts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Commit…" })).toBeInTheDocument();
   });
 
   it("displays changed files when loaded successfully", async () => {

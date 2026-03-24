@@ -9,20 +9,33 @@ import {
 } from "react";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
+import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
 import { useNavigableList } from "../../hooks/useNavigableList";
+import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import {
   isContextMenuKeyboardEvent,
+  showChangesContextMenu,
   showFileContextMenu,
 } from "../../lib/contextMenuActions";
 import { cn } from "../../lib/utils";
+import type {
+  WorkingChangeItem,
+  WorkingChangesListModel,
+} from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useChangesError,
+  useIsLoadingChanges,
+  useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
+  useViewMode,
+  useWorkingChanges,
 } from "../../store/appStore";
 import type { ChangedFile } from "../../types/file";
+import { CreateCommitEditor } from "./CreateCommitEditor";
 import { FileListItem } from "./FileListItem";
 
 export interface FileListProps {
@@ -156,7 +169,7 @@ function useCommitFiles(): UseCommitFilesResult {
   return { files, isLoading, error };
 }
 
-function FileListContent({
+function CommitFileListContent({
   hasCommit,
   isLoading,
   error,
@@ -165,7 +178,7 @@ function FileListContent({
   getItemProps,
   isFocused,
   onContextMenu,
-  contextMenuTargetPath,
+  contextMenuTargetId,
 }: {
   hasCommit: boolean;
   isLoading: boolean;
@@ -182,7 +195,7 @@ function FileListContent({
     event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
     filePath: string
   ) => void;
-  contextMenuTargetPath: string | null;
+  contextMenuTargetId: string | null;
 }) {
   if (!hasCommit) {
     return (
@@ -232,7 +245,7 @@ function FileListContent({
         return (
           <FileListItem
             file={file}
-            isContextMenuTarget={contextMenuTargetPath === file.path}
+            isContextMenuTarget={contextMenuTargetId === file.path}
             isFocused={isFocused}
             isSelected={selectedFilePath === file.path}
             itemId={itemProps["data-item-id"]}
@@ -251,14 +264,196 @@ function FileListContent({
   );
 }
 
+function ChangesSectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="mb-1 flex items-center justify-between border-panel-border/50 border-b px-2 py-1">
+      <span className="font-medium text-text-secondary text-xs">{title}</span>
+      {actionLabel && onAction && (
+        <button
+          className="text-[10px] text-text-secondary hover:text-text-primary"
+          onClick={onAction}
+          type="button"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function WorkingChangesContent({
+  hasRepo,
+  isLoading,
+  error,
+  model,
+  selectedId,
+  getItemProps,
+  isFocused,
+  onContextMenu,
+  contextMenuTargetId,
+  onSectionAction,
+}: {
+  hasRepo: boolean;
+  isLoading: boolean;
+  error: string | null;
+  model: WorkingChangesListModel;
+  selectedId: string | null;
+  isFocused: boolean;
+  getItemProps: (id: string) => {
+    "aria-selected": boolean;
+    "data-item-id": string;
+    onClick: () => void;
+  };
+  onContextMenu: (
+    event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
+    item: WorkingChangeItem
+  ) => void;
+  contextMenuTargetId: string | null;
+  onSectionAction?: (section: "staged" | "unstaged") => void;
+}) {
+  if (!hasRepo) {
+    return (
+      <div className="py-8 text-center text-sm text-text-secondary">
+        Select a repository to view changed files
+      </div>
+    );
+  }
+
+  if (isLoading && model.items.length === 0) {
+    return (
+      <div className="py-8 text-center text-sm text-text-secondary">
+        Loading changes...
+      </div>
+    );
+  }
+
+  if (error && model.items.length === 0) {
+    return (
+      <div className="py-8 text-center text-red-500 text-sm">
+        Error: {error}
+      </div>
+    );
+  }
+
+  if (model.items.length === 0) {
+    return (
+      <div className="py-8 text-center text-sm text-text-secondary">
+        No changes here... ✓
+      </div>
+    );
+  }
+
+  const renderItems = (items: WorkingChangesListModel["items"]) => (
+    <div className="space-y-0.5">
+      {items.map((item) => {
+        const itemProps = getItemProps(item.id);
+        return (
+          <FileListItem
+            file={item.file}
+            isContextMenuTarget={contextMenuTargetId === item.id}
+            isFocused={isFocused}
+            isSelected={selectedId === item.id}
+            itemId={itemProps["data-item-id"]}
+            key={item.id}
+            onClick={itemProps.onClick}
+            onContextMenu={(event) => onContextMenu(event, item)}
+            onKeyDown={(event) => {
+              if (isContextMenuKeyboardEvent(event)) {
+                onContextMenu(event, item);
+              }
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {model.sections.map((section) => {
+        const actionLabel =
+          section.section === "staged" ? "Unstage All" : "Stage All";
+        const handleAction = onSectionAction
+          ? () => onSectionAction(section.section)
+          : undefined;
+
+        if (section.section !== "unstaged") {
+          return (
+            <div key={section.section}>
+              <ChangesSectionHeader
+                actionLabel={actionLabel}
+                onAction={handleAction}
+                title={section.title}
+              />
+              {renderItems(section.items)}
+            </div>
+          );
+        }
+
+        const trackedItems = section.items.filter(
+          (item) => item.file.unstaged_status !== "Untracked"
+        );
+        const untrackedItems = section.items.filter(
+          (item) => item.file.unstaged_status === "Untracked"
+        );
+
+        return (
+          <div key={section.section}>
+            <ChangesSectionHeader
+              actionLabel={actionLabel}
+              onAction={handleAction}
+              title={section.title}
+            />
+
+            {trackedItems.length > 0 && renderItems(trackedItems)}
+
+            {untrackedItems.length > 0 && (
+              <div className="mt-2">
+                <ChangesSectionHeader
+                  title={`Untracked (${untrackedItems.length})`}
+                />
+                {renderItems(untrackedItems)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function FileList({ className }: FileListProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
+  const selectedChangeId = useSelectedChangeId();
+  const viewMode = useViewMode();
   const selectFile = useAppStore((state) => state.selectFile);
+  const selectChange = useAppStore((state) => state.selectChange);
+  const bumpWorkingChangesRevision = useAppStore(
+    (state) => state.bumpWorkingChangesRevision
+  );
   const { files, isLoading, error } = useCommitFiles();
+  const workingChanges = useWorkingChanges();
+  const isLoadingChanges = useIsLoadingChanges();
+  const changesError = useChangesError();
+  const workingChangesModel = useWorkingChangesListModel(workingChanges);
+  const effectiveSelectedChangeId = useEffectiveSelectedChangeId(
+    selectedChangeId,
+    workingChangesModel
+  );
   const isFocused = useIsFocused();
+  const [commitFormOpen, setCommitFormOpen] = useState(false);
+
   let activeCommitIds: string[] = [];
   if (selectedCommitIds.length > 0) {
     activeCommitIds = selectedCommitIds;
@@ -267,24 +462,30 @@ export function FileList({ className }: FileListProps) {
   }
 
   const isMultiCommitSelection = activeCommitIds.length > 1;
+  const isShowingWorkingChanges = viewMode === "changes";
+  const hasStagedChanges = workingChanges.some((c) => c.section === "staged");
 
-  const itemIds = files.map((file) => file.path);
+  const itemIds = isShowingWorkingChanges
+    ? workingChangesModel.items.map((item) => item.id)
+    : files.map((file) => file.path);
   const effectiveSelectedFilePath = selectedFilePath ?? files[0]?.path ?? null;
 
   const { containerProps, getItemProps } = useNavigableList({
     itemIds,
-    onSelect: selectFile,
-    selectedId: effectiveSelectedFilePath,
+    onSelect: isShowingWorkingChanges ? selectChange : selectFile,
+    selectedId: isShowingWorkingChanges
+      ? effectiveSelectedChangeId
+      : effectiveSelectedFilePath,
   });
 
   const { setOpen: setContextMenuOpen, setClosed: setContextMenuClosed } =
     useContextMenuState();
 
-  const [contextMenuTargetPath, setContextMenuTargetPath] = useState<
-    string | null
-  >(null);
+  const [contextMenuTargetId, setContextMenuTargetId] = useState<string | null>(
+    null
+  );
 
-  const handleContextMenu = useCallback(
+  const handleCommitFileContextMenu = useCallback(
     (
       event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
       filePath: string
@@ -294,7 +495,7 @@ export function FileList({ className }: FileListProps) {
       }
       event.preventDefault();
       setContextMenuOpen();
-      setContextMenuTargetPath(filePath);
+      setContextMenuTargetId(filePath);
       const element = event.currentTarget;
       showFileContextMenu({
         repoPath: selectedRepo.path,
@@ -302,8 +503,7 @@ export function FileList({ className }: FileListProps) {
         event,
         element,
         onClose: () => {
-          // Only clear if this menu's target is still the active one
-          setContextMenuTargetPath((current) => {
+          setContextMenuTargetId((current) => {
             if (current === filePath) {
               setContextMenuClosed();
               return null;
@@ -316,6 +516,71 @@ export function FileList({ className }: FileListProps) {
     [selectedRepo, setContextMenuOpen, setContextMenuClosed]
   );
 
+  const handleWorkingChangesContextMenu = useCallback(
+    (
+      event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
+      item: WorkingChangeItem
+    ) => {
+      if (!selectedRepo) {
+        return;
+      }
+      event.preventDefault();
+      setContextMenuOpen();
+      setContextMenuTargetId(item.id);
+      const element = event.currentTarget;
+      showChangesContextMenu({
+        repoPath: selectedRepo.path,
+        filePath: item.path,
+        section: item.section,
+        event,
+        element,
+        onWorkingChangesModified: bumpWorkingChangesRevision,
+        onClose: () => {
+          setContextMenuTargetId((current) => {
+            if (current === item.id) {
+              setContextMenuClosed();
+              return null;
+            }
+            return current;
+          });
+        },
+      });
+    },
+    [
+      selectedRepo,
+      setContextMenuOpen,
+      setContextMenuClosed,
+      bumpWorkingChangesRevision,
+    ]
+  );
+
+  const handleSectionAction = useCallback(
+    async (section: "staged" | "unstaged") => {
+      if (!selectedRepo) {
+        return;
+      }
+      try {
+        if (section === "staged") {
+          await invoke("unstage_all", { repoPath: selectedRepo.path });
+        } else {
+          await invoke("stage_all", { repoPath: selectedRepo.path });
+        }
+        bumpWorkingChangesRevision();
+      } catch (err) {
+        console.error(
+          `Failed to ${section === "staged" ? "unstage" : "stage"} all:`,
+          err
+        );
+      }
+    },
+    [selectedRepo, bumpWorkingChangesRevision]
+  );
+
+  const headerTitle = "Files";
+  const itemCount = isShowingWorkingChanges
+    ? workingChangesModel.items.length
+    : files.length;
+
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
       <div
@@ -327,33 +592,79 @@ export function FileList({ className }: FileListProps) {
         )}
       >
         <h2 className="shrink-0 font-semibold text-sm text-text-primary">
-          Files
+          {headerTitle}
         </h2>
-        {files.length > 0 && (
+        {itemCount > 0 && (
           <span className="shrink-0 text-text-secondary text-xs">
-            ({files.length})
+            ({itemCount})
           </span>
         )}
-        {isMultiCommitSelection && (
+        {!isShowingWorkingChanges && isMultiCommitSelection && (
           <span className="min-w-0 truncate text-text-secondary text-xs">
             Showing changes from {activeCommitIds.length} commits
           </span>
         )}
       </div>
 
-      <div {...containerProps} className="flex-1 overflow-auto p-2">
-        <FileListContent
-          contextMenuTargetPath={contextMenuTargetPath}
-          error={error}
-          files={files}
-          getItemProps={getItemProps}
-          hasCommit={!!selectedCommitId}
-          isFocused={isFocused}
-          isLoading={isLoading}
-          onContextMenu={handleContextMenu}
-          selectedFilePath={effectiveSelectedFilePath}
-        />
+      <div {...containerProps} className="min-h-0 flex-1 overflow-auto p-2">
+        {isShowingWorkingChanges ? (
+          <WorkingChangesContent
+            contextMenuTargetId={contextMenuTargetId}
+            error={changesError}
+            getItemProps={getItemProps}
+            hasRepo={!!selectedRepo}
+            isFocused={isFocused}
+            isLoading={isLoadingChanges}
+            model={workingChangesModel}
+            onContextMenu={handleWorkingChangesContextMenu}
+            onSectionAction={handleSectionAction}
+            selectedId={effectiveSelectedChangeId}
+          />
+        ) : (
+          <CommitFileListContent
+            contextMenuTargetId={contextMenuTargetId}
+            error={error}
+            files={files}
+            getItemProps={getItemProps}
+            hasCommit={!!selectedCommitId}
+            isFocused={isFocused}
+            isLoading={isLoading}
+            onContextMenu={handleCommitFileContextMenu}
+            selectedFilePath={effectiveSelectedFilePath}
+          />
+        )}
       </div>
+
+      {isShowingWorkingChanges && selectedRepo && hasStagedChanges && (
+        <>
+          {!commitFormOpen && (
+            <button
+              className={cn(
+                "flex w-full items-center justify-center gap-1 py-1.5",
+                "border-panel-border border-t",
+                "bg-panel-header-bg",
+                "font-medium text-text-secondary text-xs",
+                "hover:text-text-primary"
+              )}
+              data-testid="commit-form-toggle"
+              onClick={() => setCommitFormOpen(true)}
+              type="button"
+            >
+              Commit…
+            </button>
+          )}
+          {commitFormOpen && (
+            <CreateCommitEditor
+              onCancel={() => setCommitFormOpen(false)}
+              onCommitted={() => {
+                setCommitFormOpen(false);
+                bumpWorkingChangesRevision();
+              }}
+              repoPath={selectedRepo.path}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

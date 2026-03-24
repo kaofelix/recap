@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
+import { PencilLine } from "lucide-react";
 import {
   type KeyboardEvent,
   type MouseEvent,
@@ -10,30 +11,27 @@ import {
 } from "react";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
-import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
 import { useInView } from "../../hooks/useInView";
 import { useNavigableList } from "../../hooks/useNavigableList";
-import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import {
   isContextMenuKeyboardEvent,
-  showChangesContextMenu,
   showHistoryContextMenu,
 } from "../../lib/contextMenuActions";
 import { gravatarUrl } from "../../lib/gravatar";
+import {
+  buildSidebarHistoryItems,
+  isUncommittedChangesItemId,
+  type SidebarHistoryItem,
+  UNCOMMITTED_CHANGES_ITEM_ID,
+} from "../../lib/sidebarHistoryList";
 import { cn } from "../../lib/utils";
-import type {
-  WorkingChangeItem,
-  WorkingChangesListModel,
-} from "../../lib/workingChangesList";
+import { buildWorkingChangesListModel } from "../../lib/workingChangesList";
 import {
   useAppStore,
   useBehindCount,
-  useChangesError,
   useCommits,
   useCommitsError,
-  useIsLoadingChanges,
   useIsLoadingCommits,
-  useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedRepo,
@@ -42,32 +40,20 @@ import {
   useWorkingChanges,
 } from "../../store/appStore";
 import { AuthorFilterDropdown } from "./AuthorFilterDropdown";
-import { CreateCommitEditor } from "./CreateCommitEditor";
-import { FileListItem } from "./FileListItem";
 import { RewriteMessageEditor } from "./RewriteMessageEditor";
 
 export interface SidebarProps {
   className?: string;
 }
 
-/**
- * Format a Unix timestamp as relative time (e.g., "2 hours ago")
- */
 function formatRelativeTime(timestamp: number): string {
   return formatDistanceToNow(new Date(timestamp * 1000), { addSuffix: true });
 }
 
-/**
- * Clear any text selection in the window.
- * Prevents ugly selection state when right-clicking.
- */
 function clearTextSelection(): void {
   window.getSelection()?.removeAllRanges();
 }
 
-/**
- * Shorten a commit SHA to 7 characters
- */
 function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }
@@ -90,12 +76,10 @@ function getCommitRangeSelection(
   return commitIds.slice(from, to + 1);
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: component delegates to extracted sub-components; further splitting would scatter related state
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
-  const selectedChangeId = useSelectedChangeId();
   const viewMode = useViewMode();
   const selectCommit = useAppStore((state) => state.selectCommit);
   const selectCommitRange = useAppStore((state) => state.selectCommitRange);
@@ -105,26 +89,22 @@ export function Sidebar({ className }: SidebarProps) {
   const selectChange = useAppStore((state) => state.selectChange);
   const setViewMode = useAppStore((state) => state.setViewMode);
 
-  // Read polling state from store (populated by useRepoPolling in AppLayout)
   const commits = useCommits();
   const isLoadingCommits = useIsLoadingCommits();
   const commitsError = useCommitsError();
   const unpushedCount = useUnpushedCount();
   const behindCount = useBehindCount();
-  const changes = useWorkingChanges();
-  const isLoadingChanges = useIsLoadingChanges();
-  const changesError = useChangesError();
+  const workingChanges = useWorkingChanges();
 
   const hasMoreCommits = useAppStore((state) => state.hasMoreCommits);
   const loadMoreCommits = useAppStore((state) => state.loadMoreCommits);
 
-  const isLoading =
-    viewMode === "history" ? isLoadingCommits : isLoadingChanges;
-  const error = viewMode === "history" ? commitsError : changesError;
-
   const isFocused = useIsFocused();
+  const commitSelectionAnchorRef = useRef<string | null>(null);
+  const historyItems = buildSidebarHistoryItems(commits, workingChanges);
+  const workingChangesModel = buildWorkingChangesListModel(workingChanges);
+  const commitIds = commits.map((commit) => commit.id);
 
-  // Auto-select first commit when selected commit doesn't exist in the (filtered) list
   useEffect(() => {
     if (viewMode !== "history" || isLoadingCommits || commitsError) {
       return;
@@ -152,28 +132,38 @@ export function Sidebar({ className }: SidebarProps) {
     commitsError,
   ]);
 
-  const commitSelectionAnchorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!(viewMode === "changes" && workingChanges.length === 0)) {
+      return;
+    }
 
-  const commitIds = commits.map((commit) => commit.id);
-  const changesListModel = useWorkingChangesListModel(changes);
+    setViewMode("history");
+    const nextCommitId = commits[0]?.id ?? null;
+    selectCommit(nextCommitId);
+    commitSelectionAnchorRef.current = nextCommitId;
+  }, [workingChanges.length, viewMode, commits, setViewMode, selectCommit]);
 
   const handleSelectItem = useCallback(
     (id: string) => {
-      if (viewMode === "history") {
-        commitSelectionAnchorRef.current = id;
-        selectCommit(id);
+      if (isUncommittedChangesItemId(id)) {
+        setViewMode("changes");
+        selectChange(workingChangesModel.items[0]?.id ?? null);
         return;
       }
 
-      selectChange(id);
+      commitSelectionAnchorRef.current = id;
+      selectCommit(id);
+      setViewMode("history");
     },
-    [viewMode, selectCommit, selectChange]
+    [selectCommit, selectChange, setViewMode, workingChangesModel]
   );
 
   const handleCommitClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>, commitId: string) => {
       const isToggle = event.metaKey || event.ctrlKey;
       const isRange = event.shiftKey;
+
+      setViewMode("history");
 
       if (isRange) {
         const anchorId =
@@ -198,69 +188,46 @@ export function Sidebar({ className }: SidebarProps) {
       selectCommit,
       selectCommitRange,
       toggleCommitSelection,
+      setViewMode,
     ]
   );
 
-  const itemIds =
-    viewMode === "history"
-      ? commitIds
-      : changesListModel.items.map((item) => item.id);
-
   const effectiveSelectedCommitId =
     selectedCommitIds[0] ?? selectedCommitId ?? commits[0]?.id ?? null;
-  const effectiveSelectedChangeId = useEffectiveSelectedChangeId(
-    selectedChangeId,
-    changesListModel
-  );
-
   const selectedId =
-    viewMode === "history"
-      ? effectiveSelectedCommitId
-      : effectiveSelectedChangeId;
+    viewMode === "changes"
+      ? UNCOMMITTED_CHANGES_ITEM_ID
+      : effectiveSelectedCommitId;
 
   const { containerProps, getItemProps } = useNavigableList({
-    itemIds,
+    itemIds: historyItems.map((item) => item.id),
     onSelect: handleSelectItem,
     selectedId,
   });
 
-  const bumpWorkingChangesRevision = useAppStore(
-    (state) => state.bumpWorkingChangesRevision
-  );
-
   const { setOpen: setContextMenuOpen, setClosed: setContextMenuClosed } =
     useContextMenuState();
-
-  // Track which item has the context menu open (for highlight)
   const [contextMenuTargetId, setContextMenuTargetId] = useState<string | null>(
     null
   );
-
-  // Commit form state
-  const [commitFormOpen, setCommitFormOpen] = useState(false);
-  const hasStagedChanges = changes.some((c) => c.section === "staged");
-
-  // Rewrite message editor state
   const [editingCommit, setEditingCommit] = useState<{
     id: string;
     message: string;
   } | null>(null);
 
   const handleRewriteMessage = useCallback(
-    async (commitId: string, _summaryHint: string) => {
+    async (commitId: string, summaryHint: string) => {
       if (!selectedRepo) {
         return;
       }
       try {
-        // Fetch the full commit message (list_commits only has the summary)
         const fullMessage = await invoke<string>("get_commit_message", {
           repoPath: selectedRepo.path,
           commitId,
         });
         setEditingCommit({ id: commitId, message: fullMessage });
       } catch {
-        // If we can't fetch the full message, fall back to the summary
-        setEditingCommit({ id: commitId, message: _summaryHint });
+        setEditingCommit({ id: commitId, message: summaryHint });
       }
     },
     [selectedRepo]
@@ -290,8 +257,6 @@ export function Sidebar({ className }: SidebarProps) {
         isUnpushed,
         onRewriteMessage: handleRewriteMessage,
         onClose: () => {
-          // Only clear if this menu's target is still the active one
-          // (prevents race condition when right-clicking another item)
           setContextMenuTargetId((current) => {
             if (current === commitId) {
               setContextMenuClosed();
@@ -310,232 +275,77 @@ export function Sidebar({ className }: SidebarProps) {
     ]
   );
 
-  const handleSectionAction = useCallback(
-    async (section: "staged" | "unstaged") => {
-      if (!selectedRepo) {
-        return;
-      }
-      try {
-        if (section === "staged") {
-          await invoke("unstage_all", { repoPath: selectedRepo.path });
-        } else {
-          await invoke("stage_all", { repoPath: selectedRepo.path });
-        }
-        bumpWorkingChangesRevision();
-      } catch (err) {
-        console.error(
-          `Failed to ${section === "staged" ? "unstage" : "stage"} all:`,
-          err
-        );
-      }
-    },
-    [selectedRepo, bumpWorkingChangesRevision]
-  );
-
-  const handleChangesContextMenu = useCallback(
-    (
-      event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
-      item: WorkingChangeItem
-    ) => {
-      if (!selectedRepo) {
-        return;
-      }
-      event.preventDefault();
-      clearTextSelection();
-      setContextMenuOpen();
-      setContextMenuTargetId(item.id);
-      const element = event.currentTarget;
-      showChangesContextMenu({
-        repoPath: selectedRepo.path,
-        filePath: item.path,
-        section: item.section,
-        event,
-        element,
-        onWorkingChangesModified: bumpWorkingChangesRevision,
-        onClose: () => {
-          // Only clear if this menu's target is still the active one
-          setContextMenuTargetId((current) => {
-            if (current === item.id) {
-              setContextMenuClosed();
-              return null;
-            }
-            return current;
-          });
-        },
-      });
-    },
-    [
-      selectedRepo,
-      bumpWorkingChangesRevision,
-      setContextMenuOpen,
-      setContextMenuClosed,
-    ]
-  );
+  const isInitialLoading =
+    selectedRepo !== null && isLoadingCommits && historyItems.length === 0;
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
-      {/* Header with view mode toggle */}
       <div
         className={cn(
-          "flex h-10",
-          "border-panel-border border-b",
-          "bg-panel-header-bg"
+          "flex h-10 items-center justify-between gap-2 border-panel-border border-b bg-panel-header-bg px-3",
+          isFocused && "border-l-2 border-l-accent-primary"
         )}
-        role="tablist"
       >
-        <button
-          aria-selected={viewMode === "history"}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-1.5",
-            "border-b-2 font-medium text-xs transition-colors",
-            viewMode === "history"
-              ? "border-accent-primary text-text-primary"
-              : "border-transparent bg-bg-tertiary text-text-secondary hover:text-text-primary"
-          )}
-          onClick={() => setViewMode("history")}
-          role="tab"
-          type="button"
-        >
-          History
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold text-sm text-text-primary">History</h2>
           <AheadBehindBadge ahead={unpushedCount} behind={behindCount} />
-        </button>
-        {viewMode === "history" && commits.length > 0 && (
-          <div className="flex items-center pr-1.5">
-            <AuthorFilterDropdown commits={commits} />
-          </div>
-        )}
-        <button
-          aria-selected={viewMode === "changes"}
-          className={cn(
-            "flex flex-1 items-center justify-center",
-            "border-b-2 font-medium text-xs transition-colors",
-            viewMode === "changes"
-              ? "border-accent-primary text-text-primary"
-              : "border-transparent bg-bg-tertiary text-text-secondary hover:text-text-primary"
-          )}
-          onClick={() => setViewMode("changes")}
-          role="tab"
-          type="button"
-        >
-          Changes
-        </button>
+        </div>
+        {commits.length > 0 && <AuthorFilterDropdown commits={commits} />}
       </div>
 
-      {/* Content area */}
       <div {...containerProps} className="flex-1 overflow-auto p-2">
         {!selectedRepo && (
           <div className="py-8 text-center text-sm text-text-secondary">
-            Select a repository to view{" "}
-            {viewMode === "history" ? "commits" : "changes"}
+            Select a repository to view commits
           </div>
         )}
 
-        {selectedRepo && isLoading && (
+        {selectedRepo && isInitialLoading && (
           <div className="py-8 text-center text-sm text-text-secondary">
-            Loading {viewMode === "history" ? "commits" : "changes"}...
+            Loading commits...
           </div>
         )}
 
-        {selectedRepo && error && (
+        {selectedRepo && commitsError && commits.length === 0 && (
           <div className="py-8 text-center text-red-500 text-sm">
-            Error: {error}
+            Error: {commitsError}
           </div>
         )}
 
-        {/* History mode: commit list */}
-        {viewMode === "history" &&
-          selectedRepo &&
-          !isLoading &&
-          !error &&
-          commits.length === 0 && (
+        {selectedRepo &&
+          !isInitialLoading &&
+          !commitsError &&
+          historyItems.length === 0 && (
             <div className="py-8 text-center text-sm text-text-secondary">
               No commits found
             </div>
           )}
 
-        {viewMode === "history" &&
-          !isLoading &&
-          !error &&
-          commits.length > 0 && (
-            <CommitList
-              commits={commits}
-              contextMenuTargetId={contextMenuTargetId}
-              getItemProps={getItemProps}
-              isFocused={isFocused}
-              onCommitClick={handleCommitClick}
-              onCommitContextMenu={handleCommitContextMenu}
-              selectedCommitIds={selectedCommitIds}
-            />
-          )}
-
-        {viewMode === "history" && !isLoading && !error && hasMoreCommits && (
-          <LoadMoreSentinel
-            currentCount={commits.length}
-            onLoadMore={loadMoreCommits}
+        {selectedRepo && !commitsError && historyItems.length > 0 && (
+          <HistoryList
+            contextMenuTargetId={contextMenuTargetId}
+            getItemProps={getItemProps}
+            isFocused={isFocused}
+            items={historyItems}
+            onCommitClick={handleCommitClick}
+            onCommitContextMenu={handleCommitContextMenu}
+            selectedCommitIds={selectedCommitIds}
+            selectedId={selectedId}
           />
         )}
 
-        {/* Changes mode: file list with staged/unstaged sections */}
-        {viewMode === "changes" &&
-          selectedRepo &&
-          !isLoading &&
-          !error &&
-          changes.length === 0 && (
-            <div className="py-8 text-center text-sm text-text-secondary">
-              No changes here... ✓
-            </div>
-          )}
-
-        {viewMode === "changes" &&
-          !isLoading &&
-          !error &&
-          changes.length > 0 && (
-            <ChangesFileList
-              contextMenuTargetId={contextMenuTargetId}
-              getItemProps={getItemProps}
-              isFocused={isFocused}
-              model={changesListModel}
-              onContextMenu={handleChangesContextMenu}
-              onSectionAction={handleSectionAction}
-              selectedId={effectiveSelectedChangeId}
+        {selectedRepo &&
+          !commitsError &&
+          hasMoreCommits &&
+          commits.length > 0 && (
+            <LoadMoreSentinel
+              currentCount={commits.length}
+              onLoadMore={loadMoreCommits}
             />
           )}
       </div>
 
-      {/* Commit form — docked at bottom of Changes view */}
-      {viewMode === "changes" && selectedRepo && hasStagedChanges && (
-        <>
-          {!commitFormOpen && (
-            <button
-              className={cn(
-                "flex w-full items-center justify-center gap-1 py-1.5",
-                "border-panel-border border-t",
-                "bg-panel-header-bg",
-                "font-medium text-text-secondary text-xs",
-                "hover:text-text-primary"
-              )}
-              data-testid="commit-form-toggle"
-              onClick={() => setCommitFormOpen(true)}
-              type="button"
-            >
-              Commit…
-            </button>
-          )}
-          {commitFormOpen && (
-            <CreateCommitEditor
-              onCancel={() => setCommitFormOpen(false)}
-              onCommitted={() => {
-                setCommitFormOpen(false);
-                bumpWorkingChangesRevision();
-              }}
-              repoPath={selectedRepo.path}
-            />
-          )}
-        </>
-      )}
-
-      {/* Rewrite message editor — docked at bottom */}
-      {editingCommit && selectedRepo && viewMode === "history" && (
+      {editingCommit && selectedRepo && (
         <RewriteMessageEditor
           commitId={editingCommit.id}
           initialMessage={editingCommit.message}
@@ -571,180 +381,11 @@ function AheadBehindBadge({ ahead, behind }: AheadBehindBadgeProps) {
   );
 }
 
-interface ChangesFileListProps {
-  model: WorkingChangesListModel;
-  selectedId: string | null;
-  getItemProps: (id: string) => {
-    "aria-selected": boolean;
-    "data-item-id": string;
-    onClick: () => void;
-  };
-  isFocused: boolean;
-  onContextMenu: (
-    event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>,
-    item: WorkingChangeItem
-  ) => void;
-  contextMenuTargetId: string | null;
-  onSectionAction?: (section: "staged" | "unstaged") => void;
-}
+interface HistoryListProps {
+  items: SidebarHistoryItem[];
 
-function ChangesSectionHeader({
-  title,
-  actionLabel,
-  onAction,
-}: {
-  title: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <div className="mb-1 flex items-center justify-between border-panel-border/50 border-b px-2 py-1">
-      <span className="font-medium text-text-secondary text-xs">{title}</span>
-      {actionLabel && onAction && (
-        <button
-          className="text-[10px] text-text-secondary hover:text-text-primary"
-          onClick={onAction}
-          type="button"
-        >
-          {actionLabel}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ChangesFileList({
-  model,
-  selectedId,
-  getItemProps,
-  isFocused,
-  onContextMenu,
-  contextMenuTargetId,
-  onSectionAction,
-}: ChangesFileListProps) {
-  const renderItems = (items: WorkingChangesListModel["items"]) => (
-    <div className="space-y-0.5">
-      {items.map((item) => {
-        const itemProps = getItemProps(item.id);
-        return (
-          <FileListItem
-            file={item.file}
-            isContextMenuTarget={contextMenuTargetId === item.id}
-            isFocused={isFocused}
-            isSelected={selectedId === item.id}
-            itemId={itemProps["data-item-id"]}
-            key={item.id}
-            onClick={itemProps.onClick}
-            onContextMenu={(event) => onContextMenu(event, item)}
-            onKeyDown={(event) => {
-              if (isContextMenuKeyboardEvent(event)) {
-                onContextMenu(event, item);
-              }
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-
-  return (
-    <div className="space-y-3">
-      {model.sections.map((section) => {
-        const actionLabel =
-          section.section === "staged" ? "Unstage All" : "Stage All";
-        const handleAction = onSectionAction
-          ? () => onSectionAction(section.section)
-          : undefined;
-
-        if (section.section !== "unstaged") {
-          return (
-            <div key={section.section}>
-              <ChangesSectionHeader
-                actionLabel={actionLabel}
-                onAction={handleAction}
-                title={section.title}
-              />
-              {renderItems(section.items)}
-            </div>
-          );
-        }
-
-        const trackedItems = section.items.filter(
-          (item) => item.file.unstaged_status !== "Untracked"
-        );
-        const untrackedItems = section.items.filter(
-          (item) => item.file.unstaged_status === "Untracked"
-        );
-
-        return (
-          <div key={section.section}>
-            {trackedItems.length > 0 && (
-              <>
-                <ChangesSectionHeader
-                  actionLabel={actionLabel}
-                  onAction={handleAction}
-                  title={`Unstaged Changes (${trackedItems.length})`}
-                />
-                {renderItems(trackedItems)}
-              </>
-            )}
-
-            {untrackedItems.length > 0 && (
-              <div className={trackedItems.length > 0 ? "mt-2" : undefined}>
-                <ChangesSectionHeader
-                  title={`Untracked (${untrackedItems.length})`}
-                />
-                {renderItems(untrackedItems)}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function LoadMoreSentinel({
-  onLoadMore,
-  currentCount,
-}: {
-  onLoadMore: () => void;
-  currentCount: number;
-}) {
-  const triggeredAtCountRef = useRef<number | null>(null);
-
-  const handleInView = useCallback(() => {
-    // Only trigger once per batch — wait until commit count changes
-    if (triggeredAtCountRef.current === currentCount) {
-      return;
-    }
-    triggeredAtCountRef.current = currentCount;
-    onLoadMore();
-  }, [onLoadMore, currentCount]);
-
-  const sentinelRef = useInView(handleInView);
-
-  return (
-    <div
-      className="py-4 text-center text-text-secondary text-xs"
-      data-testid="load-more-commits"
-      ref={sentinelRef}
-    >
-      Loading more…
-    </div>
-  );
-}
-
-interface CommitListProps {
-  commits: {
-    id: string;
-    message: string;
-    author: string;
-    email: string;
-    timestamp: number;
-    is_pushed: boolean;
-  }[];
   selectedCommitIds: string[];
+  selectedId: string | null;
   isFocused: boolean;
   contextMenuTargetId: string | null;
   getItemProps: (id: string) => {
@@ -764,22 +405,41 @@ interface CommitListProps {
   ) => void;
 }
 
-function CommitList({
-  commits,
+function HistoryList({
+  items,
   selectedCommitIds,
+  selectedId,
   isFocused,
   contextMenuTargetId,
   getItemProps,
   onCommitClick,
   onCommitContextMenu,
-}: CommitListProps) {
+}: HistoryListProps) {
   return (
     <div className="space-y-1">
-      {commits.map((commit, index) => {
+      {items.map((item, index) => {
+        if (item.kind === "uncommitted") {
+          const itemProps = getItemProps(item.id);
+          return (
+            <UncommittedChangesItem
+              changeCount={item.changeCount}
+              isFocused={isFocused}
+              isSelected={selectedId === item.id}
+              itemProps={itemProps}
+              key={item.id}
+            />
+          );
+        }
+
+        const commit = item.commit;
         const isUnpushed = !commit.is_pushed;
-        const prevCommit = index > 0 ? commits[index - 1] : null;
+        const prevCommit = index > 0 ? items[index - 1] : null;
+        const prevCommitItem =
+          prevCommit?.kind === "commit" ? prevCommit.commit : null;
         const showDivider =
-          commit.is_pushed && prevCommit !== null && !prevCommit.is_pushed;
+          commit.is_pushed &&
+          prevCommitItem !== null &&
+          !prevCommitItem.is_pushed;
         const itemProps = getItemProps(commit.id);
 
         return (
@@ -789,7 +449,10 @@ function CommitList({
               commit={commit}
               isContextMenuTarget={contextMenuTargetId === commit.id}
               isFocused={isFocused}
-              isSelected={selectedCommitIds.includes(commit.id)}
+              isSelected={
+                selectedId !== UNCOMMITTED_CHANGES_ITEM_ID &&
+                selectedCommitIds.includes(commit.id)
+              }
               isUnpushed={isUnpushed}
               itemProps={itemProps}
               onClick={onCommitClick}
@@ -798,6 +461,81 @@ function CommitList({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function UncommittedChangesItem({
+  changeCount,
+  isSelected,
+  isFocused,
+  itemProps,
+}: {
+  changeCount: number;
+  isSelected: boolean;
+  isFocused: boolean;
+  itemProps: {
+    "aria-selected": boolean;
+    "data-item-id": string;
+    onClick: () => void;
+  };
+}) {
+  const changeLabel = `${changeCount} changed file${changeCount === 1 ? "" : "s"}`;
+
+  return (
+    <button
+      className={cn(
+        "w-full cursor-default select-none rounded p-2 text-left",
+        isSelected &&
+          (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused")
+      )}
+      type="button"
+      {...itemProps}
+    >
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-bg-tertiary text-text-secondary">
+          <PencilLine className="h-3 w-3" />
+        </div>
+
+        <div className="min-w-0 flex-1 opacity-65">
+          <div className="truncate font-medium text-sm text-text-primary italic">
+            Uncommitted changes
+          </div>
+          <div className="mt-0.5 truncate text-text-secondary text-xs">
+            {changeLabel} · Working tree
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function LoadMoreSentinel({
+  onLoadMore,
+  currentCount,
+}: {
+  onLoadMore: () => void;
+  currentCount: number;
+}) {
+  const triggeredAtCountRef = useRef<number | null>(null);
+
+  const handleInView = useCallback(() => {
+    if (triggeredAtCountRef.current === currentCount) {
+      return;
+    }
+    triggeredAtCountRef.current = currentCount;
+    onLoadMore();
+  }, [onLoadMore, currentCount]);
+
+  const sentinelRef = useInView(handleInView);
+
+  return (
+    <div
+      className="py-4 text-center text-text-secondary text-xs"
+      data-testid="load-more-commits"
+      ref={sentinelRef}
+    >
+      Loading more…
     </div>
   );
 }
@@ -871,10 +609,8 @@ function CommitListItem({
     <button
       className={cn(
         "w-full cursor-default select-none rounded p-2 text-left",
-        // Selected state: filled background
         isSelected &&
           (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused"),
-        // Context menu target: outline highlight (like Finder)
         isContextMenuTarget &&
           !isSelected &&
           "outline outline-1 outline-[var(--color-text-secondary)] outline-offset-[-1px]"
@@ -886,7 +622,6 @@ function CommitListItem({
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-start gap-2">
-        {/* Avatar */}
         <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary">
           {imgError ? (
             <span className="font-medium text-[10px] text-text-secondary leading-none">
@@ -905,7 +640,6 @@ function CommitListItem({
           )}
         </div>
 
-        {/* Text content */}
         <div className={cn("min-w-0 flex-1", isUnpushed && "opacity-65")}>
           <div className="truncate font-medium text-sm text-text-primary">
             {commit.message}

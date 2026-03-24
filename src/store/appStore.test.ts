@@ -606,11 +606,14 @@ describe("appStore", () => {
       expect(useAppStore.getState().focusedRegion).toBe("diff");
     });
 
-    it("focusNextPanel should skip files panel in changes mode", () => {
+    it("focusNextPanel should include files panel in changes mode", () => {
       setFocusState("changes");
 
       focusNext();
       expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+
+      focusNext();
+      expect(useAppStore.getState().focusedRegion).toBe("files");
 
       focusNext();
       expect(useAppStore.getState().focusedRegion).toBe("diff");
@@ -700,7 +703,7 @@ describe("appStore", () => {
       expect(result.current.isDiffMaximized).toBe(false);
     });
 
-    it("should normalize focused region if current panel is hidden in next mode", () => {
+    it("should preserve focused region when switching to changes mode with files focused", () => {
       const { result } = renderHook(() => useAppStore());
 
       act(() => {
@@ -709,7 +712,7 @@ describe("appStore", () => {
         result.current.setViewMode("changes");
       });
 
-      expect(result.current.focusedRegion).toBe("sidebar");
+      expect(result.current.focusedRegion).toBe("files");
     });
 
     it("should preserve focused region if still visible in next mode", () => {

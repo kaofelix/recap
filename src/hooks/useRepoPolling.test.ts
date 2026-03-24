@@ -80,7 +80,7 @@ describe("useRepoPolling", () => {
     expect(useAppStore.getState().isLoadingCommits).toBe(false);
   });
 
-  it("fetches working changes when in changes mode", async () => {
+  it("fetches working changes even while viewing commit history", async () => {
     const mockChanges = [
       {
         path: "src/App.tsx",
@@ -102,7 +102,7 @@ describe("useRepoPolling", () => {
       return Promise.resolve([]);
     });
 
-    useAppStore.setState({ viewMode: "changes" });
+    useAppStore.setState({ viewMode: "history" });
 
     const { useRepoPolling } = await import("./useRepoPolling");
 
@@ -118,7 +118,7 @@ describe("useRepoPolling", () => {
     // Wait for initial fetch
     await act(async () => {
       await Promise.resolve();
-      await Promise.resolve(); // Extra tick for the second fetch
+      await Promise.resolve();
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("get_working_changes_ex", {

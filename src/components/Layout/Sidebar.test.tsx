@@ -18,38 +18,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
-function mockChangesOnly(changes: unknown[]) {
-  mockInvoke.mockImplementation((command: unknown) => {
-    if (command === "get_working_changes_ex") {
-      return Promise.resolve(changes);
-    }
-
-    if (command === "list_commits") {
-      return Promise.resolve([]);
-    }
-
-    return Promise.resolve([]);
-  });
-}
-
-function mockChangesSequence(sequence: unknown[][]) {
-  let callIndex = 0;
-
-  mockInvoke.mockImplementation((command: unknown) => {
-    if (command === "get_working_changes_ex") {
-      const index = Math.min(callIndex, sequence.length - 1);
-      callIndex += 1;
-      return Promise.resolve(sequence[index] ?? []);
-    }
-
-    if (command === "list_commits") {
-      return Promise.resolve([]);
-    }
-
-    return Promise.resolve([]);
-  });
-}
-
 // Unmock useRepoPolling for this test file so we can test with mocked invoke
 vi.unmock("../../hooks/useRepoPolling");
 
@@ -139,11 +107,263 @@ describe("Sidebar", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows view mode toggle buttons", () => {
+  it("shows uncommitted changes above commits and keeps the history list visible when selected", async () => {
+    const mockCommits = [
+      {
+        id: "abc123def456abc123def456abc123def456abc1",
+        message: "feat: add new feature",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+        is_pushed: true,
+      },
+    ];
+
+    const mockChanges = [
+      {
+        path: "src/App.tsx",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 10,
+        staged_deletions: 5,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged" as const,
+      },
+    ];
+
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "list_commits") {
+        return Promise.resolve(mockCommits);
+      }
+
+      if (command === "get_working_changes_ex") {
+        return Promise.resolve(mockChanges);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
     renderWithPolling();
 
-    expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Changes" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Uncommitted changes")).toBeInTheDocument();
+      expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+    });
+
+    const uncommitted = screen.getByText("Uncommitted changes");
+    const commit = screen.getByText("feat: add new feature");
+
+    expect(uncommitted.compareDocumentPosition(commit)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    fireEvent.click(uncommitted.closest("button") as HTMLButtonElement);
+
+    expect(useAppStore.getState().viewMode).toBe("changes");
+    expect(screen.getByText("feat: add new feature")).toBeInTheDocument();
+  });
+
+  it("renders uncommitted changes in sentence case and italic", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: latest",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 60,
+        is_pushed: true,
+      },
+    ];
+
+    const mockChanges = [
+      {
+        path: "src/App.tsx",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 10,
+        staged_deletions: 5,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged" as const,
+      },
+    ];
+
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "list_commits") {
+        return Promise.resolve(mockCommits);
+      }
+
+      if (command === "get_working_changes_ex") {
+        return Promise.resolve(mockChanges);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    const label = await screen.findByText("Uncommitted changes");
+    expect(label).toHaveClass("italic");
+    expect(screen.queryByText("Uncommitted Changes")).not.toBeInTheDocument();
+  });
+
+  it("renders an icon instead of the WT text badge for uncommitted changes", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: latest",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 60,
+        is_pushed: true,
+      },
+    ];
+
+    const mockChanges = [
+      {
+        path: "src/App.tsx",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 10,
+        staged_deletions: 5,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged" as const,
+      },
+    ];
+
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "list_commits") {
+        return Promise.resolve(mockCommits);
+      }
+
+      if (command === "get_working_changes_ex") {
+        return Promise.resolve(mockChanges);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    const row = (await screen.findByText("Uncommitted changes")).closest(
+      "button"
+    );
+    expect(row).not.toBeNull();
+    if (!row) {
+      throw new Error("Expected uncommitted changes row");
+    }
+
+    expect(row.querySelector("svg")).not.toBeNull();
+    expect(screen.queryByText("WT")).not.toBeInTheDocument();
+  });
+
+  it("fades uncommitted changes text similarly to unpushed commits", async () => {
+    const mockCommits = [
+      {
+        id: "commit-a",
+        message: "feat: latest",
+        author: "Test User",
+        email: "test@example.com",
+        timestamp: Math.floor(Date.now() / 1000) - 60,
+        is_pushed: true,
+      },
+    ];
+
+    const mockChanges = [
+      {
+        path: "src/App.tsx",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 10,
+        staged_deletions: 5,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged" as const,
+      },
+    ];
+
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "list_commits") {
+        return Promise.resolve(mockCommits);
+      }
+
+      if (command === "get_working_changes_ex") {
+        return Promise.resolve(mockChanges);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+    });
+
+    renderWithPolling();
+
+    const label = await screen.findByText("Uncommitted changes");
+    const fadedContainer = label.closest("div.min-w-0");
+    expect(fadedContainer).toHaveClass("opacity-65");
+  });
+
+  it("shows a left focus indicator on the history header when sidebar is focused", async () => {
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "list_commits") {
+        return Promise.resolve([]);
+      }
+
+      if (command === "get_working_changes_ex") {
+        return Promise.resolve([]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      focusedRegion: "sidebar",
+    });
+
+    const { container } = renderWithPollingAndFocus("sidebar");
+
+    await waitFor(() => {
+      expect(screen.getByText("History")).toBeInTheDocument();
+    });
+
+    const header = container.querySelector(".bg-panel-header-bg");
+    expect(header).toHaveClass("border-l-2", "border-l-accent-primary");
   });
 
   it("shows loading state while fetching commits", async () => {
@@ -1522,57 +1742,19 @@ describe("Sidebar", () => {
     });
   });
 
-  describe("Changes view", () => {
-    it("switches to changes view when Changes button is clicked", async () => {
-      mockInvoke.mockResolvedValue([]);
+  describe("uncommitted changes item", () => {
+    it("shows the uncommitted changes item without replacing the history list", async () => {
+      const mockCommits = [
+        {
+          id: "commit-a",
+          message: "feat: latest",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+          is_pushed: true,
+        },
+      ];
 
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-      });
-
-      renderWithPolling();
-
-      fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
-
-      await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith("get_working_changes_ex", {
-          repoPath: "/test/repo",
-        });
-      });
-    });
-
-    it("shows changes prompt when no repo is selected in changes view", () => {
-      useAppStore.setState({ viewMode: "changes" });
-
-      renderWithPolling();
-
-      expect(
-        screen.getByText("Select a repository to view changes")
-      ).toBeInTheDocument();
-    });
-
-    it("shows empty state when no working changes", async () => {
-      mockInvoke.mockResolvedValue([]);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("No changes here... ✓")).toBeInTheDocument();
-      });
-    });
-
-    it("displays working changes when loaded successfully", async () => {
       const mockChanges = [
         {
           path: "src/App.tsx",
@@ -1585,45 +1767,50 @@ describe("Sidebar", () => {
           old_path: null,
           section: "staged" as const,
         },
-        {
-          path: "src/new-file.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
       ];
 
-      mockChangesOnly(mockChanges);
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve(mockChanges);
+        }
+
+        return Promise.resolve([]);
+      });
 
       useAppStore.setState({
         repos: [
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        viewMode: "changes",
       });
 
       renderWithPolling();
 
       await waitFor(() => {
-        // Filename is shown separately from directory
-        expect(screen.getByText("App.tsx")).toBeInTheDocument();
+        expect(screen.getByText("Uncommitted changes")).toBeInTheDocument();
+        expect(screen.getByText("feat: latest")).toBeInTheDocument();
       });
-
-      expect(screen.getByText("new-file.ts")).toBeInTheDocument();
-      expect(screen.getByText("M")).toBeInTheDocument(); // Modified indicator
-      expect(screen.getByText("?")).toBeInTheDocument(); // Untracked indicator
     });
 
-    it("renders staged and unstaged sections with counts", async () => {
+    it("clears commit highlight when uncommitted changes is selected", async () => {
+      const mockCommits = [
+        {
+          id: "commit-a",
+          message: "feat: latest",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+          is_pushed: true,
+        },
+      ];
+
       const mockChanges = [
         {
-          path: "src/staged.ts",
+          path: "src/App.tsx",
           staged_status: "Modified",
           unstaged_status: null,
           staged_additions: 10,
@@ -1633,1229 +1820,137 @@ describe("Sidebar", () => {
           old_path: null,
           section: "staged" as const,
         },
-        {
-          path: "src/unstaged.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
       ];
 
-      mockChangesOnly(mockChanges);
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve(mockChanges);
+        }
+
+        return Promise.resolve([]);
+      });
 
       useAppStore.setState({
         repos: [
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        viewMode: "changes",
       });
 
       renderWithPolling();
 
-      await waitFor(() => {
-        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-        expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
-      });
-    });
-
-    it("shows an Untracked subsection inside Unstaged Changes", async () => {
-      const mockChanges = [
-        {
-          path: "src/modified.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 2,
-          unstaged_deletions: 1,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-        {
-          path: "src/untracked.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 5,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
-        expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
-      });
-
-      const untrackedHeaderText = screen.getByText("Untracked (1)");
-      const untrackedHeader = untrackedHeaderText.closest("div");
-      const modifiedRow = screen.getByText("modified.ts");
-
-      expect(untrackedHeader).toHaveClass("border-b");
-      expect(untrackedHeaderText).toHaveClass("text-text-secondary");
-      expect(untrackedHeaderText).not.toHaveClass("uppercase");
-
-      expect(untrackedHeader).not.toBeNull();
-      // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
-      expect(modifiedRow.compareDocumentPosition(untrackedHeader!)).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING
+      const commitButton = (await screen.findByText("feat: latest")).closest(
+        "button"
       );
-    });
-
-    it("hides empty sections", async () => {
-      const mockChanges = [
-        {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText("Unstaged Changes")).not.toBeInTheDocument();
-    });
-
-    it("shows staged section above unstaged section", async () => {
-      const mockChanges = [
-        {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/unstaged.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        const stagedHeader = screen.getByText("Staged Changes (1)");
-        const untrackedHeader = screen.getByText("Untracked (1)");
-
-        // Staged should come before untracked in document order
-        expect(stagedHeader.compareDocumentPosition(untrackedHeader)).toBe(
-          Node.DOCUMENT_POSITION_FOLLOWING
-        );
-      });
-    });
-
-    it("handles same file appearing in both sections", async () => {
-      const mockChanges = [
-        {
-          path: "src/file.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 5,
-          staged_deletions: 0,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/file.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 3,
-          unstaged_deletions: 1,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        // Both sections should show
-        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
-
-        // File should appear twice (once in each section)
-        const fileItems = screen.getAllByText("file.ts");
-        expect(fileItems).toHaveLength(2);
-      });
-    });
-
-    it("selects the clicked section when the same file appears in both sections", async () => {
-      const mockChanges = [
-        {
-          path: "src/file.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 1,
-          staged_deletions: 0,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/file.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 1,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedFilePath: "src/file.ts",
-        selectedChangeId: "src/file.ts#staged",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      const rows = await screen.findAllByText("file.ts");
-      const unstagedRow = rows[1].closest("button");
-      expect(unstagedRow).not.toBeNull();
-      if (!unstagedRow) {
-        throw new Error("Expected unstaged row button");
+      expect(commitButton).not.toBeNull();
+      if (!commitButton) {
+        throw new Error("Expected commit button");
       }
 
-      fireEvent.click(unstagedRow);
+      expect(commitButton).toHaveClass("bg-list-selected-unfocused");
 
-      expect(useAppStore.getState().selectedChangeId).toBe(
-        "src/file.ts#unstaged"
+      const uncommittedButton = (
+        await screen.findByText("Uncommitted changes")
+      ).closest("button");
+      expect(uncommittedButton).not.toBeNull();
+      if (!uncommittedButton) {
+        throw new Error("Expected uncommitted changes button");
+      }
+
+      fireEvent.click(uncommittedButton);
+
+      await waitFor(() => {
+        expect(uncommittedButton).toHaveClass("bg-list-selected-unfocused");
+        expect(commitButton).not.toHaveClass("bg-list-selected-unfocused");
+      });
+    });
+
+    it("selects the first working change immediately when uncommitted changes is clicked", async () => {
+      const mockCommits = [
+        {
+          id: "commit-a",
+          message: "feat: latest",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+          is_pushed: true,
+        },
+      ];
+
+      const mockChanges = [
+        {
+          path: "src/App.tsx",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 10,
+          staged_deletions: 5,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged" as const,
+        },
+      ];
+
+      mockInvoke.mockImplementation((command: unknown) => {
+        if (command === "list_commits") {
+          return Promise.resolve(mockCommits);
+        }
+
+        if (command === "get_working_changes_ex") {
+          return Promise.resolve(mockChanges);
+        }
+
+        return Promise.resolve([]);
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+      });
+
+      renderWithPolling();
+
+      const button = (await screen.findByText("Uncommitted changes")).closest(
+        "button"
       );
-      expect(useAppStore.getState().selectedFilePath).toBe("src/file.ts");
-    });
-
-    it("navigates continuously across section boundary", async () => {
-      const mockChanges = [
-        {
-          path: "src/a.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 1,
-          staged_deletions: 0,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/b.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 1,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedFilePath: "src/a.ts",
-        selectedChangeId: "src/a.ts#staged",
-        focusedRegion: "sidebar",
-        viewMode: "changes",
-      });
-
-      renderWithPollingAndFocus("sidebar");
-
-      await screen.findByText("a.ts");
-
-      act(() => {
-        commandEmitter.emit("navigation.selectNext");
-      });
-
-      expect(useAppStore.getState().selectedChangeId).toBe("src/b.ts#unstaged");
-    });
-
-    it("auto-selects the first changed file when entering Changes view with no selection", async () => {
-      const mockChanges = [
-        {
-          path: "src/App.tsx",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/new-file.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedFilePath: null,
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
+      expect(button).not.toBeNull();
+      if (!button) {
+        throw new Error("Expected uncommitted changes button");
+      }
+      fireEvent.click(button);
 
       await waitFor(() => {
-        expect(useAppStore.getState().selectedFilePath).toBe("src/App.tsx");
-      });
-    });
-
-    it("does not override an existing valid file selection in Changes view", async () => {
-      const mockChanges = [
-        {
-          path: "src/App.tsx",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/new-file.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedFilePath: "src/new-file.ts",
-        selectedChangeId: "src/new-file.ts#unstaged",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
         expect(useAppStore.getState().selectedChangeId).toBe(
-          "src/new-file.ts#unstaged"
+          "src/App.tsx#staged"
         );
-      });
-    });
-
-    it("navigates changed files with navigation commands when sidebar is focused", async () => {
-      const mockChanges = [
-        {
-          path: "src/App.tsx",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/new-file.ts",
-          staged_status: null,
-          unstaged_status: "Untracked",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 20,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedFilePath: "src/App.tsx",
-        focusedRegion: "sidebar",
-        viewMode: "changes",
-      });
-
-      renderWithPollingAndFocus("sidebar");
-
-      await waitFor(() => {
-        expect(screen.getByText("App.tsx")).toBeInTheDocument();
-      });
-
-      act(() => {
-        commandEmitter.emit("navigation.selectNext");
-      });
-
-      expect(useAppStore.getState().selectedFilePath).toBe("src/new-file.ts");
-    });
-
-    it("shows addition and deletion counts for changed files", async () => {
-      const mockChanges = [
-        {
-          path: "src/App.tsx",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("+10")).toBeInTheDocument();
-        expect(screen.getByText("-5")).toBeInTheDocument();
-      });
-    });
-
-    describe("auto-refresh", () => {
-      beforeEach(() => {
-        vi.useFakeTimers();
-      });
-
-      afterEach(async () => {
-        await act(async () => {
-          vi.useRealTimers();
-        });
-      });
-
-      it("polls for changes every 2 seconds when in Changes view", async () => {
-        const mockChanges = [
-          {
-            path: "src/App.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 10,
-            staged_deletions: 5,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-        ];
-
-        mockChangesOnly(mockChanges);
-
-        useAppStore.setState({
-          repos: [
-            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-          ],
-          selectedRepoId: "1",
-          viewMode: "changes",
-        });
-
-        renderWithPolling();
-
-        // Initial fetch happens immediately - flush the promise
-        await act(async () => {
-          await Promise.resolve();
-        });
-        const initialChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(initialChangesCalls).toBe(1);
-
-        // Advance time by 2 seconds - should trigger poll
-        await act(async () => {
-          vi.advanceTimersByTime(2000);
-          await Promise.resolve();
-        });
-        const firstPolledChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(firstPolledChangesCalls).toBe(2);
-
-        // Advance time by another 2 seconds
-        await act(async () => {
-          vi.advanceTimersByTime(2000);
-          await Promise.resolve();
-        });
-        const secondPolledChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(secondPolledChangesCalls).toBe(3);
-      });
-
-      it("stops polling when switching to History view", async () => {
-        mockInvoke.mockResolvedValue([]);
-
-        useAppStore.setState({
-          repos: [
-            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-          ],
-          selectedRepoId: "1",
-          viewMode: "changes",
-        });
-
-        renderWithPolling();
-
-        // Initial fetch
-        await act(async () => {
-          await Promise.resolve();
-        });
-
-        const changesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-
-        // Switch to history view
-        await act(async () => {
-          useAppStore.setState({ viewMode: "history" });
-        });
-
-        // Advance time by 4 seconds
-        await act(async () => {
-          vi.advanceTimersByTime(4000);
-          await Promise.resolve();
-        });
-
-        // Should not have made any more get_working_changes_ex calls
-        const newChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(newChangesCalls).toBe(changesCalls);
-      });
-
-      it("stops polling when component unmounts", async () => {
-        mockInvoke.mockResolvedValue([]);
-
-        useAppStore.setState({
-          repos: [
-            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-          ],
-          selectedRepoId: "1",
-          viewMode: "changes",
-        });
-
-        const { unmount } = renderWithPolling();
-
-        // Initial fetch
-        await act(async () => {
-          await Promise.resolve();
-        });
-        const initialChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(initialChangesCalls).toBe(1);
-
-        // Unmount the component
-        unmount();
-
-        // Advance time by 4 seconds
-        await act(async () => {
-          vi.advanceTimersByTime(4000);
-          await Promise.resolve();
-        });
-
-        // Should not have made any more get_working_changes_ex calls
-        const postUnmountChangesCalls = mockInvoke.mock.calls.filter(
-          (call) => call[0] === "get_working_changes_ex"
-        ).length;
-        expect(postUnmountChangesCalls).toBe(1);
-      });
-
-      it("updates display when file list changes", async () => {
-        const initialChanges = [
-          {
-            path: "src/App.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 5,
-            staged_deletions: 2,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-        ];
-
-        const updatedChanges = [
-          {
-            path: "src/App.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 5,
-            staged_deletions: 2,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-          {
-            path: "src/NewFile.tsx",
-            staged_status: null,
-            unstaged_status: "Untracked",
-            staged_additions: 0,
-            staged_deletions: 0,
-            unstaged_additions: 10,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "unstaged" as const,
-          },
-        ];
-
-        mockChangesSequence([initialChanges, updatedChanges]);
-
-        useAppStore.setState({
-          repos: [
-            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-          ],
-          selectedRepoId: "1",
-          viewMode: "changes",
-        });
-
-        renderWithPolling();
-
-        // Initial fetch
-        await act(async () => {
-          await Promise.resolve();
-        });
-
-        expect(screen.getByText("App.tsx")).toBeInTheDocument();
-        expect(screen.queryByText("NewFile.tsx")).not.toBeInTheDocument();
-
-        // Advance time to trigger poll
-        await act(async () => {
-          vi.advanceTimersByTime(2000);
-          await Promise.resolve();
-        });
-
-        // Should show the new file
-        expect(screen.getByText("App.tsx")).toBeInTheDocument();
-        expect(screen.getByText("NewFile.tsx")).toBeInTheDocument();
-      });
-
-      it("auto-selects the first remaining file when selected file disappears from changes", async () => {
-        const initialChanges = [
-          {
-            path: "src/App.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 5,
-            staged_deletions: 2,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-          {
-            path: "src/Other.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 3,
-            staged_deletions: 1,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-        ];
-
-        // After poll, App.tsx is no longer in the list (user reverted changes)
-        const updatedChanges = [
-          {
-            path: "src/Other.tsx",
-            staged_status: "Modified",
-            unstaged_status: null,
-            staged_additions: 3,
-            staged_deletions: 1,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-        ];
-
-        mockChangesSequence([initialChanges, updatedChanges]);
-
-        useAppStore.setState({
-          repos: [
-            { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-          ],
-          selectedRepoId: "1",
-          selectedFilePath: "src/App.tsx", // File is selected
-          viewMode: "changes",
-        });
-
-        renderWithPolling();
-
-        // Initial fetch
-        await act(async () => {
-          await Promise.resolve();
-        });
-
-        // App.tsx should be selected
         expect(useAppStore.getState().selectedFilePath).toBe("src/App.tsx");
-
-        // Advance time to trigger poll - App.tsx disappears
-        await act(async () => {
-          vi.advanceTimersByTime(2000);
-          await Promise.resolve();
-        });
-
-        // Selection should move to the first remaining file
-        expect(useAppStore.getState().selectedFilePath).toBe("src/Other.tsx");
       });
     });
-  });
 
-  describe("section header actions", () => {
-    it("shows 'Unstage All' button on the staged section header", async () => {
-      const mockChanges = [
+    it("falls back to the latest commit when uncommitted changes disappear", async () => {
+      const mockCommits = [
         {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
+          id: "commit-a",
+          message: "feat: latest",
+          author: "Test User",
+          email: "test@example.com",
+          timestamp: Math.floor(Date.now() / 1000) - 60,
+          is_pushed: true,
         },
       ];
 
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByRole("button", { name: "Unstage All" })
-      ).toBeInTheDocument();
-    });
-
-    it("shows 'Stage All' button on the unstaged section header", async () => {
-      const mockChanges = [
-        {
-          path: "src/unstaged.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 5,
-          unstaged_deletions: 2,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByRole("button", { name: "Stage All" })
-      ).toBeInTheDocument();
-    });
-
-    it("invokes unstage_all when 'Unstage All' button is clicked", async () => {
-      mockInvoke.mockImplementation((command: unknown) => {
-        if (command === "get_working_changes_ex") {
-          return Promise.resolve([
-            {
-              path: "src/staged.ts",
-              staged_status: "Modified",
-              unstaged_status: null,
-              staged_additions: 10,
-              staged_deletions: 5,
-              unstaged_additions: 0,
-              unstaged_deletions: 0,
-              old_path: null,
-              section: "staged" as const,
-            },
-          ]);
-        }
-        if (command === "list_commits") {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve();
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Unstage All" })
-        ).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByRole("button", { name: "Unstage All" }));
-
-      await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith("unstage_all", {
-          repoPath: "/test/repo",
-        });
-      });
-    });
-
-    it("invokes stage_all when 'Stage All' button is clicked", async () => {
-      mockInvoke.mockImplementation((command: unknown) => {
-        if (command === "get_working_changes_ex") {
-          return Promise.resolve([
-            {
-              path: "src/unstaged.ts",
-              staged_status: null,
-              unstaged_status: "Modified",
-              staged_additions: 0,
-              staged_deletions: 0,
-              unstaged_additions: 5,
-              unstaged_deletions: 2,
-              old_path: null,
-              section: "unstaged" as const,
-            },
-          ]);
-        }
-        if (command === "list_commits") {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve();
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Stage All" })
-        ).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByRole("button", { name: "Stage All" }));
-
-      await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith("stage_all", {
-          repoPath: "/test/repo",
-        });
-      });
-    });
-  });
-
-  describe("commit form", () => {
-    it("shows a 'Commit' toggle header when there are staged changes", async () => {
-      const mockChanges = [
-        {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
-      });
-    });
-
-    it("does not show the commit toggle when there are no staged changes", async () => {
-      const mockChanges = [
-        {
-          path: "src/unstaged.ts",
-          staged_status: null,
-          unstaged_status: "Modified",
-          staged_additions: 0,
-          staged_deletions: 0,
-          unstaged_additions: 5,
-          unstaged_deletions: 2,
-          old_path: null,
-          section: "unstaged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("unstaged.ts")).toBeInTheDocument();
-      });
-
-      expect(
-        screen.queryByTestId("commit-form-toggle")
-      ).not.toBeInTheDocument();
-    });
-
-    it("expands the commit form when toggle is clicked", async () => {
-      const mockChanges = [
-        {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
-      });
-
-      // Form should not be visible yet
-      expect(
-        screen.queryByPlaceholderText("Commit summary")
-      ).not.toBeInTheDocument();
-
-      // Click toggle to expand
-      fireEvent.click(screen.getByTestId("commit-form-toggle"));
-
-      expect(screen.getByPlaceholderText("Commit summary")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Commit" })
-      ).toBeInTheDocument();
-    });
-
-    it("collapses the commit form when Cancel is clicked", async () => {
-      const mockChanges = [
-        {
-          path: "src/staged.ts",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 5,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("commit-form-toggle")).toBeInTheDocument();
-      });
-
-      // Expand
-      fireEvent.click(screen.getByTestId("commit-form-toggle"));
-      expect(screen.getByPlaceholderText("Commit summary")).toBeInTheDocument();
-
-      // Cancel collapses
-      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-      expect(
-        screen.queryByPlaceholderText("Commit summary")
-      ).not.toBeInTheDocument();
-    });
-
-    it("does not show the commit form in history mode", async () => {
       mockInvoke.mockImplementation((command: unknown) => {
         if (command === "list_commits") {
-          return Promise.resolve([
-            {
-              id: "commit-1",
-              message: "feat: something",
-              author: "Test User",
-              email: "test@example.com",
-              timestamp: Math.floor(Date.now() / 1000) - 600,
-            },
-          ]);
+          return Promise.resolve(mockCommits);
         }
+
         if (command === "get_working_changes_ex") {
-          return Promise.resolve([
-            {
-              path: "src/staged.ts",
-              staged_status: "Modified",
-              unstaged_status: null,
-              staged_additions: 5,
-              staged_deletions: 2,
-              unstaged_additions: 0,
-              unstaged_deletions: 0,
-              old_path: null,
-              section: "staged" as const,
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "history",
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(screen.getByText("feat: something")).toBeInTheDocument();
-      });
-
-      expect(
-        screen.queryByTestId("commit-form-toggle")
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  describe("changedFiles sync", () => {
-    it("syncs working changes to changedFiles store in changes mode", async () => {
-      const mockChanges = [
-        {
-          path: "src/App.tsx",
-          staged_status: "Modified",
-          unstaged_status: null,
-          staged_additions: 5,
-          staged_deletions: 2,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-        {
-          path: "src/Button.tsx",
-          staged_status: "Added",
-          unstaged_status: null,
-          staged_additions: 10,
-          staged_deletions: 0,
-          unstaged_additions: 0,
-          unstaged_deletions: 0,
-          old_path: null,
-          section: "staged" as const,
-        },
-      ];
-
-      mockChangesOnly(mockChanges);
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        viewMode: "changes",
-        changedFiles: [],
-      });
-
-      renderWithPolling();
-
-      await waitFor(() => {
-        expect(useAppStore.getState().changedFiles).toEqual(mockChanges);
-      });
-    });
-
-    it("clears changedFiles in store when working changes fetch fails", async () => {
-      mockInvoke.mockImplementation((command: unknown) => {
-        if (command === "get_working_changes_ex") {
-          return Promise.reject(new Error("Failed to get working changes"));
-        }
-
-        if (command === "list_commits") {
           return Promise.resolve([]);
         }
 
@@ -2868,25 +1963,13 @@ describe("Sidebar", () => {
         ],
         selectedRepoId: "1",
         viewMode: "changes",
-        changedFiles: [
-          {
-            path: "old-file.ts",
-            staged_status: "Modified" as const,
-            unstaged_status: null,
-            staged_additions: 1,
-            staged_deletions: 1,
-            unstaged_additions: 0,
-            unstaged_deletions: 0,
-            old_path: null,
-            section: "staged" as const,
-          },
-        ],
       });
 
       renderWithPolling();
 
       await waitFor(() => {
-        expect(useAppStore.getState().changedFiles).toEqual([]);
+        expect(useAppStore.getState().viewMode).toBe("history");
+        expect(useAppStore.getState().selectedCommitId).toBe("commit-a");
       });
     });
   });

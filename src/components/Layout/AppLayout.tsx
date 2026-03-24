@@ -285,8 +285,8 @@ export function AppLayout({ className }: AppLayoutProps) {
       commits.map((commit) => commit.id)
     );
 
-  // File list is shown in the inner group only in history mode with a valid selection.
-  const showFileList = viewMode === "history" && !hasNonConsecutiveSelection;
+  // File list is shown for both commit history and uncommitted changes.
+  const showFileList = !hasNonConsecutiveSelection;
 
   useEffect(() => {
     const sidebar = sidebarPanelRef.current;

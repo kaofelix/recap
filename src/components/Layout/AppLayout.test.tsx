@@ -19,11 +19,13 @@ describe("AppLayout", () => {
     expect(screen.getByText("Branch:")).toBeInTheDocument();
   });
 
-  it("renders the sidebar with view mode toggle", () => {
+  it("renders a unified history sidebar without a changes tab", () => {
     render(<AppLayout />);
 
-    expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Changes" })).toBeInTheDocument();
+    expect(screen.getByText("History")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Changes" })
+    ).not.toBeInTheDocument();
   });
 
   it("renders the file list panel", () => {
@@ -86,13 +88,13 @@ describe("AppLayout", () => {
     expect(separators.length).toBe(2);
   });
 
-  it("renders only one separator in changes mode", () => {
+  it("keeps the file list panel visible when uncommitted changes are selected", () => {
     useAppStore.setState({ viewMode: "changes" });
     render(<AppLayout />);
 
-    // In changes mode: 1 outer separator only (no file-list in inner group)
     const separators = screen.getAllByTestId("panel-separator");
-    expect(separators.length).toBe(1);
+    expect(separators.length).toBe(2);
+    expect(screen.getByTestId("panel-file-list")).toBeInTheDocument();
   });
 
   it("advances to the next panel on consecutive navigation commands", () => {

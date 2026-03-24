@@ -101,12 +101,8 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function getVisiblePanels(viewMode: ViewMode): FocusRegion[] {
-  if (viewMode === "history") {
-    return ["sidebar", "files", "diff"];
-  }
-
-  return ["sidebar", "diff"];
+function getVisiblePanels(_viewMode: ViewMode): FocusRegion[] {
+  return ["sidebar", "files", "diff"];
 }
 
 export const useAppStore = create<AppState>()(

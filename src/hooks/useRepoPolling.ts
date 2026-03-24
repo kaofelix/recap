@@ -56,7 +56,7 @@ function reconcileSelection(
  *
  * This hook manages all background data fetching for the app:
  * - Commits: Always polled when a repo is selected
- * - Working changes: Polled when in "changes" view mode
+ * - Working changes: Always polled when a repo is selected
  *
  * Uses visibility-aware polling:
  * - Fast (2s) when app is visible and focused
@@ -225,11 +225,9 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     // Always fetch commits when repo is selected
     await fetchCommits();
 
-    // Only fetch working changes when in changes mode
-    if (viewMode === "changes") {
-      await fetchWorkingChanges();
-    }
-  }, [fetchCommits, fetchWorkingChanges, viewMode]);
+    // Always fetch working changes so the sidebar can surface them immediately
+    await fetchWorkingChanges();
+  }, [fetchCommits, fetchWorkingChanges]);
 
   // Reset initial load flags when repo changes
   useEffect(() => {
