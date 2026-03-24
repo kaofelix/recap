@@ -36,6 +36,7 @@ import {
   useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
+  useWorkingChanges,
   useWorkingChangesRevision,
 } from "../../store/appStore";
 import type {
@@ -469,6 +470,8 @@ export function DiffView({ className }: DiffViewProps) {
   const isDiffMaximized = useIsDiffMaximized();
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
   const changedFiles = useChangedFiles();
+  const workingChanges = useWorkingChanges();
+  const activeFiles = viewMode === "changes" ? workingChanges : changedFiles;
 
   // File navigation
   const {
@@ -478,7 +481,7 @@ export function DiffView({ className }: DiffViewProps) {
     selectPreviousFile,
     selectNextFile,
   } = useFileNavigation(
-    changedFiles,
+    activeFiles,
     selectedFilePath,
     selectedChangeId,
     viewMode

@@ -80,7 +80,7 @@ describe("useRepoPolling", () => {
     expect(useAppStore.getState().isLoadingCommits).toBe(false);
   });
 
-  it("fetches working changes even while viewing commit history", async () => {
+  it("fetches working changes in history mode without overwriting commit file selection", async () => {
     const mockChanges = [
       {
         path: "src/App.tsx",
@@ -95,6 +95,16 @@ describe("useRepoPolling", () => {
       },
     ];
 
+    const commitFiles = [
+      {
+        path: "src/commit-file.tsx",
+        additions: 3,
+        deletions: 1,
+        status: "modified",
+        old_path: null,
+      },
+    ];
+
     mockInvoke.mockImplementation((command: string) => {
       if (command === "get_working_changes_ex") {
         return Promise.resolve(mockChanges);
@@ -102,7 +112,12 @@ describe("useRepoPolling", () => {
       return Promise.resolve([]);
     });
 
-    useAppStore.setState({ viewMode: "history" });
+    useAppStore.setState({
+      viewMode: "history",
+      changedFiles: commitFiles,
+      selectedFilePath: "src/commit-file.tsx",
+      selectedChangeId: null,
+    });
 
     const { useRepoPolling } = await import("./useRepoPolling");
 
@@ -126,7 +141,9 @@ describe("useRepoPolling", () => {
     });
 
     expect(useAppStore.getState().workingChanges).toEqual(mockChanges);
-    expect(useAppStore.getState().changedFiles).toEqual(mockChanges);
+    expect(useAppStore.getState().changedFiles).toEqual(commitFiles);
+    expect(useAppStore.getState().selectedFilePath).toBe("src/commit-file.tsx");
+    expect(useAppStore.getState().selectedChangeId).toBeNull();
   });
 
   it("polls at 2s interval when visible", async () => {

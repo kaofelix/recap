@@ -180,9 +180,11 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
         repoPath: selectedRepo.path,
       });
       setWorkingChanges(result);
-      setChangedFiles(result);
+      if (viewMode === "changes") {
+        setChangedFiles(result);
+        reconcileSelection(result, selectChange);
+      }
       setChangesError(null);
-      reconcileSelection(result, selectChange);
 
       // Only bump revision if working changes actually changed
       // This prevents unnecessary re-fetches of file contents
@@ -212,6 +214,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     }
   }, [
     selectedRepo,
+    viewMode,
     setWorkingChanges,
     setChangedFiles,
     setChangesLoading,

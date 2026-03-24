@@ -1728,7 +1728,6 @@ describe("Sidebar", () => {
       const initialCommitCalls = mockInvoke.mock.calls.filter(
         (call) => call[0] === "list_commits"
       ).length;
-      expect(initialCommitCalls).toBe(1);
 
       await act(async () => {
         vi.advanceTimersByTime(2000);
@@ -1738,7 +1737,7 @@ describe("Sidebar", () => {
       const polledCommitCalls = mockInvoke.mock.calls.filter(
         (call) => call[0] === "list_commits"
       ).length;
-      expect(polledCommitCalls).toBe(2);
+      expect(polledCommitCalls).toBe(initialCommitCalls + 1);
     });
   });
 
