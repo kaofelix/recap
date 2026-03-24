@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../store/appStore";
+import type { ChangedFile } from "../types/file";
 
 // Mock Tauri invoke
 const mockInvoke = vi.fn();
@@ -95,12 +96,12 @@ describe("useRepoPolling", () => {
       },
     ];
 
-    const commitFiles = [
+    const commitFiles: ChangedFile[] = [
       {
         path: "src/commit-file.tsx",
         additions: 3,
         deletions: 1,
-        status: "modified",
+        status: "Modified",
         old_path: null,
       },
     ];

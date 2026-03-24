@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-24
+
+### Fixed
+
+- **Refresh now keeps the selected file** — Fixed a regression where refreshing while reviewing changes could jump the cursor to the first file and leave the diff panel empty.
+
 ## [0.4.0] - 2026-03-19
 
 ### Added
