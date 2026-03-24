@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-19
+
+### Added
+
+- **Uncommitted changes in History** — Your working tree now appears as a dedicated **Uncommitted changes** item at the top of History, so you can move between commits and in-progress changes from one list.
+- **Commit from the Files panel** — You can now stage files, use **Stage All** / **Unstage All**, and create a commit directly from the Files panel while reviewing uncommitted changes.
+- **Rewrite unpushed commit messages** — Right-click an unpushed commit to edit its message inline.
+- **Author filtering in History** — You can now filter commit history by author, search by name or email, and keep browsing long histories with infinite scroll.
+- **Ahead/behind branch status** — History now shows when your branch is ahead of or behind its upstream.
+- **Branch picker stays in sync** — The branch picker now updates to reflect the currently checked-out branch.
+
+### Fixed
+
+- **More accurate pushed/unpushed status** — Pushed and unpushed commit indicators now stay correct even when your branch has diverged from upstream.
+
 ## [0.3.1] - 2026-03-18
 
 ### Fixed
