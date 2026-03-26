@@ -1,5 +1,5 @@
 import { GitGraph } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Group,
   type GroupImperativeHandle,
@@ -23,6 +23,7 @@ import {
   useSelectedRepo,
   useViewMode,
 } from "../../store/appStore";
+import type { FocusRegion } from "../../types/focus";
 import { DiffView } from "./DiffView";
 import { FileList } from "./FileList";
 import { Sidebar } from "./Sidebar";
@@ -175,6 +176,42 @@ function applyGroupLayouts(
   }
 }
 
+function isSidebarHidden(layout: Record<string, number> | null | undefined) {
+  if (!layout) {
+    return false;
+  }
+
+  return typeof layout.sidebar === "number" && layout.sidebar <= 0;
+}
+
+function getVisibleFocusRegions({
+  showSidebar,
+  showFileList,
+  isDiffMaximized,
+}: {
+  showSidebar: boolean;
+  showFileList: boolean;
+  isDiffMaximized: boolean;
+}): FocusRegion[] {
+  if (isDiffMaximized) {
+    return ["diff"];
+  }
+
+  const regions: FocusRegion[] = [];
+
+  if (showSidebar) {
+    regions.push("sidebar");
+  }
+
+  if (showFileList) {
+    regions.push("files");
+  }
+
+  regions.push("diff");
+
+  return regions;
+}
+
 function isConsecutiveCommitSelection(
   selectedCommitIds: string[],
   orderedCommitIds: string[]
@@ -230,8 +267,8 @@ export function AppLayout({ className }: AppLayoutProps) {
   const viewMode = useViewMode();
   const selectedRepo = useSelectedRepo();
   const selectedCommitIds = useSelectedCommitIds();
-  const focusNextPanel = useAppStore((s) => s.focusNextPanel);
-  const focusPrevPanel = useAppStore((s) => s.focusPrevPanel);
+  const focusedRegion = useAppStore((s) => s.focusedRegion);
+  const setFocusedRegion = useAppStore((s) => s.setFocusedRegion);
   const isDiffMaximized = useAppStore((s) => s.isDiffMaximized);
   const toggleDiffMaximized = useAppStore((s) => s.toggleDiffMaximized);
 
@@ -264,6 +301,21 @@ export function AppLayout({ className }: AppLayoutProps) {
     storage: layoutStorage,
   });
 
+  const [isCommitListHidden, setIsCommitListHidden] = useState(() =>
+    isSidebarHidden(outerDefaultLayout)
+  );
+
+  const handleOuterLayoutChanged = useCallback(
+    (layout: Record<string, number>) => {
+      outerOnLayoutChanged(layout);
+
+      if (!isDiffMaximized) {
+        setIsCommitListHidden(isSidebarHidden(layout));
+      }
+    },
+    [outerOnLayoutChanged, isDiffMaximized]
+  );
+
   const outerGroupRef = useRef<GroupImperativeHandle>(null);
   const innerGroupRef = useRef<GroupImperativeHandle>(null);
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
@@ -287,6 +339,15 @@ export function AppLayout({ className }: AppLayoutProps) {
 
   // File list is shown for both commit history and uncommitted changes.
   const showFileList = !hasNonConsecutiveSelection;
+  const visibleFocusRegions = useMemo(
+    () =>
+      getVisibleFocusRegions({
+        showSidebar: !isCommitListHidden,
+        showFileList,
+        isDiffMaximized,
+      }),
+    [isCommitListHidden, showFileList, isDiffMaximized]
+  );
 
   useEffect(() => {
     const sidebar = sidebarPanelRef.current;
@@ -334,6 +395,74 @@ export function AppLayout({ className }: AppLayoutProps) {
     wasDiffMaximizedRef.current = false;
   }, [isDiffMaximized, showFileList]);
 
+  useEffect(() => {
+    if (!focusedRegion) {
+      return;
+    }
+
+    if (visibleFocusRegions.includes(focusedRegion)) {
+      return;
+    }
+
+    setFocusedRegion(visibleFocusRegions[0] ?? null);
+  }, [focusedRegion, visibleFocusRegions, setFocusedRegion]);
+
+  const focusNextPanel = useCallback(() => {
+    if (visibleFocusRegions.length === 0) {
+      return;
+    }
+
+    const currentFocusedRegion = useAppStore.getState().focusedRegion;
+    const rawIndex = currentFocusedRegion
+      ? visibleFocusRegions.indexOf(currentFocusedRegion)
+      : -1;
+    const currentIndex = rawIndex >= 0 ? rawIndex : -1;
+    const nextIndex = (currentIndex + 1) % visibleFocusRegions.length;
+
+    setFocusedRegion(visibleFocusRegions[nextIndex]);
+  }, [setFocusedRegion, visibleFocusRegions]);
+
+  const focusPrevPanel = useCallback(() => {
+    if (visibleFocusRegions.length === 0) {
+      return;
+    }
+
+    const currentFocusedRegion = useAppStore.getState().focusedRegion;
+    const rawIndex = currentFocusedRegion
+      ? visibleFocusRegions.indexOf(currentFocusedRegion)
+      : 0;
+    const currentIndex = rawIndex >= 0 ? rawIndex : 0;
+    const prevIndex =
+      (currentIndex - 1 + visibleFocusRegions.length) %
+      visibleFocusRegions.length;
+
+    setFocusedRegion(visibleFocusRegions[prevIndex]);
+  }, [setFocusedRegion, visibleFocusRegions]);
+
+  const toggleCommitList = useCallback(() => {
+    if (isDiffMaximized) {
+      return;
+    }
+
+    const sidebar = sidebarPanelRef.current;
+    if (!sidebar) {
+      return;
+    }
+
+    if (isPanelCollapsed(sidebar)) {
+      expandPanel(sidebar);
+      setIsCommitListHidden(false);
+      return;
+    }
+
+    collapsePanel(sidebar);
+    setIsCommitListHidden(true);
+
+    if (focusedRegion === "sidebar") {
+      setFocusedRegion(showFileList ? "files" : "diff");
+    }
+  }, [focusedRegion, isDiffMaximized, setFocusedRegion, showFileList]);
+
   // Set up keyboard handler
   useKeyboardHandler(defaultKeymap);
 
@@ -341,6 +470,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   useGlobalCommand("navigation.focusNextPanel", focusNextPanel);
   useGlobalCommand("navigation.focusPrevPanel", focusPrevPanel);
   useGlobalCommand("layout.toggleDiffMaximized", toggleDiffMaximized);
+  useGlobalCommand("layout.toggleCommitList", toggleCommitList);
 
   return (
     <div
@@ -350,14 +480,18 @@ export function AppLayout({ className }: AppLayoutProps) {
         className
       )}
     >
-      <Toolbar />
+      <Toolbar
+        isCommitListHidden={isCommitListHidden}
+        isCommitListToggleDisabled={isDiffMaximized}
+        onToggleCommitList={toggleCommitList}
+      />
 
       {/* Outer group: sidebar | right-content */}
       <Group
         className="flex-1"
         defaultLayout={outerDefaultLayout}
         groupRef={outerGroupRef}
-        onLayoutChanged={outerOnLayoutChanged}
+        onLayoutChanged={handleOuterLayoutChanged}
         orientation="horizontal"
       >
         <Panel

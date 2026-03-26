@@ -9,4 +9,12 @@ describe("defaultKeymap", () => {
       ])
     );
   });
+
+  it("includes keyboard shortcut to toggle commit list with Cmd+[", () => {
+    expect(defaultKeymap).toEqual(
+      expect.arrayContaining([
+        { key: "meta+[", command: "layout.toggleCommitList" },
+      ])
+    );
+  });
 });

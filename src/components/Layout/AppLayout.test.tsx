@@ -9,7 +9,18 @@ describe("AppLayout", () => {
     // Clear any stored panel layout
     localStorage.clear();
     // Reset store state
-    useAppStore.setState({ viewMode: "history", isDiffMaximized: false });
+    useAppStore.setState({
+      repos: [],
+      selectedRepoId: null,
+      selectedCommitId: null,
+      selectedCommitIds: [],
+      focusedRegion: null,
+      commits: [],
+      isLoadingCommits: false,
+      commitsError: null,
+      viewMode: "history",
+      isDiffMaximized: false,
+    });
   });
 
   it("renders the toolbar", () => {
@@ -17,6 +28,16 @@ describe("AppLayout", () => {
 
     expect(screen.getByText("Repository:")).toBeInTheDocument();
     expect(screen.getByText("Branch:")).toBeInTheDocument();
+  });
+
+  it("places commit list toggle button to the left of repository label", () => {
+    render(<AppLayout />);
+
+    const repositoryLabel = screen.getByText("Repository:");
+    expect(repositoryLabel.previousElementSibling).toHaveAttribute(
+      "aria-label",
+      "Hide commit list"
+    );
   });
 
   it("renders a unified history sidebar without a changes tab", () => {
@@ -109,6 +130,160 @@ describe("AppLayout", () => {
     expect(useAppStore.getState().focusedRegion).toBe("files");
   });
 
+  it("skips commit list when panel is collapsed during panel navigation", () => {
+    useAppStore.setState({ focusedRegion: null, viewMode: "history" });
+    render(<AppLayout />);
+
+    act(() => {
+      screen.getByRole("button", { name: /hide commit list/i }).click();
+    });
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("files");
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("diff");
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("files");
+  });
+
+  it("moves focus away from commit list when panel is collapsed", () => {
+    useAppStore.setState({ focusedRegion: "sidebar", viewMode: "history" });
+    render(<AppLayout />);
+
+    act(() => {
+      screen.getByRole("button", { name: /hide commit list/i }).click();
+    });
+
+    expect(useAppStore.getState().focusedRegion).toBe("files");
+  });
+
+  it("skips file list in panel navigation when file list is hidden", () => {
+    useAppStore.setState({
+      commits: [
+        {
+          id: "commit-a",
+          message: "A",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 1,
+          is_pushed: true,
+        },
+        {
+          id: "commit-b",
+          message: "B",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 2,
+          is_pushed: true,
+        },
+        {
+          id: "commit-c",
+          message: "C",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 3,
+          is_pushed: true,
+        },
+      ],
+      selectedCommitIds: ["commit-a", "commit-c"],
+      selectedCommitId: "commit-a",
+      focusedRegion: null,
+      viewMode: "history",
+      isLoadingCommits: false,
+      commitsError: null,
+    });
+
+    render(<AppLayout />);
+
+    expect(screen.queryByTestId("panel-file-list")).not.toBeInTheDocument();
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("diff");
+  });
+
+  it("moves focus away from file list when file list becomes hidden", () => {
+    useAppStore.setState({
+      commits: [
+        {
+          id: "commit-a",
+          message: "A",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 1,
+          is_pushed: true,
+        },
+        {
+          id: "commit-b",
+          message: "B",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 2,
+          is_pushed: true,
+        },
+        {
+          id: "commit-c",
+          message: "C",
+          author: "Ada",
+          email: "ada@example.com",
+          timestamp: 3,
+          is_pushed: true,
+        },
+      ],
+      selectedCommitIds: ["commit-a"],
+      selectedCommitId: "commit-a",
+      focusedRegion: "files",
+      viewMode: "history",
+      isLoadingCommits: false,
+      commitsError: null,
+    });
+
+    render(<AppLayout />);
+
+    act(() => {
+      useAppStore.getState().selectCommitRange(["commit-a", "commit-c"]);
+    });
+
+    expect(screen.queryByTestId("panel-file-list")).not.toBeInTheDocument();
+    expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+  });
+
+  it("restricts panel navigation to diff when diff view is maximized", () => {
+    useAppStore.setState({ focusedRegion: "diff", viewMode: "history" });
+    render(<AppLayout />);
+
+    act(() => {
+      screen.getByRole("button", { name: "Maximize diff view" }).click();
+    });
+
+    expect(useAppStore.getState().isDiffMaximized).toBe(true);
+    expect(useAppStore.getState().focusedRegion).toBe("diff");
+
+    act(() => {
+      commandEmitter.emit("navigation.focusNextPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("diff");
+
+    act(() => {
+      commandEmitter.emit("navigation.focusPrevPanel");
+    });
+    expect(useAppStore.getState().focusedRegion).toBe("diff");
+  });
+
   it("collapses and restores side panels when diff view is maximized", () => {
     render(<AppLayout />);
 
@@ -171,6 +346,75 @@ describe("AppLayout", () => {
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("toggles commit list from toolbar button", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+
+    act(() => {
+      screen.getByRole("button", { name: /hide commit list/i }).click();
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+
+    act(() => {
+      screen.getByRole("button", { name: /show commit list/i }).click();
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("toggles commit list via Cmd+[ keyboard shortcut", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "[", metaKey: true })
+      );
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "[", metaKey: true })
+      );
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("does not toggle commit list when diff view is maximized", () => {
+    render(<AppLayout />);
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+
+    act(() => {
+      screen.getByRole("button", { name: "Maximize diff view" }).click();
+    });
+
+    expect(useAppStore.getState().isDiffMaximized).toBe(true);
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
+
+    const toggleButton = screen.getByRole("button", {
+      name: /commit list/i,
+    });
+    expect(toggleButton).toBeDisabled();
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "[", metaKey: true })
+      );
+    });
+
+    expect(useAppStore.getState().isDiffMaximized).toBe(true);
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
   });
 
   it("restores previous panel sizes after maximize toggle", () => {

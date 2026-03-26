@@ -1,3 +1,4 @@
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "../../lib/utils";
 import {
   AddRepoButton,
@@ -9,13 +10,26 @@ import {
 
 export interface ToolbarProps {
   className?: string;
+  isCommitListHidden: boolean;
+  isCommitListToggleDisabled?: boolean;
+  onToggleCommitList: () => void;
 }
 
-export function Toolbar({ className }: ToolbarProps) {
+export function Toolbar({
+  className,
+  isCommitListHidden,
+  isCommitListToggleDisabled = false,
+  onToggleCommitList,
+}: ToolbarProps) {
   const handleAddRepoError = (message: string) => {
     // TODO: Replace with toast notification
     console.error("Failed to add repository:", message);
   };
+
+  const commitListLabel = isCommitListHidden
+    ? "Show commit list"
+    : "Hide commit list";
+  const CommitListIcon = isCommitListHidden ? PanelLeftOpen : PanelLeftClose;
 
   return (
     <header
@@ -27,6 +41,22 @@ export function Toolbar({ className }: ToolbarProps) {
       )}
     >
       <div className="flex items-center gap-2">
+        <button
+          aria-label={commitListLabel}
+          className={cn(
+            "relative flex h-8 w-8 items-center justify-center rounded",
+            "text-text-secondary hover:text-text-primary",
+            "hover:bg-bg-hover active:bg-bg-active",
+            "transition-colors duration-150",
+            "disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+          disabled={isCommitListToggleDisabled}
+          onClick={onToggleCommitList}
+          title={`${commitListLabel} (⌘[)`}
+          type="button"
+        >
+          <CommitListIcon className="h-4 w-4" />
+        </button>
         <span className="font-medium text-sm text-text-secondary">
           Repository:
         </span>
