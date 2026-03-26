@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-24
+
+### Added
+
+- **Toggle commit list** — A new toolbar button (to the left of the repository picker) hides or shows the commit list panel, giving more room for the diff view. Use **⌘[** as a keyboard shortcut.
+
 ## [0.4.3] - 2026-03-24
 
 ### Added
