@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-03-24
+
+### Added
+
+- **Smarter author filter ordering** — The author filter now pins selected authors to the top and groups everyone else into **Recent contributors** and **Older contributors**, so active collaborators are easier to find.
+
+### Fixed
+
+- **Author filter no longer collapses while filtering** — Choosing an author now keeps the full contributor list available instead of shrinking the dropdown to only the authors in the currently filtered commit list.
+
 ## [0.4.2] - 2026-03-24
 
 ### Fixed
