@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-24
+
+### Added
+
+- **About Recap** — The native "About Recap" menu item now appears in the application menu, showing the app icon and version in the standard macOS about panel.
+
 ## [0.5.0] - 2026-03-24
 
 ### Added

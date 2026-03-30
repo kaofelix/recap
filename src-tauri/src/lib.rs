@@ -1,7 +1,8 @@
 mod commands;
 mod git;
 
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::image::Image;
+use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
 const CHECK_FOR_UPDATES_MENU_ID: &str = "check_for_updates";
@@ -16,6 +17,11 @@ pub fn run() {
                     .build(app)?;
 
             let app_submenu = SubmenuBuilder::new(app, "Recap")
+                .about(Some(AboutMetadata {
+                    icon: Image::from_bytes(include_bytes!("../icons/icon.png")).ok(),
+                    ..Default::default()
+                }))
+                .separator()
                 .item(&check_for_updates)
                 .separator()
                 .services()
