@@ -30,6 +30,11 @@
     var(--theme-accent-primary) 15%,
     white
   );
+  --theme-selection-bg: color-mix(
+    in oklch,
+    var(--theme-accent-primary) 30%,
+    white
+  );
   --theme-list-selected-unfocused: #f3f4f6;
 
   /* Diff colors */
@@ -87,6 +92,11 @@
   --theme-accent-muted: color-mix(
     in oklch,
     var(--theme-accent-primary) 20%,
+    var(--theme-bg-secondary)
+  );
+  --theme-selection-bg: color-mix(
+    in oklch,
+    var(--theme-accent-primary) 50%,
     var(--theme-bg-secondary)
   );
   --theme-list-selected-unfocused: #21262d;
@@ -210,7 +220,7 @@ body {
 
 /* Selection highlight */
 ::selection {
-  background-color: var(--color-accent-muted);
+  background-color: var(--theme-selection-bg);
   color: var(--color-text-primary);
 }
 
