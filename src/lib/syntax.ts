@@ -1,4 +1,5 @@
 import Prism from "prismjs";
+import { DiffMethod } from "react-diff-viewer-continued";
 
 // Import additional languages (order matters due to dependencies)
 // Core languages first
@@ -161,4 +162,31 @@ export function highlightCode(
   }
 
   return Prism.highlight(code, Prism.languages[language], language);
+}
+
+/**
+ * Map of Prism language identifiers to optimized DiffMethod values.
+ * Only languages with dedicated structural diff algorithms are listed.
+ */
+const LANGUAGE_TO_DIFF_METHOD: Partial<Record<string, DiffMethod>> = {
+  json: DiffMethod.JSON,
+  yaml: DiffMethod.YAML,
+};
+
+/**
+ * Get the optimal DiffMethod for a file path based on its extension.
+ * Returns format-specific methods (JSON, YAML) when available,
+ * falling back to WORDS for general code files.
+ */
+export function getDiffMethodForPath(filePath: string | null): DiffMethod {
+  if (!filePath) {
+    return DiffMethod.WORDS;
+  }
+
+  const language = getLanguageFromPath(filePath);
+  if (language && language in LANGUAGE_TO_DIFF_METHOD) {
+    return LANGUAGE_TO_DIFF_METHOD[language];
+  }
+
+  return DiffMethod.WORDS;
 }

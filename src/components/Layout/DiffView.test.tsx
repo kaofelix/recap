@@ -926,6 +926,86 @@ describe("DiffView", () => {
     expect(screen.getByRole("button", { name: "Unified view" })).toBeEnabled();
   });
 
+  describe("format-specific diff method", () => {
+    it("uses JSON diff method for .json files", async () => {
+      mockInvoke.mockResolvedValue({
+        old_content: '{"key": "old"}',
+        new_content: '{"key": "new"}',
+        is_binary: false,
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitId: "abc123",
+        selectedFilePath: "package.json",
+      });
+
+      render(<DiffView />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+          "data-compare-method",
+          "diffJson"
+        );
+      });
+    });
+
+    it("uses YAML diff method for .yml files", async () => {
+      mockInvoke.mockResolvedValue({
+        old_content: "key: old",
+        new_content: "key: new",
+        is_binary: false,
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitId: "abc123",
+        selectedFilePath: "config.yml",
+      });
+
+      render(<DiffView />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+          "data-compare-method",
+          "diffYaml"
+        );
+      });
+    });
+
+    it("uses WORDS diff method for regular code files", async () => {
+      mockInvoke.mockResolvedValue({
+        old_content: "const x = 1;",
+        new_content: "const x = 2;",
+        is_binary: false,
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitId: "abc123",
+        selectedFilePath: "src/app.ts",
+      });
+
+      render(<DiffView />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+          "data-compare-method",
+          "diffWords"
+        );
+      });
+    });
+  });
+
   describe("file navigation", () => {
     it("shows up and down navigation buttons", () => {
       useAppStore.setState({

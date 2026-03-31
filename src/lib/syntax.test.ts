@@ -1,5 +1,10 @@
+import { DiffMethod } from "react-diff-viewer-continued";
 import { describe, expect, it } from "vitest";
-import { getLanguageFromPath, highlightCode } from "./syntax";
+import {
+  getDiffMethodForPath,
+  getLanguageFromPath,
+  highlightCode,
+} from "./syntax";
 
 describe("getLanguageFromPath", () => {
   it.each([
@@ -95,5 +100,40 @@ describe("highlightCode", () => {
 
   it("handles null input", () => {
     expect(highlightCode(null, "typescript")).toBe("");
+  });
+});
+
+describe("getDiffMethodForPath", () => {
+  it.each([
+    ["config.json", DiffMethod.JSON],
+    ["package.json", DiffMethod.JSON],
+    ["tsconfig.json", DiffMethod.JSON],
+    ["data.JSON", DiffMethod.JSON],
+  ])("returns JSON diff method for %s", (filePath, expected) => {
+    expect(getDiffMethodForPath(filePath)).toBe(expected);
+  });
+
+  it.each([
+    ["config.yaml", DiffMethod.YAML],
+    ["config.yml", DiffMethod.YAML],
+    ["docker-compose.yaml", DiffMethod.YAML],
+    ["config.YML", DiffMethod.YAML],
+  ])("returns YAML diff method for %s", (filePath, expected) => {
+    expect(getDiffMethodForPath(filePath)).toBe(expected);
+  });
+
+  it.each([
+    ["app.ts", DiffMethod.WORDS],
+    ["main.rs", DiffMethod.WORDS],
+    ["styles.css", DiffMethod.WORDS],
+    ["README.md", DiffMethod.WORDS],
+    ["Makefile", DiffMethod.WORDS],
+    ["unknown.xyz", DiffMethod.WORDS],
+  ])("returns WORDS diff method for %s", (filePath, expected) => {
+    expect(getDiffMethodForPath(filePath)).toBe(expected);
+  });
+
+  it("returns WORDS when path is null", () => {
+    expect(getDiffMethodForPath(null)).toBe(DiffMethod.WORDS);
   });
 });

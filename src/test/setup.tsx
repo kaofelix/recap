@@ -221,6 +221,7 @@ vi.mock("react-diff-viewer-continued", () => ({
     oldValue,
     newValue,
     splitView,
+    compareMethod,
     renderContent,
     useDarkTheme,
     styles,
@@ -228,6 +229,7 @@ vi.mock("react-diff-viewer-continued", () => ({
     oldValue: string;
     newValue: string;
     splitView: boolean;
+    compareMethod?: string;
     renderContent?: (source: string) => React.ReactElement;
     useDarkTheme?: boolean;
     styles?: {
@@ -247,6 +249,7 @@ vi.mock("react-diff-viewer-continued", () => ({
 
     return (
       <div
+        data-compare-method={compareMethod}
         data-gutter-background-dark-dark={
           styles?.variables?.dark?.gutterBackgroundDark
         }
@@ -263,10 +266,15 @@ vi.mock("react-diff-viewer-continued", () => ({
     );
   },
   DiffMethod: {
-    CHARS: "CHARS",
-    WORDS: "WORDS",
-    LINES: "LINES",
-    SENTENCES: "SENTENCES",
+    CHARS: "diffChars",
+    WORDS: "diffWords",
+    WORDS_WITH_SPACE: "diffWordsWithSpace",
+    LINES: "diffLines",
+    TRIMMED_LINES: "diffTrimmedLines",
+    SENTENCES: "diffSentences",
+    CSS: "diffCss",
+    JSON: "diffJson",
+    YAML: "diffYaml",
   },
 }));
 

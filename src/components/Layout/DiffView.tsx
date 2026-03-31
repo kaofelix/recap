@@ -16,14 +16,18 @@ import {
 } from "lucide-react";
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
+import ReactDiffViewer, { type DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommand } from "../../hooks/useCommand";
 import { useFileContents } from "../../hooks/useFileContents";
 import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useTheme } from "../../hooks/useTheme";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
-import { getLanguageFromPath, highlightCode } from "../../lib/syntax";
+import {
+  getDiffMethodForPath,
+  getLanguageFromPath,
+  highlightCode,
+} from "../../lib/syntax";
 import { cn, splitPath } from "../../lib/utils";
 import { parseWorkingChangeId } from "../../lib/workingChangesList";
 import {
@@ -403,6 +407,7 @@ interface DiffContentProps {
   splitView: boolean;
   wordWrap: boolean;
   isDarkTheme: boolean;
+  compareMethod: DiffMethod;
   renderContent: (source: string) => ReactElement;
 }
 
@@ -418,6 +423,7 @@ function DiffContent({
   splitView,
   wordWrap,
   isDarkTheme,
+  compareMethod,
   renderContent,
 }: DiffContentProps) {
   const diffStyles = useMemo(() => getDiffStyles(wordWrap), [wordWrap]);
@@ -443,7 +449,7 @@ function DiffContent({
 
   return (
     <ReactDiffViewer
-      compareMethod={DiffMethod.WORDS}
+      compareMethod={compareMethod}
       hideLineNumbers={false}
       infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
       newValue={newValue}
@@ -754,6 +760,7 @@ export function DiffView({ className }: DiffViewProps) {
 
       <div className="min-h-0 flex-1 select-text overflow-hidden">
         <DiffContent
+          compareMethod={getDiffMethodForPath(selectedFilePath)}
           error={error}
           hasChanges={hasChanges}
           hasData={hasData}
