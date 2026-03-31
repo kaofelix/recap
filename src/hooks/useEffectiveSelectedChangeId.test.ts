@@ -19,6 +19,7 @@ const model: WorkingChangesListModel = {
         unstaged_deletions: 0,
         old_path: null,
         section: "staged",
+        mtime_ms: null,
       },
     },
     {
@@ -35,6 +36,7 @@ const model: WorkingChangesListModel = {
         unstaged_deletions: 0,
         old_path: null,
         section: "unstaged",
+        mtime_ms: null,
       },
     },
   ],

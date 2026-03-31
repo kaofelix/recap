@@ -16,6 +16,7 @@ describe("useWorkingChangesListModel", () => {
         unstaged_deletions: 0,
         old_path: null,
         section: "unstaged",
+        mtime_ms: null,
       },
       {
         path: "src/staged.ts",
@@ -27,6 +28,7 @@ describe("useWorkingChangesListModel", () => {
         unstaged_deletions: 0,
         old_path: null,
         section: "staged",
+        mtime_ms: null,
       },
     ];
 
@@ -50,6 +52,7 @@ describe("useWorkingChangesListModel", () => {
         unstaged_deletions: 0,
         old_path: null,
         section: "unstaged",
+        mtime_ms: null,
       },
       {
         path: "src/modified.ts",
@@ -61,6 +64,7 @@ describe("useWorkingChangesListModel", () => {
         unstaged_deletions: 1,
         old_path: null,
         section: "unstaged",
+        mtime_ms: null,
       },
     ];
 
@@ -91,6 +95,7 @@ describe("useWorkingChangesListModel", () => {
         unstaged_deletions: 0,
         old_path: null,
         section: "staged",
+        mtime_ms: null,
       },
     ];
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commandEmitter } from "../../commands";
 import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
+import type { WorkingFile } from "../../types/file";
 import { FileList } from "./FileList";
 
 // Mock Tauri invoke
@@ -99,6 +100,7 @@ describe("FileList", () => {
           unstaged_deletions: 0,
           old_path: null,
           section: "staged",
+          mtime_ms: null,
         },
         {
           path: "src/unstaged.ts",
@@ -110,6 +112,7 @@ describe("FileList", () => {
           unstaged_deletions: 0,
           old_path: null,
           section: "unstaged",
+          mtime_ms: null,
         },
       ],
       changedFiles: [
@@ -123,6 +126,7 @@ describe("FileList", () => {
           unstaged_deletions: 0,
           old_path: null,
           section: "staged",
+          mtime_ms: null,
         },
         {
           path: "src/unstaged.ts",
@@ -134,6 +138,7 @@ describe("FileList", () => {
           unstaged_deletions: 0,
           old_path: null,
           section: "unstaged",
+          mtime_ms: null,
         },
       ],
     });
@@ -157,7 +162,7 @@ describe("FileList", () => {
   });
 
   it("hides Unstaged Changes header when only untracked files exist", async () => {
-    const untrackedFile = {
+    const untrackedFile: WorkingFile = {
       path: "src/newfile.ts",
       staged_status: null,
       unstaged_status: "Untracked",
@@ -166,7 +171,8 @@ describe("FileList", () => {
       unstaged_additions: 10,
       unstaged_deletions: 0,
       old_path: null,
-      section: "unstaged" as const,
+      section: "unstaged",
+      mtime_ms: null,
     };
 
     useAppStore.setState({

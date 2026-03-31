@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-24
+
+### Fixed
+
+- **Unstaged Changes header no longer appears for untracked-only files** — When the working directory only had untracked files, an empty "Unstaged Changes" header was shown above the "Untracked" section.
+- **Diff view now refreshes when editing a file without changing line counts** — Modifying the content of an already-changed line (e.g., tweaking a value) no longer requires switching away and back to see the updated diff.
+
 ## [0.5.1] - 2026-03-24
 
 ### Added

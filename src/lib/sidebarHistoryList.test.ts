@@ -29,6 +29,7 @@ const workingFile = (
   unstaged_deletions: 0,
   old_path: null,
   section,
+  mtime_ms: null,
 });
 
 describe("sidebarHistoryList", () => {
