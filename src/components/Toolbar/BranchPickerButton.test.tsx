@@ -1,8 +1,10 @@
 import { act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
+import { useToastStore } from "../../store/toastStore";
 import { tauriMocks } from "../../test/setup";
 import { render, screen, userEvent } from "../../test/utils";
+import { Toaster } from "../Toaster";
 import { BranchPickerButton } from "./BranchPickerButton";
 
 function createMockBranches() {
@@ -39,6 +41,7 @@ describe("BranchPickerButton", () => {
     // Reset store state
     act(() => {
       useAppStore.getState().clearRepos();
+      useToastStore.getState().clearToasts();
     });
 
     // Reset mocks
@@ -229,7 +232,7 @@ describe("BranchPickerButton", () => {
     });
   });
 
-  it("should show error when checkout fails", async () => {
+  it("should show a toast when checkout fails", async () => {
     const user = userEvent.setup();
 
     tauriMocks.invoke.mockImplementation((cmd: string) => {
@@ -248,7 +251,12 @@ describe("BranchPickerButton", () => {
       useAppStore.getState().addRepo("/path/to/my-repo");
     });
 
-    render(<BranchPickerButton />);
+    render(
+      <>
+        <BranchPickerButton />
+        <Toaster />
+      </>
+    );
 
     await waitFor(() => {
       expect(screen.getByText("main")).toBeInTheDocument();
@@ -260,11 +268,10 @@ describe("BranchPickerButton", () => {
     const featureAItem = screen.getByRole("menuitem", { name: /feature-a/i });
     await user.click(featureAItem);
 
-    // Dropdown closes after click, re-open to see error
-    await user.click(button);
-
     await waitFor(() => {
-      expect(screen.getByText(/uncommitted changes/i)).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /uncommitted changes/i
+      );
     });
   });
 

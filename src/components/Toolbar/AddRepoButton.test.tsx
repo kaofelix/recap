@@ -1,8 +1,10 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../store/appStore";
+import { useToastStore } from "../../store/toastStore";
 import { tauriMocks } from "../../test/setup";
 import { render, screen, waitFor } from "../../test/utils";
+import { Toaster } from "../Toaster";
 import { AddRepoButton } from "./AddRepoButton";
 
 // Regex pattern for button name matching
@@ -13,6 +15,7 @@ describe("AddRepoButton", () => {
     // Reset store state
     act(() => {
       useAppStore.getState().clearRepos();
+      useToastStore.getState().clearToasts();
     });
     // Reset mocks
     vi.clearAllMocks();
@@ -122,15 +125,19 @@ describe("AddRepoButton", () => {
     });
   });
 
-  it("should call onError when validation fails", async () => {
+  it("should show a toast when validation fails", async () => {
     const mockPath = "/path/to/invalid-folder";
     const errorMessage = "Not a valid git repository";
 
     tauriMocks.dialogOpen.mockResolvedValue(mockPath);
     tauriMocks.invoke.mockRejectedValue(new Error(errorMessage));
 
-    const onError = vi.fn();
-    render(<AddRepoButton onError={onError} />);
+    render(
+      <>
+        <AddRepoButton />
+        <Toaster />
+      </>
+    );
 
     const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
@@ -138,21 +145,25 @@ describe("AddRepoButton", () => {
     });
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith(errorMessage);
+      expect(screen.getByRole("alert")).toHaveTextContent(errorMessage);
     });
 
     expect(useAppStore.getState().repos).toHaveLength(0);
   });
 
-  it("should call onError with string errors", async () => {
+  it("should show a toast with string errors", async () => {
     const mockPath = "/path/to/invalid-folder";
     const errorMessage = "String error message";
 
     tauriMocks.dialogOpen.mockResolvedValue(mockPath);
     tauriMocks.invoke.mockRejectedValue(errorMessage);
 
-    const onError = vi.fn();
-    render(<AddRepoButton onError={onError} />);
+    render(
+      <>
+        <AddRepoButton />
+        <Toaster />
+      </>
+    );
 
     const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
     await act(async () => {
@@ -160,7 +171,7 @@ describe("AddRepoButton", () => {
     });
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith(errorMessage);
+      expect(screen.getByRole("alert")).toHaveTextContent(errorMessage);
     });
   });
 

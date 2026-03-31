@@ -21,11 +21,6 @@ export function Toolbar({
   isCommitListToggleDisabled = false,
   onToggleCommitList,
 }: ToolbarProps) {
-  const handleAddRepoError = (message: string) => {
-    // TODO: Replace with toast notification
-    console.error("Failed to add repository:", message);
-  };
-
   const commitListLabel = isCommitListHidden
     ? "Show commit list"
     : "Hide commit list";
@@ -61,7 +56,7 @@ export function Toolbar({
           Repository:
         </span>
         <RepoPickerButton />
-        <AddRepoButton onError={handleAddRepoError} />
+        <AddRepoButton />
       </div>
 
       <div className="flex items-center gap-2">

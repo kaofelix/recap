@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore } from "../../store/appStore";
+import { useToastStore } from "../../store/toastStore";
 
 export interface RepoInfo {
   path: string;
@@ -12,12 +13,12 @@ export interface RepoInfo {
 
 export interface AddRepoButtonProps {
   className?: string;
-  onError?: (message: string) => void;
 }
 
-export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
+export function AddRepoButton({ className }: AddRepoButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const addRepo = useAppStore((state) => state.addRepo);
+  const addToast = useToastStore((state) => state.addToast);
 
   const handleClick = async () => {
     try {
@@ -47,7 +48,7 @@ export function AddRepoButton({ className, onError }: AddRepoButtonProps) {
       addRepo(repoInfo.path);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      onError?.(message);
+      addToast({ message });
     } finally {
       setIsLoading(false);
     }

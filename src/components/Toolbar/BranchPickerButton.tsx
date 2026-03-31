@@ -14,6 +14,7 @@ import {
   useCurrentBranchName,
   useSelectedRepo,
 } from "../../store";
+import { useToastStore } from "../../store/toastStore";
 import type { Branch } from "../../types/branch";
 
 export interface BranchPickerButtonProps {
@@ -35,10 +36,10 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   const selectedRepo = useSelectedRepo();
   const selectCommit = useAppStore((state) => state.selectCommit);
   const currentBranchName = useCurrentBranchName();
+  const addToast = useToastStore((state) => state.addToast);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Use store's currentBranchName (polled), falling back to local branch list
   const displayBranchName =
@@ -53,14 +54,14 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
 
       if (!silent) {
         setIsLoading(true);
-        setError(null);
       }
       try {
         const result = await listBranches(selectedRepo.path);
         setBranches(result);
       } catch (err) {
         if (!silent) {
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          addToast({ message });
           setBranches([]);
         }
       } finally {
@@ -69,7 +70,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
         }
       }
     },
-    [selectedRepo]
+    [selectedRepo, addToast]
   );
 
   // Fetch branches on repo change
@@ -101,7 +102,6 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
     }
 
     setIsLoading(true);
-    setError(null);
     try {
       await checkoutBranch(selectedRepo.path, branchName);
       // Refresh branches to update current
@@ -109,7 +109,8 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
       // Clear commit selection since we're on a new branch
       selectCommit(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      addToast({ message });
     } finally {
       setIsLoading(false);
     }
@@ -156,17 +157,13 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
           )}
           sideOffset={4}
         >
-          {error && (
-            <div className="px-3 py-2 text-red-500 text-sm">{error}</div>
-          )}
-
           {isLoading && localBranches.length === 0 && (
             <div className="px-3 py-2 text-sm text-text-secondary">
               Loading...
             </div>
           )}
 
-          {!isLoading && localBranches.length === 0 && !error && (
+          {!isLoading && localBranches.length === 0 && (
             <div className="px-3 py-2 text-sm text-text-secondary">
               No branches found
             </div>
