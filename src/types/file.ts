@@ -58,4 +58,6 @@ export interface WorkingFile {
   old_path: string | null;
   /** Which section this entry belongs to */
   section: WorkingFileSection;
+  /** File modification time in milliseconds since epoch (for change detection) */
+  mtime_ms: number | null;
 }

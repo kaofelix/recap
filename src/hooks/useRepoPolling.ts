@@ -187,7 +187,10 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       setChangesError(null);
 
       // Only bump revision if working changes actually changed
-      // This prevents unnecessary re-fetches of file contents
+      // This prevents unnecessary re-fetches of file contents.
+      // mtime_ms is included so edits that don't change line counts
+      // (e.g., modifying the content of an already-modified line) still
+      // trigger a diff refresh.
       const fingerprint = JSON.stringify(
         result.map((f) => ({
           path: f.path,
@@ -196,6 +199,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
           staged_deletions: f.staged_deletions,
           unstaged_additions: f.unstaged_additions,
           unstaged_deletions: f.unstaged_deletions,
+          mtime_ms: f.mtime_ms,
         }))
       );
 

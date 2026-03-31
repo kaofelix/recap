@@ -1,3 +1,6 @@
+use std::path::Path;
+use std::time::SystemTime;
+
 use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, Repository};
 use serde::Serialize;
 
@@ -62,6 +65,8 @@ pub struct WorkingFile {
     pub old_path: Option<String>,
     /// Which section this entry belongs to: "staged" or "unstaged"
     pub section: String,
+    /// File modification time in milliseconds since epoch (for change detection)
+    pub mtime_ms: Option<u64>,
 }
 
 /// Type of diff line
@@ -1322,6 +1327,13 @@ pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, Strin
             (0, 0)
         };
 
+        // Get file modification time for change detection
+        let mtime_ms = std::fs::metadata(Path::new(repo_path).join(&path))
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64);
+
         // Create entry for staged changes if present
         if staged_status.is_some() {
             files.push(WorkingFile {
@@ -1334,6 +1346,7 @@ pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, Strin
                 unstaged_deletions: 0,
                 old_path: None,
                 section: "staged".to_string(),
+                mtime_ms,
             });
         }
 
@@ -1349,6 +1362,7 @@ pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, Strin
                 unstaged_deletions,
                 old_path: None,
                 section: "unstaged".to_string(),
+                mtime_ms,
             });
         }
     }
