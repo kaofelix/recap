@@ -142,9 +142,11 @@ describe("FileList", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Staged Changes (1)")).toBeInTheDocument();
-      expect(screen.getByText("Unstaged Changes (1)")).toBeInTheDocument();
+      expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
     });
 
+    // No "Unstaged Changes" header when all unstaged files are untracked
+    expect(screen.queryByText(/Unstaged Changes/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Uncommitted changes" })
@@ -152,6 +154,39 @@ describe("FileList", () => {
     expect(screen.getByText("staged.ts")).toBeInTheDocument();
     expect(screen.getByText("unstaged.ts")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Commit…" })).toBeInTheDocument();
+  });
+
+  it("hides Unstaged Changes header when only untracked files exist", async () => {
+    const untrackedFile = {
+      path: "src/newfile.ts",
+      staged_status: null,
+      unstaged_status: "Untracked",
+      staged_additions: 0,
+      staged_deletions: 0,
+      unstaged_additions: 10,
+      unstaged_deletions: 0,
+      old_path: null,
+      section: "unstaged" as const,
+    };
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
+      viewMode: "changes",
+      workingChanges: [untrackedFile],
+      changedFiles: [untrackedFile],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Untracked (1)")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Unstaged Changes/)).not.toBeInTheDocument();
+    expect(screen.getByText("newfile.ts")).toBeInTheDocument();
   });
 
   it("displays changed files when loaded successfully", async () => {

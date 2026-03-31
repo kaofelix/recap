@@ -407,17 +407,26 @@ function WorkingChangesContent({
 
         return (
           <div key={section.section}>
-            <ChangesSectionHeader
-              actionLabel={actionLabel}
-              onAction={handleAction}
-              title={section.title}
-            />
-
-            {trackedItems.length > 0 && renderItems(trackedItems)}
+            {trackedItems.length > 0 && (
+              <>
+                <ChangesSectionHeader
+                  actionLabel={actionLabel}
+                  onAction={handleAction}
+                  title={`Unstaged Changes (${trackedItems.length})`}
+                />
+                {renderItems(trackedItems)}
+              </>
+            )}
 
             {untrackedItems.length > 0 && (
-              <div className="mt-2">
+              <div className={trackedItems.length > 0 ? "mt-2" : undefined}>
                 <ChangesSectionHeader
+                  actionLabel={
+                    trackedItems.length === 0 ? actionLabel : undefined
+                  }
+                  onAction={
+                    trackedItems.length === 0 ? handleAction : undefined
+                  }
                   title={`Untracked (${untrackedItems.length})`}
                 />
                 {renderItems(untrackedItems)}
