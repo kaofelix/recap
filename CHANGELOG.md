@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-24
+
+### Fixed
+
+- **Copy, paste, cut, and select-all now work** — Added the native Edit menu so standard keyboard shortcuts (⌘C, ⌘V, ⌘X, ⌘A) are properly handled by the webview.
+- **Text selection highlight is now visible in dark mode** — Selection was nearly invisible due to low-contrast background; now uses a more prominent highlight.
+- **Select All no longer selects UI chrome** — ⌘A only selects text in content areas (diff view, toasts) instead of the entire app interface.
+
 ## [0.5.2] - 2026-03-24
 
 ### Fixed
