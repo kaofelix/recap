@@ -154,7 +154,7 @@ export function FileListItem({
   return (
     <button
       className={cn(
-        "file-list-item flex w-full cursor-default select-none items-center gap-2 rounded px-2 py-1.5 text-left",
+        "file-list-item flex w-full cursor-default items-center gap-2 rounded px-2 py-1.5 text-left",
         // Selected state: filled background
         isSelected &&
           (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused"),

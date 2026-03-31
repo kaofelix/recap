@@ -487,7 +487,7 @@ function UncommittedChangesItem({
   return (
     <button
       className={cn(
-        "w-full cursor-default select-none rounded p-2 text-left",
+        "w-full cursor-default rounded p-2 text-left",
         isSelected &&
           (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused")
       )}
@@ -611,7 +611,7 @@ function CommitListItem({
   return (
     <button
       className={cn(
-        "w-full cursor-default select-none rounded p-2 text-left",
+        "w-full cursor-default rounded p-2 text-left",
         isSelected &&
           (isFocused ? "bg-accent-muted" : "bg-list-selected-unfocused"),
         isContextMenuTarget &&

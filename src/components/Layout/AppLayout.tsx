@@ -475,7 +475,7 @@ export function AppLayout({ className }: AppLayoutProps) {
   return (
     <div
       className={cn(
-        "flex h-screen w-screen flex-col",
+        "flex h-screen w-screen select-none flex-col",
         "bg-bg-primary text-text-primary",
         className
       )}

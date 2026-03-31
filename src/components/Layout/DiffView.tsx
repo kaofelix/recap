@@ -752,7 +752,7 @@ export function DiffView({ className }: DiffViewProps) {
         </Provider>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 select-text overflow-hidden">
         <DiffContent
           error={error}
           hasChanges={hasChanges}

@@ -23,7 +23,7 @@ export function Toaster() {
           role="alert"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <p className="flex-1 text-sm">{toast.message}</p>
+          <p className="flex-1 select-text text-sm">{toast.message}</p>
           <button
             aria-label="Dismiss"
             className={cn(
