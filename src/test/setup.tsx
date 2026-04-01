@@ -222,6 +222,7 @@ vi.mock("react-diff-viewer-continued", () => ({
     newValue,
     splitView,
     compareMethod,
+    codeFoldMessageRenderer,
     renderContent,
     useDarkTheme,
     styles,
@@ -230,6 +231,11 @@ vi.mock("react-diff-viewer-continued", () => ({
     newValue: string;
     splitView: boolean;
     compareMethod?: string;
+    codeFoldMessageRenderer?: (
+      totalFoldedLines: number,
+      leftStartLineNumber: number,
+      rightStartLineNumber: number
+    ) => React.ReactElement;
     renderContent?: (source: string) => React.ReactElement;
     useDarkTheme?: boolean;
     styles?: {
@@ -256,6 +262,7 @@ vi.mock("react-diff-viewer-continued", () => ({
         data-gutter-background-dark-light={
           styles?.variables?.light?.gutterBackgroundDark
         }
+        data-has-code-fold-renderer={String(!!codeFoldMessageRenderer)}
         data-split-view={splitView}
         data-testid="diff-viewer"
         data-use-dark-theme={String(Boolean(useDarkTheme))}

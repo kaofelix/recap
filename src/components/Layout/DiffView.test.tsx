@@ -11,7 +11,7 @@ import { FocusProvider } from "../../context/FocusContext";
 import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
 import { tauriMocks } from "../../test/setup";
-import { DiffView } from "./DiffView";
+import { codeFoldMessage, DiffView } from "./DiffView";
 
 const mockInvoke = tauriMocks.invoke;
 
@@ -1260,6 +1260,44 @@ describe("DiffView", () => {
 
       // Should stay on last file
       expect(useAppStore.getState().selectedFilePath).toBe("src/c.ts");
+    });
+  });
+
+  describe("codeFoldMessage", () => {
+    it("shows the number of unchanged lines for singular", () => {
+      const { container } = render(codeFoldMessage(1, 5, 5));
+      expect(container.textContent).toBe("1 unchanged line");
+    });
+
+    it("shows the number of unchanged lines for plural", () => {
+      const { container } = render(codeFoldMessage(42, 10, 10));
+      expect(container.textContent).toBe("42 unchanged lines");
+    });
+
+    it("passes codeFoldMessageRenderer to diff viewer", async () => {
+      mockInvoke.mockResolvedValue({
+        old_content: "old content",
+        new_content: "new content",
+        is_binary: false,
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitId: "abc123",
+        selectedFilePath: "src/app.ts",
+      });
+
+      render(<DiffView />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
+          "data-has-code-fold-renderer",
+          "true"
+        );
+      });
     });
   });
 });

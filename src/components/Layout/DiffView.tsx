@@ -53,6 +53,23 @@ export interface DiffViewProps {
   className?: string;
 }
 
+/** Render a user-friendly code fold message instead of the default @@ hunk header */
+export function codeFoldMessage(
+  totalFoldedLines: number,
+  _leftStartLineNumber: number,
+  _rightStartLineNumber: number
+): ReactElement {
+  const label =
+    totalFoldedLines === 1
+      ? "1 unchanged line"
+      : `${totalFoldedLines} unchanged lines`;
+  return (
+    <span style={{ color: "var(--color-text-tertiary)", fontWeight: "normal" }}>
+      {label}
+    </span>
+  );
+}
+
 type DiffDisplayMode = "split" | "unified";
 
 const NON_CONSECUTIVE_SELECTION_ERROR =
@@ -85,7 +102,7 @@ const themeVariables = {
     gutterColor: "var(--color-text-tertiary)",
     addedGutterColor: "var(--color-text-primary)",
     removedGutterColor: "var(--color-text-primary)",
-    codeFoldContentColor: "var(--color-text-secondary)",
+    codeFoldContentColor: "var(--color-text-tertiary)",
     codeFoldBackground: "var(--color-bg-secondary)",
     codeFoldGutterBackground: "var(--color-bg-secondary)",
     emptyLineBackground: "var(--color-bg-secondary)",
@@ -112,7 +129,7 @@ const themeVariables = {
     gutterColor: "var(--color-text-tertiary)",
     addedGutterColor: "var(--color-text-primary)",
     removedGutterColor: "var(--color-text-primary)",
-    codeFoldContentColor: "var(--color-text-secondary)",
+    codeFoldContentColor: "var(--color-text-tertiary)",
     codeFoldBackground: "var(--color-bg-secondary)",
     codeFoldGutterBackground: "var(--color-bg-secondary)",
     emptyLineBackground: "var(--color-bg-secondary)",
@@ -120,11 +137,24 @@ const themeVariables = {
 };
 
 /** Generate diff styles based on word wrap setting */
+/** Shared styles for code fold rows */
+/** Shared styles for code fold rows */
+const codeFoldStyles = {
+  codeFold: {
+    fontSize: "12px",
+    lineHeight: "32px",
+  },
+  codeFoldGutter: {
+    paddingLeft: "12px", // pl-3
+  },
+};
+
 function getDiffStyles(wordWrap: boolean) {
   if (wordWrap) {
     // Word wrap enabled: always fit, no horizontal scroll
     return {
       variables: themeVariables,
+      ...codeFoldStyles,
       diffContainer: {
         minWidth: "unset",
         width: "100%",
@@ -141,6 +171,7 @@ function getDiffStyles(wordWrap: boolean) {
   // Word wrap disabled: whole table scrolls horizontally together
   return {
     variables: themeVariables,
+    ...codeFoldStyles,
     diffContainer: {
       minWidth: "max-content",
       overflowX: "visible" as const,
@@ -449,6 +480,7 @@ function DiffContent({
 
   return (
     <ReactDiffViewer
+      codeFoldMessageRenderer={codeFoldMessage}
       compareMethod={compareMethod}
       hideLineNumbers={false}
       infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
