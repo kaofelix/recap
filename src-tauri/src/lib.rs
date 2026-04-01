@@ -10,7 +10,14 @@ const CHECK_FOR_UPDATES_EVENT: &str = "menu://check-for-updates";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(feature = "webdriver")]
+    {
+        builder = builder.plugin(tauri_plugin_webdriver::init());
+    }
+
+    builder
         .setup(|app| {
             let check_for_updates =
                 MenuItemBuilder::with_id(CHECK_FOR_UPDATES_MENU_ID, "Check for Updates…")
