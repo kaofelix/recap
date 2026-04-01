@@ -149,12 +149,25 @@ const codeFoldStyles = {
   },
 };
 
-function getDiffStyles(wordWrap: boolean) {
+// In split view, content columns share space after fixed gutter (2×50px)
+// and marker (2×28px) columns = 156px total. Each content column gets at
+// least half the remaining space so columns stay stable under virtualization
+// (prevents empty-side columns from collapsing when only additions/deletions
+// are visible in the current scroll window).
+const splitContentMinWidth = "calc((100% - 156px) / 2)";
+
+function getDiffStyles(wordWrap: boolean, splitView: boolean) {
+  // Stabilize column widths for split view under virtualization
+  const contentStyle = splitView
+    ? { minWidth: splitContentMinWidth }
+    : undefined;
+
   if (wordWrap) {
     // Word wrap enabled: always fit, no horizontal scroll
     return {
       variables: themeVariables,
       ...codeFoldStyles,
+      ...(contentStyle && { content: contentStyle }),
       diffContainer: {
         minWidth: "unset",
         width: "100%",
@@ -172,6 +185,7 @@ function getDiffStyles(wordWrap: boolean) {
   return {
     variables: themeVariables,
     ...codeFoldStyles,
+    ...(contentStyle && { content: contentStyle }),
     diffContainer: {
       minWidth: "max-content",
       overflowX: "visible" as const,
@@ -457,7 +471,10 @@ function DiffContent({
   compareMethod,
   renderContent,
 }: DiffContentProps) {
-  const diffStyles = useMemo(() => getDiffStyles(wordWrap), [wordWrap]);
+  const diffStyles = useMemo(
+    () => getDiffStyles(wordWrap, splitView),
+    [wordWrap, splitView]
+  );
 
   if (!hasFile) {
     return <DiffPlaceholder message="Select a file to view diff" />;
@@ -483,6 +500,7 @@ function DiffContent({
       codeFoldMessageRenderer={codeFoldMessage}
       compareMethod={compareMethod}
       hideLineNumbers={false}
+      infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
       newValue={newValue}
       oldValue={oldValue}
       renderContent={renderContent}
@@ -789,7 +807,7 @@ export function DiffView({ className }: DiffViewProps) {
         </Provider>
       </div>
 
-      <div className="flex-1 select-text overflow-auto">
+      <div className="diff-scroll-wrapper min-h-0 flex-1 select-text overflow-hidden">
         <DiffContent
           compareMethod={getDiffMethodForPath(selectedFilePath)}
           error={error}

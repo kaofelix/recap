@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 *.pxd
+
+# E2E tests (not part of the main test suite)
+e2e/

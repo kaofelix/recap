@@ -252,6 +252,13 @@ tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
   background-color: var(--color-bg-secondary) !important;
 }
 
+/* Fix react-diff-viewer: the library sets inline overflowX: 'hidden' on its
+   scroll container when infiniteLoading is enabled. Override to allow
+   horizontal scrolling when word wrap is off. */
+.diff-scroll-wrapper > div[style] {
+  overflow-x: auto !important;
+}
+
 /* Theme toggle icon animation */
 @keyframes theme-icon-spin {
   0% {
