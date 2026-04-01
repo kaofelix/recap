@@ -184,8 +184,10 @@ export function getDiffMethodForPath(filePath: string | null): DiffMethod {
   }
 
   const language = getLanguageFromPath(filePath);
-  if (language && language in LANGUAGE_TO_DIFF_METHOD) {
-    return LANGUAGE_TO_DIFF_METHOD[language];
+  const method =
+    language != null ? LANGUAGE_TO_DIFF_METHOD[language] : undefined;
+  if (method != null) {
+    return method;
   }
 
   return DiffMethod.WORDS;

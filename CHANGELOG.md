@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-04-01
+
+### Improved
+
+- **Smarter diffs for JSON and YAML** — JSON and YAML files now use format-aware structural comparison, producing cleaner and faster diffs for large structured data files.
+- **Friendlier code fold messages** — Collapsed unchanged sections now show "N unchanged lines" instead of raw `@@` hunk headers.
+- **Diff viewer performance** — Re-enabled row virtualization so only visible rows are rendered, with fixes for split-view column stability and horizontal scrolling.
+
 ## [0.5.3] - 2026-03-24
 
 ### Fixed
