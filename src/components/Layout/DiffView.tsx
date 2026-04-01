@@ -483,7 +483,6 @@ function DiffContent({
       codeFoldMessageRenderer={codeFoldMessage}
       compareMethod={compareMethod}
       hideLineNumbers={false}
-      infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
       newValue={newValue}
       oldValue={oldValue}
       renderContent={renderContent}
@@ -790,7 +789,7 @@ export function DiffView({ className }: DiffViewProps) {
         </Provider>
       </div>
 
-      <div className="min-h-0 flex-1 select-text overflow-hidden">
+      <div className="flex-1 select-text overflow-auto">
         <DiffContent
           compareMethod={getDiffMethodForPath(selectedFilePath)}
           error={error}
