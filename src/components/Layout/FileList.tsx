@@ -88,6 +88,7 @@ function useCommitFiles(): UseCommitFilesResult {
     if (!(selectedRepo && selectedCommitIds.length > 0)) {
       previousSelectionRef.current = { repoPath: null, commitKey: null };
       setFiles([]);
+      setChangedFiles([]);
       setError(null);
       return;
     }

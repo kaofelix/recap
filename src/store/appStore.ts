@@ -188,12 +188,13 @@ export const useAppStore = create<AppState>()(
       },
 
       selectCommit: (id: string | null) => {
-        // Clear file selection and changed files when commit changes
+        // Clear file selection when commit changes.
+        // changedFiles is managed exclusively by the commit-files hook
+        // so we don't clear it here — the hook will replace it after fetching.
         set({
           selectedCommitIds: id ? [id] : [],
           selectedFilePath: null,
           selectedChangeId: null,
-          changedFiles: [],
         });
       },
 
@@ -203,7 +204,6 @@ export const useAppStore = create<AppState>()(
           selectedCommitIds: normalized,
           selectedFilePath: null,
           selectedChangeId: null,
-          changedFiles: [],
         });
       },
 
@@ -218,7 +218,6 @@ export const useAppStore = create<AppState>()(
             selectedCommitIds,
             selectedFilePath: null,
             selectedChangeId: null,
-            changedFiles: [],
           };
         });
       },
@@ -247,11 +246,13 @@ export const useAppStore = create<AppState>()(
       },
 
       setViewMode: (mode: ViewMode) => {
+        // Don't clear changedFiles — each mode's writer will manage it:
+        // - history: useCommitFiles replaces changedFiles on fetch
+        // - changes: DiffView reads workingChanges directly
         set({
           viewMode: mode,
           selectedFilePath: null,
           selectedChangeId: null,
-          changedFiles: [],
           isDiffMaximized: false,
         });
       },

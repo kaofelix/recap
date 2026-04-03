@@ -78,6 +78,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setChangesLoading = useAppStore((state) => state.setChangesLoading);
   const setChangesError = useAppStore((state) => state.setChangesError);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
+
   const setUnpushedCount = useAppStore((state) => state.setUnpushedCount);
   const setBehindCount = useAppStore((state) => state.setBehindCount);
   const setCurrentBranchName = useAppStore(
@@ -181,7 +182,6 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       });
       setWorkingChanges(result);
       if (viewMode === "changes") {
-        setChangedFiles(result);
         reconcileSelection(result, selectChange);
       }
       setChangesError(null);
@@ -210,7 +210,6 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     } catch (err) {
       setChangesError(err instanceof Error ? err.message : String(err));
       setWorkingChanges([]);
-      setChangedFiles([]);
     } finally {
       if (isInitial) {
         setChangesLoading(false);
@@ -220,7 +219,6 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     selectedRepo,
     viewMode,
     setWorkingChanges,
-    setChangedFiles,
     setChangesLoading,
     setChangesError,
     selectChange,

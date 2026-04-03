@@ -726,7 +726,7 @@ describe("appStore", () => {
       expect(result.current.changedFiles).toEqual(files);
     });
 
-    it("should be cleared when commit selection changes", () => {
+    it("should be preserved when commit selection changes", () => {
       const { result } = renderHook(() => useAppStore());
       const files = [makeFile("src/App.tsx")];
 
@@ -737,14 +737,16 @@ describe("appStore", () => {
 
       expect(result.current.changedFiles).toEqual(files);
 
+      // Changing commit does not clear changedFiles — the commit-files
+      // hook will replace them after fetching the new commit's files.
       act(() => {
         result.current.selectCommit("def456");
       });
 
-      expect(result.current.changedFiles).toEqual([]);
+      expect(result.current.changedFiles).toEqual(files);
     });
 
-    it("should be cleared when commit range selection changes", () => {
+    it("should be preserved when commit range selection changes", () => {
       const { result } = renderHook(() => useAppStore());
       const files = [makeFile("src/App.tsx")];
 
@@ -755,14 +757,16 @@ describe("appStore", () => {
 
       expect(result.current.changedFiles).toEqual(files);
 
+      // Changing range does not clear changedFiles — the commit-files
+      // hook will replace them after fetching.
       act(() => {
         result.current.selectCommitRange(["def456", "ghi789"]);
       });
 
-      expect(result.current.changedFiles).toEqual([]);
+      expect(result.current.changedFiles).toEqual(files);
     });
 
-    it("should be cleared when toggling commit selection", () => {
+    it("should be preserved when toggling commit selection", () => {
       const { result } = renderHook(() => useAppStore());
       const files = [makeFile("src/App.tsx")];
 
@@ -773,14 +777,16 @@ describe("appStore", () => {
 
       expect(result.current.changedFiles).toEqual(files);
 
+      // Toggling commit does not clear changedFiles — the commit-files
+      // hook will replace them after fetching.
       act(() => {
         result.current.toggleCommitSelection("def456");
       });
 
-      expect(result.current.changedFiles).toEqual([]);
+      expect(result.current.changedFiles).toEqual(files);
     });
 
-    it("should be cleared when view mode changes", () => {
+    it("should be preserved when view mode changes", () => {
       const { result } = renderHook(() => useAppStore());
       const files = [makeFile("src/App.tsx")];
 
@@ -790,11 +796,14 @@ describe("appStore", () => {
 
       expect(result.current.changedFiles).toEqual(files);
 
+      // Switching view mode does not clear changedFiles — each mode's
+      // writer owns the field (commit-files hook for history,
+      // workingChanges for changes mode via DiffView).
       act(() => {
         result.current.setViewMode("changes");
       });
 
-      expect(result.current.changedFiles).toEqual([]);
+      expect(result.current.changedFiles).toEqual(files);
     });
 
     it("should be cleared when repo selection changes", () => {
