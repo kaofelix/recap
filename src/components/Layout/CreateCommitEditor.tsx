@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useState } from "react";
+import { createCommit } from "../../api/commands";
 import { CommitMessageForm } from "./CommitMessageForm";
 
 export interface CreateCommitEditorProps {
@@ -29,10 +29,7 @@ export function CreateCommitEditor({
       setError(null);
 
       try {
-        await invoke("create_commit", {
-          repoPath,
-          message,
-        });
+        await createCommit(repoPath, message);
         // Reset the form by changing the key
         setFormKey((k) => k + 1);
         onCommitted();

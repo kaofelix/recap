@@ -1,4 +1,4 @@
-export type { AddRepoButtonProps, RepoInfo } from "./AddRepoButton";
+export type { AddRepoButtonProps } from "./AddRepoButton";
 export { AddRepoButton } from "./AddRepoButton";
 export type { BranchPickerButtonProps } from "./BranchPickerButton";
 export { BranchPickerButton } from "./BranchPickerButton";

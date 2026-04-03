@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
+import { getCommitFiles, getCommitRangeFiles } from "../api/commands";
 import {
   useAppStore,
   useSelectedCommitIds,
@@ -8,23 +8,6 @@ import {
 import type { ChangedFile } from "../types/file";
 
 const COMMIT_FETCH_DEBOUNCE_MS = 120;
-
-async function fetchCommitFiles(
-  repoPath: string,
-  commitId: string
-): Promise<ChangedFile[]> {
-  return invoke<ChangedFile[]>("get_commit_files", { repoPath, commitId });
-}
-
-async function fetchCommitRangeFiles(
-  repoPath: string,
-  commitIds: string[]
-): Promise<ChangedFile[]> {
-  return invoke<ChangedFile[]>("get_commit_range_files", {
-    repoPath,
-    commitIds,
-  });
-}
 
 /**
  * Select the first file after commit files are loaded.
@@ -94,8 +77,8 @@ export function useCommitFiles(): void {
     const runFetch = () => {
       const request =
         selectedCommitIds.length > 1
-          ? fetchCommitRangeFiles(repoPath, selectedCommitIds)
-          : fetchCommitFiles(repoPath, selectedCommitIds[0]);
+          ? getCommitRangeFiles(repoPath, selectedCommitIds)
+          : getCommitFiles(repoPath, selectedCommitIds[0]);
 
       request
         .then((result) => {

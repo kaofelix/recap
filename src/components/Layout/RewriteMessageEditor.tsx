@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useState } from "react";
+import { rewordCommit } from "../../api/commands";
 import { CommitMessageForm } from "./CommitMessageForm";
 
 export interface RewriteMessageEditorProps {
@@ -29,11 +29,7 @@ export function RewriteMessageEditor({
       setError(null);
 
       try {
-        await invoke("reword_commit", {
-          repoPath,
-          commitId,
-          newMessage,
-        });
+        await rewordCommit(repoPath, commitId, newMessage);
         onClose();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));

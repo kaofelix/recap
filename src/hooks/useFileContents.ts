@@ -1,5 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+import {
+  getCommitRangeFileContents,
+  getFileContents,
+  getStagedFileContents,
+  getUnstagedFileContents,
+  getWorkingFileContents,
+} from "../api/commands";
 import type { FileContents } from "../types/diff";
 import type { WorkingFileSection } from "../types/file";
 import type { Repository } from "../types/repository";
@@ -78,40 +84,23 @@ export function useFileContents(
 
     const fetchContents = async (): Promise<FileContents> => {
       if (activeCommitIds.length > 1) {
-        return invoke<FileContents>("get_commit_range_file_contents", {
-          repoPath,
-          commitIds: activeCommitIds,
-          filePath,
-        });
+        return getCommitRangeFileContents(repoPath, activeCommitIds, filePath);
       }
 
       if (activeCommitIds.length === 1) {
-        return invoke<FileContents>("get_file_contents", {
-          repoPath,
-          commitId: activeCommitIds[0],
-          filePath,
-        });
+        return getFileContents(repoPath, activeCommitIds[0], filePath);
       }
 
       // In changes mode, use section to determine which command to call
       if (section === "staged") {
-        return invoke<FileContents>("get_staged_file_contents", {
-          repoPath,
-          filePath,
-        });
+        return getStagedFileContents(repoPath, filePath);
       }
 
       if (section === "unstaged") {
-        return invoke<FileContents>("get_unstaged_file_contents", {
-          repoPath,
-          filePath,
-        });
+        return getUnstagedFileContents(repoPath, filePath);
       }
 
-      return invoke<FileContents>("get_working_file_contents", {
-        repoPath,
-        filePath,
-      });
+      return getWorkingFileContents(repoPath, filePath);
     };
 
     const runFetch = () => {

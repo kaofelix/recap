@@ -7,9 +7,9 @@ import {
   Separator,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
-import { invoke } from "@tauri-apps/api/core";
 import { Check, Filter } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { type AuthorInfo, listAuthors } from "../../api/commands";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -17,18 +17,11 @@ import {
   useSelectedRepo,
 } from "../../store/appStore";
 
-interface AuthorOption {
-  name: string;
-  email: string;
-  commit_count: number;
-  last_commit_timestamp: number;
-}
-
 const RECENT_CONTRIBUTOR_DAYS = 30;
 const RECENT_CONTRIBUTOR_WINDOW_SECONDS =
   RECENT_CONTRIBUTOR_DAYS * 24 * 60 * 60;
 
-function sortAuthors(authors: AuthorOption[]): AuthorOption[] {
+function sortAuthors(authors: AuthorInfo[]): AuthorInfo[] {
   return [...authors].sort((a, b) => {
     if (a.last_commit_timestamp !== b.last_commit_timestamp) {
       return b.last_commit_timestamp - a.last_commit_timestamp;
@@ -40,7 +33,7 @@ function sortAuthors(authors: AuthorOption[]): AuthorOption[] {
   });
 }
 
-function isRecentContributor(author: AuthorOption, now: number): boolean {
+function isRecentContributor(author: AuthorInfo, now: number): boolean {
   return (
     now - author.last_commit_timestamp <= RECENT_CONTRIBUTOR_WINDOW_SECONDS
   );
@@ -61,7 +54,7 @@ export function AuthorFilterDropdown() {
   const toggleAuthorFilter = useAppStore((state) => state.toggleAuthorFilter);
   const clearAuthorFilter = useAppStore((state) => state.clearAuthorFilter);
 
-  const [authors, setAuthors] = useState<AuthorOption[]>([]);
+  const [authors, setAuthors] = useState<AuthorInfo[]>([]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -74,9 +67,7 @@ export function AuthorFilterDropdown() {
 
     const loadAuthors = async () => {
       try {
-        const result = await invoke<AuthorOption[]>("list_authors", {
-          repoPath: selectedRepoPath,
-        });
+        const result = await listAuthors(selectedRepoPath);
         if (!cancelled) {
           setAuthors(result);
         }
@@ -107,9 +98,9 @@ export function AuthorFilterDropdown() {
       : authors;
 
     const now = Math.floor(Date.now() / 1000);
-    const selected: AuthorOption[] = [];
-    const recent: AuthorOption[] = [];
-    const older: AuthorOption[] = [];
+    const selected: AuthorInfo[] = [];
+    const recent: AuthorInfo[] = [];
+    const older: AuthorInfo[] = [];
 
     for (const author of matchingAuthors) {
       if (authorFilter.includes(author.email)) {
@@ -136,7 +127,7 @@ export function AuthorFilterDropdown() {
     [clearAuthorFilter]
   );
 
-  const renderAuthor = (author: AuthorOption) => {
+  const renderAuthor = (author: AuthorInfo) => {
     const isSelected = authorFilter.includes(author.email);
     return (
       <CheckboxItem

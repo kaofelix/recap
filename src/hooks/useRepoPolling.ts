@@ -1,8 +1,12 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef } from "react";
+import {
+  getAheadBehind,
+  getCurrentBranch,
+  getWorkingChanges,
+  listCommits,
+} from "../api/commands";
 import { buildWorkingChangesListModel } from "../lib/workingChangesList";
 import { useAppStore } from "../store/appStore";
-import type { Commit } from "../types/commit";
 import type { WorkingFile } from "../types/file";
 import type { Repository } from "../types/repository";
 import { useAppVisibility } from "./useAppVisibility";
@@ -111,16 +115,11 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       isInitialCommitsLoad.current = false;
     }
 
-    const listCommitsArgs: Record<string, unknown> = {
-      repoPath: selectedRepo.path,
-      limit: commitLimit,
-    };
-    if (authorFilter.length > 0) {
-      listCommitsArgs.authorEmails = authorFilter;
-    }
-
     try {
-      const result = await invoke<Commit[]>("list_commits", listCommitsArgs);
+      const result = await listCommits(selectedRepo.path, {
+        limit: commitLimit,
+        authorEmails: authorFilter.length > 0 ? authorFilter : undefined,
+      });
       setCommits(result);
       setCommitsError(null);
       setHasMoreCommits(result.length >= commitLimit);
@@ -135,10 +134,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
 
     // Fetch ahead/behind in parallel (non-blocking — errors just clear the count)
     try {
-      const ab = await invoke<{ ahead: number; behind: number }>(
-        "get_ahead_behind",
-        { repoPath: selectedRepo.path }
-      );
+      const ab = await getAheadBehind(selectedRepo.path);
       setUnpushedCount(ab.ahead);
       setBehindCount(ab.behind);
     } catch {
@@ -149,9 +145,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
 
     // Fetch current branch name (non-blocking — errors clear it)
     try {
-      const branchName = await invoke<string>("get_current_branch", {
-        repoPath: selectedRepo.path,
-      });
+      const branchName = await getCurrentBranch(selectedRepo.path);
       setCurrentBranchName(branchName);
     } catch {
       setCurrentBranchName(null);
@@ -181,9 +175,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     }
 
     try {
-      const result = await invoke<WorkingFile[]>("get_working_changes_ex", {
-        repoPath: selectedRepo.path,
-      });
+      const result = await getWorkingChanges(selectedRepo.path);
       setWorkingChanges(result);
       if (viewMode === "changes") {
         reconcileSelection(

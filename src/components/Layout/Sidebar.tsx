@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
 import { PencilLine } from "lucide-react";
 import {
@@ -9,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { getCommitMessage } from "../../api/commands";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
 import { useGravatar } from "../../hooks/useGravatar";
@@ -219,10 +219,7 @@ export function Sidebar({ className }: SidebarProps) {
         return;
       }
       try {
-        const fullMessage = await invoke<string>("get_commit_message", {
-          repoPath: selectedRepo.path,
-          commitId,
-        });
+        const fullMessage = await getCommitMessage(selectedRepo.path, commitId);
         setEditingCommit({ id: commitId, message: fullMessage });
       } catch {
         setEditingCommit({ id: commitId, message: summaryHint });

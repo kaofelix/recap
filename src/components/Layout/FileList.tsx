@@ -1,10 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import {
   type KeyboardEvent,
   type MouseEvent,
   useCallback,
   useState,
 } from "react";
+import { stageAll, unstageAll } from "../../api/commands";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommitFiles } from "../../hooks/useCommitFiles";
@@ -444,9 +444,9 @@ export function FileList({ className }: FileListProps) {
       }
       try {
         if (section === "staged") {
-          await invoke("unstage_all", { repoPath: selectedRepo.path });
+          await unstageAll(selectedRepo.path);
         } else {
-          await invoke("stage_all", { repoPath: selectedRepo.path });
+          await stageAll(selectedRepo.path);
         }
         requestWorkingChangesPoll();
       } catch (err) {

@@ -1,20 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
-
-interface FrontendErrorPayload {
-  source: string;
-  message: string;
-  stack?: string;
-  componentStack?: string;
-  url?: string;
-  userAgent?: string;
-  timestamp: string;
-}
+import {
+  type FrontendErrorReport,
+  reportFrontendError as sendErrorReport,
+} from "../api/commands";
 
 let isInitialized = false;
 
-export async function reportFrontendError(payload: FrontendErrorPayload) {
+export async function reportFrontendError(payload: FrontendErrorReport) {
   try {
-    await invoke("report_frontend_error", { report: payload });
+    await sendErrorReport(payload);
   } catch (error) {
     console.error("Failed to report frontend error", error);
   }

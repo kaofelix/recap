@@ -5,9 +5,9 @@ import {
   Root,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
-import { invoke } from "@tauri-apps/api/core";
 import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { checkoutBranch, listBranches } from "../../api/commands";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -19,17 +19,6 @@ import type { Branch } from "../../types/branch";
 
 export interface BranchPickerButtonProps {
   className?: string;
-}
-
-async function listBranches(repoPath: string): Promise<Branch[]> {
-  return invoke<Branch[]>("list_branches", { repoPath });
-}
-
-async function checkoutBranch(
-  repoPath: string,
-  branchName: string
-): Promise<void> {
-  return invoke<void>("checkout_branch", { repoPath, branchName });
 }
 
 export function BranchPickerButton({ className }: BranchPickerButtonProps) {

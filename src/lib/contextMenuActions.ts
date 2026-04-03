@@ -1,6 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import {
+  discardFile,
+  getRemoteUrl,
+  stageFile,
+  unstageFile,
+} from "../api/commands";
 import type { WorkingFileSection } from "../types/file";
 import {
   type ContextMenuAction,
@@ -54,7 +59,7 @@ export async function showHistoryContextMenu(
   // Resolve forge URL before showing the menu so we can disable if unavailable
   let forgeUrl: string | null = null;
   try {
-    const remoteUrl = await invoke<string>("get_remote_url", { repoPath });
+    const remoteUrl = await getRemoteUrl(repoPath);
     forgeUrl = getForgeCommitUrl(remoteUrl, commitId);
   } catch {
     // No origin remote or unparseable URL — disable action
@@ -241,15 +246,15 @@ export async function showChangesContextMenu(
               break;
             }
             case "stage":
-              await invoke("stage_file", { repoPath, filePath });
+              await stageFile(repoPath, filePath);
               onWorkingChangesModified?.();
               break;
             case "unstage":
-              await invoke("unstage_file", { repoPath, filePath });
+              await unstageFile(repoPath, filePath);
               onWorkingChangesModified?.();
               break;
             case "discard":
-              await invoke("discard_file", { repoPath, filePath });
+              await discardFile(repoPath, filePath);
               onWorkingChangesModified?.();
               break;
             default:

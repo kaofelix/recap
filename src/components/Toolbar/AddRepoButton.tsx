@@ -1,15 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { validateRepo } from "../../api/commands";
 import { cn } from "../../lib/utils";
 import { useAppStore } from "../../store/appStore";
 import { useToastStore } from "../../store/toastStore";
-
-export interface RepoInfo {
-  path: string;
-  name: string;
-  branch: string;
-}
 
 export interface AddRepoButtonProps {
   className?: string;
@@ -42,7 +36,7 @@ export function AddRepoButton({ className }: AddRepoButtonProps) {
       }
 
       // Validate with backend
-      const repoInfo = await invoke<RepoInfo>("validate_repo", { path });
+      const repoInfo = await validateRepo(path);
 
       // Add to store (auto-selects the new repo)
       addRepo(repoInfo.path);
