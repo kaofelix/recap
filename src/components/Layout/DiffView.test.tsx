@@ -44,6 +44,8 @@ describe("DiffView", () => {
       changedFiles: [],
       viewMode: "history",
       isDiffMaximized: false,
+      diffDisplayMode: "split",
+      wordWrap: true,
     });
   });
 
@@ -58,6 +60,8 @@ describe("DiffView", () => {
         changedFiles: [],
         viewMode: "history",
         isDiffMaximized: false,
+        diffDisplayMode: "split",
+        wordWrap: true,
       });
     });
   });
@@ -484,8 +488,8 @@ describe("DiffView", () => {
     const unifiedButton = screen.getByRole("button", { name: "Unified view" });
     fireEvent.click(unifiedButton);
 
-    // Check localStorage was updated
-    expect(localStorage.getItem("diff-view-mode")).toBe("unified");
+    // Check store was updated
+    expect(useAppStore.getState().diffDisplayMode).toBe("unified");
     expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
       "data-split-view",
       "false"
@@ -495,7 +499,7 @@ describe("DiffView", () => {
     const splitButton = screen.getByRole("button", { name: "Split view" });
     fireEvent.click(splitButton);
 
-    expect(localStorage.getItem("diff-view-mode")).toBe("split");
+    expect(useAppStore.getState().diffDisplayMode).toBe("split");
     expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
       "data-split-view",
       "true"
@@ -503,7 +507,7 @@ describe("DiffView", () => {
   });
 
   it("persists view mode preference", () => {
-    localStorage.setItem("diff-view-mode", "unified");
+    useAppStore.setState({ diffDisplayMode: "unified" });
 
     render(<DiffView />);
 
@@ -729,9 +733,6 @@ describe("DiffView", () => {
   });
 
   it("forces unified view for added files", async () => {
-    // Set user preference to split
-    localStorage.setItem("diff-view-mode", "split");
-
     const mockContents = {
       old_content: null,
       new_content: "new file content",
@@ -740,6 +741,7 @@ describe("DiffView", () => {
 
     mockInvoke.mockResolvedValue(mockContents);
 
+    // Set user preference to split via store
     useAppStore.setState({
       repos: [
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
@@ -747,6 +749,7 @@ describe("DiffView", () => {
       selectedRepoId: "1",
       selectedCommitIds: ["abc123"],
       selectedFilePath: "new-file.ts",
+      diffDisplayMode: "split",
     });
 
     render(<DiffView />);
@@ -763,9 +766,6 @@ describe("DiffView", () => {
   });
 
   it("forces unified view for deleted files", async () => {
-    // Set user preference to split
-    localStorage.setItem("diff-view-mode", "split");
-
     const mockContents = {
       old_content: "deleted file content",
       new_content: null,
@@ -774,6 +774,7 @@ describe("DiffView", () => {
 
     mockInvoke.mockResolvedValue(mockContents);
 
+    // Set user preference to split via store
     useAppStore.setState({
       repos: [
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
@@ -781,6 +782,7 @@ describe("DiffView", () => {
       selectedRepoId: "1",
       selectedCommitIds: ["abc123"],
       selectedFilePath: "deleted-file.ts",
+      diffDisplayMode: "split",
     });
 
     render(<DiffView />);
@@ -847,7 +849,7 @@ describe("DiffView", () => {
         "data-split-view",
         "false"
       );
-      expect(localStorage.getItem("diff-view-mode")).toBe("split");
+      expect(useAppStore.getState().diffDisplayMode).toBe("split");
     });
 
     act(() => {
@@ -859,7 +861,7 @@ describe("DiffView", () => {
         "data-split-view",
         "false"
       );
-      expect(localStorage.getItem("diff-view-mode")).toBe("split");
+      expect(useAppStore.getState().diffDisplayMode).toBe("split");
     });
   });
 

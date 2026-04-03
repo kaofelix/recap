@@ -15,7 +15,7 @@ import {
   WrapText,
 } from "lucide-react";
 import type { ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import ReactDiffViewer, { type DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommand } from "../../hooks/useCommand";
@@ -33,6 +33,7 @@ import { parseWorkingChangeId } from "../../lib/workingChangesList";
 import {
   useAppStore,
   useChangedFiles,
+  useDiffDisplayMode,
   useIsDiffMaximized,
   useSelectedChangeId,
   useSelectedCommitId,
@@ -40,6 +41,7 @@ import {
   useSelectedFilePath,
   useSelectedRepo,
   useViewMode,
+  useWordWrap,
   useWorkingChanges,
   useWorkingChangesRevision,
 } from "../../store/appStore";
@@ -69,8 +71,6 @@ export function codeFoldMessage(
     </span>
   );
 }
-
-type DiffDisplayMode = "split" | "unified";
 
 const NON_CONSECUTIVE_SELECTION_ERROR =
   "Unable to display diff for multiple non-consecutive commits";
@@ -563,27 +563,10 @@ export function DiffView({ className }: DiffViewProps) {
     selectedFileSection
   );
 
-  const [diffDisplayMode, setDiffDisplayMode] = useState<DiffDisplayMode>(
-    () => {
-      const saved = localStorage.getItem("diff-view-mode");
-      return saved === "unified" || saved === "split" ? saved : "split";
-    }
-  );
-
-  const [wordWrap, setWordWrap] = useState<boolean>(() => {
-    const saved = localStorage.getItem("diff-word-wrap");
-    return saved === null ? true : saved === "true";
-  });
-
-  // Persist view mode preference
-  useEffect(() => {
-    localStorage.setItem("diff-view-mode", diffDisplayMode);
-  }, [diffDisplayMode]);
-
-  // Persist word wrap preference
-  useEffect(() => {
-    localStorage.setItem("diff-word-wrap", String(wordWrap));
-  }, [wordWrap]);
+  const diffDisplayMode = useDiffDisplayMode();
+  const setDiffDisplayMode = useAppStore((s) => s.setDiffDisplayMode);
+  const wordWrap = useWordWrap();
+  const toggleWordWrap = useAppStore((s) => s.toggleWordWrap);
 
   // Determine old/new values from contents
   const oldValue = contents?.old_content ?? "";
@@ -605,9 +588,7 @@ export function DiffView({ className }: DiffViewProps) {
       return;
     }
 
-    setDiffDisplayMode((current) =>
-      current === "split" ? "unified" : "split"
-    );
+    setDiffDisplayMode(diffDisplayMode === "split" ? "unified" : "split");
   };
 
   useGlobalCommand("layout.toggleDiffDisplayMode", toggleDiffDisplayMode);
@@ -783,7 +764,7 @@ export function DiffView({ className }: DiffViewProps) {
                       ? "border-border-primary bg-bg-tertiary text-text-primary"
                       : "border-border-primary bg-bg-secondary text-text-tertiary hover:bg-bg-hover hover:text-text-secondary"
                   )}
-                  onClick={() => setWordWrap(!wordWrap)}
+                  onClick={toggleWordWrap}
                   type="button"
                 >
                   <WrapText className="h-4 w-4" />

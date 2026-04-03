@@ -7,6 +7,7 @@ import type { FocusRegion } from "../types/focus";
 import type { Repository } from "../types/repository";
 
 export type ViewMode = "history" | "changes";
+export type DiffDisplayMode = "split" | "unified";
 
 export interface PollingState {
   commits: Commit[];
@@ -51,6 +52,12 @@ export interface AppState {
   /** Whether there are more commits to load beyond the current limit */
   hasMoreCommits: boolean;
 
+  // DiffView preferences
+  /** Whether the diff viewer shows split or unified mode */
+  diffDisplayMode: DiffDisplayMode;
+  /** Whether word wrap is enabled in the diff viewer */
+  wordWrap: boolean;
+
   addRepo: (path: string) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
@@ -83,6 +90,8 @@ export interface AppState {
   clearAuthorFilter: () => void;
   loadMoreCommits: () => void;
   setHasMoreCommits: (hasMore: boolean) => void;
+  setDiffDisplayMode: (mode: DiffDisplayMode) => void;
+  toggleWordWrap: () => void;
 }
 
 /**
@@ -131,6 +140,10 @@ export const useAppStore = create<AppState>()(
       authorFilter: [],
       commitLimit: 50,
       hasMoreCommits: true,
+
+      // DiffView preferences
+      diffDisplayMode: "split" as DiffDisplayMode,
+      wordWrap: true,
 
       addRepo: (path: string) => {
         const { repos } = get();
@@ -360,15 +373,20 @@ export const useAppStore = create<AppState>()(
           return { commitLimit: state.commitLimit + 50 };
         }),
       setHasMoreCommits: (hasMoreCommits: boolean) => set({ hasMoreCommits }),
+      setDiffDisplayMode: (diffDisplayMode: DiffDisplayMode) =>
+        set({ diffDisplayMode }),
+      toggleWordWrap: () => set((state) => ({ wordWrap: !state.wordWrap })),
     }),
     {
       name: "recap-storage",
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         repos: state.repos,
         selectedRepoId: state.selectedRepoId,
         viewMode: state.viewMode,
         authorFilter: state.authorFilter,
+        diffDisplayMode: state.diffDisplayMode,
+        wordWrap: state.wordWrap,
       }),
       migrate: (persisted: unknown, version: number) => {
         const persistedState = (persisted ?? {}) as Record<string, unknown>;
@@ -378,15 +396,25 @@ export const useAppStore = create<AppState>()(
             persistedState;
           return state;
         }
-        // v1 → v2: strip volatile fields (now handled by partialize,
-        // but clean up any stale data from old persisted state)
-        const { repos, selectedRepoId, viewMode, authorFilter } =
-          persistedState;
+        if (version < 2) {
+          // v1 → v2: strip volatile fields (now handled by partialize,
+          // but clean up any stale data from old persisted state)
+          const { repos, selectedRepoId, viewMode, authorFilter } =
+            persistedState;
+          return {
+            repos: repos ?? [],
+            selectedRepoId: selectedRepoId ?? null,
+            viewMode: viewMode ?? "history",
+            authorFilter: authorFilter ?? [],
+            diffDisplayMode: "split",
+            wordWrap: true,
+          };
+        }
+        // v2 → v3: add diffDisplayMode and wordWrap preferences
         return {
-          repos: repos ?? [],
-          selectedRepoId: selectedRepoId ?? null,
-          viewMode: viewMode ?? "history",
-          authorFilter: authorFilter ?? [],
+          ...persistedState,
+          diffDisplayMode: persistedState.diffDisplayMode ?? "split",
+          wordWrap: persistedState.wordWrap ?? true,
         };
       },
       onRehydrateStorage: () => {
@@ -450,3 +478,8 @@ export const useBehindCount = () => useAppStore((state) => state.behindCount);
 export const useCurrentBranchName = () =>
   useAppStore((state) => state.currentBranchName);
 export const useAuthorFilter = () => useAppStore((state) => state.authorFilter);
+
+// DiffView preference selectors
+export const useDiffDisplayMode = () =>
+  useAppStore((state) => state.diffDisplayMode);
+export const useWordWrap = () => useAppStore((state) => state.wordWrap);

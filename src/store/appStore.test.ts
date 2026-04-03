@@ -4,6 +4,7 @@ import {
   useAppStore,
   useAuthorFilter,
   useCurrentBranchName,
+  useDiffDisplayMode,
   useIsDiffMaximized,
   useRepos,
   useSelectedCommitId,
@@ -12,6 +13,7 @@ import {
   useSelectedRepo,
   useSelectedRepoId,
   useViewMode,
+  useWordWrap,
 } from "./appStore";
 
 describe("appStore", () => {
@@ -23,6 +25,10 @@ describe("appStore", () => {
       useAppStore.getState().setFocusedRegion(null);
       useAppStore.getState().setDiffMaximized(false);
       useAppStore.getState().setChangedFiles([]);
+      useAppStore.getState().setDiffDisplayMode("split");
+      if (!useAppStore.getState().wordWrap) {
+        useAppStore.getState().toggleWordWrap();
+      }
     });
   });
 
@@ -1185,11 +1191,13 @@ describe("appStore", () => {
       return parsed.state;
     }
 
-    it("should persist repos, selectedRepoId, viewMode, and authorFilter", () => {
+    it("should persist repos, selectedRepoId, viewMode, authorFilter, diffDisplayMode, and wordWrap", () => {
       act(() => {
         useAppStore.getState().addRepo("/path/to/repo");
         useAppStore.getState().setViewMode("changes");
         useAppStore.getState().toggleAuthorFilter("alice@example.com");
+        useAppStore.getState().setDiffDisplayMode("unified");
+        useAppStore.getState().toggleWordWrap();
       });
 
       const persisted = getPersistedState();
@@ -1200,6 +1208,8 @@ describe("appStore", () => {
       );
       expect(persisted?.viewMode).toBe("changes");
       expect(persisted?.authorFilter).toEqual(["alice@example.com"]);
+      expect(persisted?.diffDisplayMode).toBe("unified");
+      expect(persisted?.wordWrap).toBe(false);
     });
 
     it("should NOT persist volatile polling state", () => {
@@ -1272,7 +1282,7 @@ describe("appStore", () => {
       expect(persisted).not.toHaveProperty("hasMoreCommits");
     });
 
-    it("should only contain the four persistent keys", () => {
+    it("should only contain the six persistent keys", () => {
       act(() => {
         useAppStore.getState().addRepo("/path/to/repo");
       });
@@ -1281,8 +1291,79 @@ describe("appStore", () => {
       expect(persisted).not.toBeNull();
       // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
       expect(Object.keys(persisted!).sort()).toEqual(
-        ["authorFilter", "repos", "selectedRepoId", "viewMode"].sort()
+        [
+          "authorFilter",
+          "diffDisplayMode",
+          "repos",
+          "selectedRepoId",
+          "viewMode",
+          "wordWrap",
+        ].sort()
       );
+    });
+  });
+
+  describe("diffDisplayMode", () => {
+    it("should default to split", () => {
+      expect(useAppStore.getState().diffDisplayMode).toBe("split");
+    });
+
+    it("should update via setDiffDisplayMode", () => {
+      act(() => {
+        useAppStore.getState().setDiffDisplayMode("unified");
+      });
+
+      expect(useAppStore.getState().diffDisplayMode).toBe("unified");
+
+      act(() => {
+        useAppStore.getState().setDiffDisplayMode("split");
+      });
+
+      expect(useAppStore.getState().diffDisplayMode).toBe("split");
+    });
+
+    it("should expose useDiffDisplayMode selector", () => {
+      const { result } = renderHook(() => useDiffDisplayMode());
+
+      expect(result.current).toBe("split");
+
+      act(() => {
+        useAppStore.getState().setDiffDisplayMode("unified");
+      });
+
+      expect(result.current).toBe("unified");
+    });
+  });
+
+  describe("wordWrap", () => {
+    it("should default to true", () => {
+      expect(useAppStore.getState().wordWrap).toBe(true);
+    });
+
+    it("should toggle via toggleWordWrap", () => {
+      act(() => {
+        useAppStore.getState().toggleWordWrap();
+      });
+
+      expect(useAppStore.getState().wordWrap).toBe(false);
+
+      act(() => {
+        useAppStore.getState().toggleWordWrap();
+      });
+
+      expect(useAppStore.getState().wordWrap).toBe(true);
+    });
+
+    it("should expose useWordWrap selector", () => {
+      const { result } = renderHook(() => useWordWrap());
+
+      expect(result.current).toBe(true);
+
+      act(() => {
+        useAppStore.getState().toggleWordWrap();
+      });
+
+      expect(result.current).toBe(false);
     });
   });
 
