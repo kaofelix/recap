@@ -63,8 +63,6 @@ export interface AppState {
   setDiffMaximized: (maximized: boolean) => void;
   toggleDiffMaximized: () => void;
   bumpWorkingChangesRevision: () => void;
-  focusNextPanel: () => void;
-  focusPrevPanel: () => void;
   clearRepos: () => void;
 
   // Polling actions
@@ -98,10 +96,6 @@ function extractRepoName(path: string): string {
  */
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function getVisiblePanels(_viewMode: ViewMode): FocusRegion[] {
-  return ["sidebar", "files", "diff"];
 }
 
 export const useAppStore = create<AppState>()(
@@ -253,22 +247,12 @@ export const useAppStore = create<AppState>()(
       },
 
       setViewMode: (mode: ViewMode) => {
-        set((state) => {
-          const visiblePanels = getVisiblePanels(mode);
-          const focusedRegion =
-            state.focusedRegion === null ||
-            visiblePanels.includes(state.focusedRegion)
-              ? state.focusedRegion
-              : visiblePanels[0];
-
-          return {
-            viewMode: mode,
-            selectedFilePath: null,
-            selectedChangeId: null,
-            changedFiles: [],
-            focusedRegion,
-            isDiffMaximized: false,
-          };
+        set({
+          viewMode: mode,
+          selectedFilePath: null,
+          selectedChangeId: null,
+          changedFiles: [],
+          isDiffMaximized: false,
         });
       },
 
@@ -295,33 +279,6 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           workingChangesRevision: state.workingChangesRevision + 1,
         }));
-      },
-
-      focusNextPanel: () => {
-        set((state) => {
-          const visiblePanels = getVisiblePanels(state.viewMode);
-          const rawIndex = state.focusedRegion
-            ? visiblePanels.indexOf(state.focusedRegion)
-            : -1;
-          const currentIndex = rawIndex >= 0 ? rawIndex : -1;
-          const nextIndex = (currentIndex + 1) % visiblePanels.length;
-
-          return { focusedRegion: visiblePanels[nextIndex] };
-        });
-      },
-
-      focusPrevPanel: () => {
-        set((state) => {
-          const visiblePanels = getVisiblePanels(state.viewMode);
-          const rawIndex = state.focusedRegion
-            ? visiblePanels.indexOf(state.focusedRegion)
-            : 0;
-          const currentIndex = rawIndex >= 0 ? rawIndex : 0;
-          const prevIndex =
-            (currentIndex - 1 + visiblePanels.length) % visiblePanels.length;
-
-          return { focusedRegion: visiblePanels[prevIndex] };
-        });
       },
 
       clearRepos: () => {
