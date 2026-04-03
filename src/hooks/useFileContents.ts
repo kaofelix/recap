@@ -28,7 +28,7 @@ const EMPTY_RESULT: UseFileContentsResult = {
  * @param filePath - The file path to fetch
  * @param commitId - If provided, fetch from this commit. If null, fetch from working directory.
  * @param commitIds - Optional commit selection (single or range) for history mode.
- * @param refreshKey - Optional key to force refresh.
+ * @param refreshKey - Optional key to force refresh. Changes trigger a re-fetch.
  * @param section - For changes mode, 'staged' or 'unstaged' to determine which diff to show.
  */
 export function useFileContents(
@@ -36,7 +36,7 @@ export function useFileContents(
   filePath: string | null,
   commitId: string | null,
   commitIds: string[] = EMPTY_COMMIT_IDS,
-  refreshKey = 0,
+  refreshKey: string | number = 0,
   section: WorkingFileSection | null = null
 ): UseFileContentsResult {
   const [contents, setContents] = useState<FileContents | null>(null);

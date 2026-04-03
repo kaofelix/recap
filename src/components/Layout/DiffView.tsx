@@ -43,7 +43,7 @@ import {
   useViewMode,
   useWordWrap,
   useWorkingChanges,
-  useWorkingChangesRevision,
+  useWorkingChangesFingerprint,
 } from "../../store/appStore";
 import type {
   ChangedFile,
@@ -518,7 +518,7 @@ export function DiffView({ className }: DiffViewProps) {
   const selectedFilePath = useSelectedFilePath();
   const selectedChangeId = useSelectedChangeId();
   const viewMode = useViewMode();
-  const workingChangesRevision = useWorkingChangesRevision();
+  const workingChangesFingerprint = useWorkingChangesFingerprint();
   const isFocused = useIsFocused();
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -548,8 +548,10 @@ export function DiffView({ className }: DiffViewProps) {
   const activeCommitIds =
     viewMode === "history" ? selectedCommitIds : EMPTY_COMMIT_IDS;
 
-  // Refresh key triggers diff reload when working changes are updated by useWorkingChanges polling
-  const refreshKey = viewMode === "changes" ? workingChangesRevision : 0;
+  // Refresh key triggers diff reload when the working changes fingerprint changes.
+  // The fingerprint is data-driven (computed from file metadata during polling),
+  // so diffs refresh automatically without manual coordination from mutation sites.
+  const refreshKey = viewMode === "changes" ? workingChangesFingerprint : 0;
 
   // Determine the section for changes mode (staged vs unstaged)
   const selectedFileSection = resolveChangesSection(viewMode, selectedChangeId);

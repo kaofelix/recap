@@ -89,15 +89,16 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   );
   const setHasMoreCommits = useAppStore((state) => state.setHasMoreCommits);
   const selectChange = useAppStore((state) => state.selectChange);
-  const bumpWorkingChangesRevision = useAppStore(
-    (state) => state.bumpWorkingChangesRevision
+  const setWorkingChangesFingerprint = useAppStore(
+    (state) => state.setWorkingChangesFingerprint
+  );
+  const workingChangesPollRequest = useAppStore(
+    (state) => state.workingChangesPollRequest
   );
 
   // Track if this is the initial load (for loading states)
   const isInitialCommitsLoad = useRef(true);
   const isInitialChangesLoad = useRef(true);
-  // Track previous working changes to detect actual changes
-  const prevWorkingChangesRef = useRef<string | null>(null);
 
   const fetchCommits = useCallback(async () => {
     if (!selectedRepo) {
@@ -194,11 +195,12 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       }
       setChangesError(null);
 
-      // Only bump revision if working changes actually changed
-      // This prevents unnecessary re-fetches of file contents.
+      // Compute a data-driven fingerprint of the working changes.
       // mtime_ms is included so edits that don't change line counts
       // (e.g., modifying the content of an already-modified line) still
       // trigger a diff refresh.
+      // Zustand only re-renders subscribers when the value actually changes,
+      // so setting the same fingerprint is a no-op for consumers.
       const fingerprint = JSON.stringify(
         result.map((f) => ({
           path: f.path,
@@ -210,11 +212,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
           mtime_ms: f.mtime_ms,
         }))
       );
-
-      if (!isInitial && fingerprint !== prevWorkingChangesRef.current) {
-        bumpWorkingChangesRevision();
-      }
-      prevWorkingChangesRef.current = fingerprint;
+      setWorkingChangesFingerprint(fingerprint);
     } catch (err) {
       setChangesError(err instanceof Error ? err.message : String(err));
       setWorkingChanges([]);
@@ -232,7 +230,7 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     setChangesLoading,
     setChangesError,
     selectChange,
-    bumpWorkingChangesRevision,
+    setWorkingChangesFingerprint,
   ]);
 
   // Combined fetch function
@@ -282,6 +280,15 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       isInitialChangesLoad.current = true;
     }
   }, [viewMode]);
+
+  // Respond to explicit poll requests from mutation sites (stage/unstage/discard/commit)
+  // This provides immediate feedback rather than waiting for the next poll cycle.
+  useEffect(() => {
+    if (!selectedRepo || workingChangesPollRequest === 0) {
+      return;
+    }
+    fetchWorkingChanges();
+  }, [selectedRepo, workingChangesPollRequest, fetchWorkingChanges]);
 
   // Main polling effect
   useEffect(() => {

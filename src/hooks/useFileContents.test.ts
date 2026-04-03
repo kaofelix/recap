@@ -285,7 +285,7 @@ describe("useFileContents", () => {
           emptyCommitIds,
           refreshKey
         ),
-      { initialProps: { refreshKey: 0 } }
+      { initialProps: { refreshKey: 0 as string | number } }
     );
 
     await waitFor(() => {
@@ -310,6 +310,44 @@ describe("useFileContents", () => {
     expect(mockInvoke).toHaveBeenLastCalledWith("get_working_file_contents", {
       repoPath: mockRepo.path,
       filePath: mockFilePath,
+    });
+  });
+
+  it("refetches when refresh key changes from a string fingerprint", async () => {
+    mockInvoke.mockResolvedValue(mockContents);
+
+    const emptyCommitIds: string[] = [];
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) =>
+        useFileContents(
+          mockRepo,
+          mockFilePath,
+          null,
+          emptyCommitIds,
+          refreshKey
+        ),
+      { initialProps: { refreshKey: "fingerprint-v1" as string | number } }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    mockInvoke.mockResolvedValueOnce({
+      old_content: "old content",
+      new_content: "updated via fingerprint",
+      is_binary: false,
+    });
+
+    const initialCallCount = mockInvoke.mock.calls.length;
+
+    rerender({ refreshKey: "fingerprint-v2" });
+
+    await waitFor(() => {
+      expect(mockInvoke.mock.calls.length).toBeGreaterThan(initialCallCount);
+      expect(result.current.contents?.new_content).toBe(
+        "updated via fingerprint"
+      );
     });
   });
 

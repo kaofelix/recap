@@ -30,7 +30,8 @@ export interface AppState {
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
-  workingChangesRevision: number;
+  workingChangesFingerprint: string;
+  workingChangesPollRequest: number;
 
   // Polling state (managed by useRepoPolling)
   commits: Commit[];
@@ -73,7 +74,8 @@ export interface AppState {
   setFocusedRegion: (region: FocusRegion | null) => void;
   setDiffMaximized: (maximized: boolean) => void;
   toggleDiffMaximized: () => void;
-  bumpWorkingChangesRevision: () => void;
+  setWorkingChangesFingerprint: (fingerprint: string) => void;
+  requestWorkingChangesPoll: () => void;
   clearRepos: () => void;
 
   // Polling actions
@@ -125,7 +127,8 @@ export const useAppStore = create<AppState>()(
       viewMode: "history" as ViewMode,
       focusedRegion: null,
       isDiffMaximized: false,
-      workingChangesRevision: 0,
+      workingChangesFingerprint: "",
+      workingChangesPollRequest: 0,
 
       // Polling state
       commits: [],
@@ -304,9 +307,13 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      bumpWorkingChangesRevision: () => {
+      setWorkingChangesFingerprint: (workingChangesFingerprint: string) => {
+        set({ workingChangesFingerprint });
+      },
+
+      requestWorkingChangesPoll: () => {
         set((state) => ({
-          workingChangesRevision: state.workingChangesRevision + 1,
+          workingChangesPollRequest: state.workingChangesPollRequest + 1,
         }));
       },
 
@@ -321,7 +328,8 @@ export const useAppStore = create<AppState>()(
           isLoadingCommitFiles: false,
           commitFilesError: null,
           isDiffMaximized: false,
-          workingChangesRevision: 0,
+          workingChangesFingerprint: "",
+          workingChangesPollRequest: 0,
           commits: [],
           isLoadingCommits: false,
           commitsError: null,
@@ -454,8 +462,8 @@ export const useFocusedRegion = () =>
   useAppStore((state) => state.focusedRegion);
 export const useIsDiffMaximized = () =>
   useAppStore((state) => state.isDiffMaximized);
-export const useWorkingChangesRevision = () =>
-  useAppStore((state) => state.workingChangesRevision);
+export const useWorkingChangesFingerprint = () =>
+  useAppStore((state) => state.workingChangesFingerprint);
 export const useChangedFiles = () => useAppStore((state) => state.changedFiles);
 export const useIsLoadingCommitFiles = () =>
   useAppStore((state) => state.isLoadingCommitFiles);

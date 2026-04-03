@@ -324,8 +324,8 @@ export function FileList({ className }: FileListProps) {
   const viewMode = useViewMode();
   const selectFile = useAppStore((state) => state.selectFile);
   const selectChange = useAppStore((state) => state.selectChange);
-  const bumpWorkingChangesRevision = useAppStore(
-    (state) => state.bumpWorkingChangesRevision
+  const requestWorkingChangesPoll = useAppStore(
+    (state) => state.requestWorkingChangesPoll
   );
   // Side-effect hook: fetches commit files and writes to the store
   useCommitFiles();
@@ -417,7 +417,7 @@ export function FileList({ className }: FileListProps) {
         section: item.section,
         event,
         element,
-        onWorkingChangesModified: bumpWorkingChangesRevision,
+        onWorkingChangesModified: requestWorkingChangesPoll,
         onClose: () => {
           setContextMenuTargetId((current) => {
             if (current === item.id) {
@@ -433,7 +433,7 @@ export function FileList({ className }: FileListProps) {
       selectedRepo,
       setContextMenuOpen,
       setContextMenuClosed,
-      bumpWorkingChangesRevision,
+      requestWorkingChangesPoll,
     ]
   );
 
@@ -448,7 +448,7 @@ export function FileList({ className }: FileListProps) {
         } else {
           await invoke("stage_all", { repoPath: selectedRepo.path });
         }
-        bumpWorkingChangesRevision();
+        requestWorkingChangesPoll();
       } catch (err) {
         console.error(
           `Failed to ${section === "staged" ? "unstage" : "stage"} all:`,
@@ -456,7 +456,7 @@ export function FileList({ className }: FileListProps) {
         );
       }
     },
-    [selectedRepo, bumpWorkingChangesRevision]
+    [selectedRepo, requestWorkingChangesPoll]
   );
 
   const headerTitle = "Files";
@@ -541,7 +541,7 @@ export function FileList({ className }: FileListProps) {
               onCancel={() => setCommitFormOpen(false)}
               onCommitted={() => {
                 setCommitFormOpen(false);
-                bumpWorkingChangesRevision();
+                requestWorkingChangesPoll();
               }}
               repoPath={selectedRepo.path}
             />

@@ -686,17 +686,55 @@ describe("appStore", () => {
     });
   });
 
-  describe("working changes revision", () => {
-    it("increments revision when bumpWorkingChangesRevision is called", () => {
-      const { result } = renderHook(() => useAppStore());
+  describe("working changes fingerprint", () => {
+    it("defaults to empty string", () => {
+      expect(useAppStore.getState().workingChangesFingerprint).toBe("");
+    });
 
-      expect(result.current.workingChangesRevision).toBe(0);
-
+    it("updates via setWorkingChangesFingerprint", () => {
       act(() => {
-        result.current.bumpWorkingChangesRevision();
+        useAppStore
+          .getState()
+          .setWorkingChangesFingerprint('[{"path":"a.ts"}]');
       });
 
-      expect(result.current.workingChangesRevision).toBe(1);
+      expect(useAppStore.getState().workingChangesFingerprint).toBe(
+        '[{"path":"a.ts"}]'
+      );
+    });
+
+    it("is cleared by clearRepos", () => {
+      act(() => {
+        useAppStore
+          .getState()
+          .setWorkingChangesFingerprint('[{"path":"a.ts"}]');
+      });
+
+      expect(useAppStore.getState().workingChangesFingerprint).not.toBe("");
+
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      expect(useAppStore.getState().workingChangesFingerprint).toBe("");
+    });
+  });
+
+  describe("requestWorkingChangesPoll", () => {
+    it("increments poll request counter", () => {
+      expect(useAppStore.getState().workingChangesPollRequest).toBe(0);
+
+      act(() => {
+        useAppStore.getState().requestWorkingChangesPoll();
+      });
+
+      expect(useAppStore.getState().workingChangesPollRequest).toBe(1);
+
+      act(() => {
+        useAppStore.getState().requestWorkingChangesPoll();
+      });
+
+      expect(useAppStore.getState().workingChangesPollRequest).toBe(2);
     });
   });
 
@@ -1277,7 +1315,8 @@ describe("appStore", () => {
       expect(persisted).not.toHaveProperty("changedFiles");
       expect(persisted).not.toHaveProperty("isDiffMaximized");
       expect(persisted).not.toHaveProperty("focusedRegion");
-      expect(persisted).not.toHaveProperty("workingChangesRevision");
+      expect(persisted).not.toHaveProperty("workingChangesFingerprint");
+      expect(persisted).not.toHaveProperty("workingChangesPollRequest");
       expect(persisted).not.toHaveProperty("commitLimit");
       expect(persisted).not.toHaveProperty("hasMoreCommits");
     });
