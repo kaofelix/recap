@@ -3,12 +3,11 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   useCallback,
-  useEffect,
-  useRef,
   useState,
 } from "react";
 import { useContextMenuState } from "../../context/ContextMenuContext";
 import { useIsFocused } from "../../context/FocusContext";
+import { useCommitFiles } from "../../hooks/useCommitFiles";
 import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
 import { useNavigableList } from "../../hooks/useNavigableList";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
@@ -24,8 +23,11 @@ import type {
 } from "../../lib/workingChangesList";
 import {
   useAppStore,
+  useChangedFiles,
   useChangesError,
+  useCommitFilesError,
   useIsLoadingChanges,
+  useIsLoadingCommitFiles,
   useSelectedChangeId,
   useSelectedCommitIds,
   useSelectedFilePath,
@@ -33,7 +35,7 @@ import {
   useViewMode,
   useWorkingChanges,
 } from "../../store/appStore";
-import type { ChangedFile } from "../../types/file";
+import type { ChangedFile, WorkingFile } from "../../types/file";
 import { CreateCommitEditor } from "./CreateCommitEditor";
 import { FileListItem } from "./FileListItem";
 
@@ -41,124 +43,8 @@ export interface FileListProps {
   className?: string;
 }
 
-interface UseCommitFilesResult {
-  files: ChangedFile[];
-  isLoading: boolean;
-  error: string | null;
-}
-
-const COMMIT_FETCH_DEBOUNCE_MS = 120;
 const NON_CONSECUTIVE_SELECTION_ERROR =
   "Unable to display diff for multiple non-consecutive commits";
-
-async function fetchCommitFiles(
-  repoPath: string,
-  commitId: string
-): Promise<ChangedFile[]> {
-  return invoke<ChangedFile[]>("get_commit_files", { repoPath, commitId });
-}
-
-async function fetchCommitRangeFiles(
-  repoPath: string,
-  commitIds: string[]
-): Promise<ChangedFile[]> {
-  return invoke<ChangedFile[]>("get_commit_range_files", {
-    repoPath,
-    commitIds,
-  });
-}
-
-function useCommitFiles(): UseCommitFilesResult {
-  const selectedRepo = useSelectedRepo();
-  const selectedCommitIds = useSelectedCommitIds();
-  const selectFile = useAppStore((state) => state.selectFile);
-  const setChangedFiles = useAppStore((state) => state.setChangedFiles);
-  const [files, setFiles] = useState<ChangedFile[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const previousSelectionRef = useRef<{
-    repoPath: string | null;
-    commitKey: string | null;
-  }>({
-    repoPath: null,
-    commitKey: null,
-  });
-
-  useEffect(() => {
-    if (!(selectedRepo && selectedCommitIds.length > 0)) {
-      previousSelectionRef.current = { repoPath: null, commitKey: null };
-      setFiles([]);
-      setChangedFiles([]);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    let timeoutId: number | null = null;
-    const repoPath = selectedRepo.path;
-    const commitKey = selectedCommitIds.join("::");
-
-    const previousSelection = previousSelectionRef.current;
-    const shouldDebounce =
-      previousSelection.repoPath === repoPath &&
-      previousSelection.commitKey !== null &&
-      previousSelection.commitKey !== commitKey;
-
-    previousSelectionRef.current = { repoPath, commitKey };
-
-    setIsLoading(true);
-    setError(null);
-
-    const runFetch = () => {
-      const request =
-        selectedCommitIds.length > 1
-          ? fetchCommitRangeFiles(repoPath, selectedCommitIds)
-          : fetchCommitFiles(repoPath, selectedCommitIds[0]);
-
-      request
-        .then((result) => {
-          if (cancelled) {
-            return;
-          }
-          setFiles(result);
-          setChangedFiles(result);
-          if (result.length > 0) {
-            selectFile(result[0].path);
-          }
-        })
-        .catch((err) => {
-          if (cancelled) {
-            return;
-          }
-          setError(err instanceof Error ? err.message : String(err));
-          setFiles([]);
-          setChangedFiles([]);
-          selectFile(null);
-        })
-        .finally(() => {
-          if (cancelled) {
-            return;
-          }
-          setIsLoading(false);
-        });
-    };
-
-    if (shouldDebounce) {
-      timeoutId = window.setTimeout(runFetch, COMMIT_FETCH_DEBOUNCE_MS);
-    } else {
-      runFetch();
-    }
-
-    return () => {
-      cancelled = true;
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [selectedRepo, selectedCommitIds, selectFile, setChangedFiles]);
-
-  return { files, isLoading, error };
-}
 
 function CommitFileListContent({
   hasCommit,
@@ -174,7 +60,7 @@ function CommitFileListContent({
   hasCommit: boolean;
   isLoading: boolean;
   error: string | null;
-  files: ChangedFile[];
+  files: (ChangedFile | WorkingFile)[];
   selectedFilePath: string | null;
   isFocused: boolean;
   getItemProps: (id: string) => {
@@ -441,7 +327,11 @@ export function FileList({ className }: FileListProps) {
   const bumpWorkingChangesRevision = useAppStore(
     (state) => state.bumpWorkingChangesRevision
   );
-  const { files, isLoading, error } = useCommitFiles();
+  // Side-effect hook: fetches commit files and writes to the store
+  useCommitFiles();
+  const commitFiles = useChangedFiles();
+  const isLoadingCommitFiles = useIsLoadingCommitFiles();
+  const commitFilesError = useCommitFilesError();
   const workingChanges = useWorkingChanges();
   const isLoadingChanges = useIsLoadingChanges();
   const changesError = useChangesError();
@@ -459,8 +349,9 @@ export function FileList({ className }: FileListProps) {
 
   const itemIds = isShowingWorkingChanges
     ? workingChangesModel.items.map((item) => item.id)
-    : files.map((file) => file.path);
-  const effectiveSelectedFilePath = selectedFilePath ?? files[0]?.path ?? null;
+    : commitFiles.map((file) => file.path);
+  const effectiveSelectedFilePath =
+    selectedFilePath ?? commitFiles[0]?.path ?? null;
 
   const { containerProps, getItemProps } = useNavigableList({
     itemIds,
@@ -571,7 +462,7 @@ export function FileList({ className }: FileListProps) {
   const headerTitle = "Files";
   const itemCount = isShowingWorkingChanges
     ? workingChangesModel.items.length
-    : files.length;
+    : commitFiles.length;
 
   return (
     <div className={cn("flex h-full flex-col", "bg-panel-bg", className)}>
@@ -615,12 +506,12 @@ export function FileList({ className }: FileListProps) {
         ) : (
           <CommitFileListContent
             contextMenuTargetId={contextMenuTargetId}
-            error={error}
-            files={files}
+            error={commitFilesError}
+            files={commitFiles}
             getItemProps={getItemProps}
             hasCommit={selectedCommitIds.length > 0}
             isFocused={isFocused}
-            isLoading={isLoading}
+            isLoading={isLoadingCommitFiles}
             onContextMenu={handleCommitFileContextMenu}
             selectedFilePath={effectiveSelectedFilePath}
           />

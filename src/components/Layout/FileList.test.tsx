@@ -29,6 +29,8 @@ describe("FileList", () => {
       isLoadingChanges: false,
       changesError: null,
       changedFiles: [],
+      isLoadingCommitFiles: false,
+      commitFilesError: null,
     });
   });
 
@@ -46,6 +48,8 @@ describe("FileList", () => {
         isLoadingChanges: false,
         changesError: null,
         changedFiles: [],
+        isLoadingCommitFiles: false,
+        commitFilesError: null,
       });
     });
   });

@@ -832,6 +832,74 @@ describe("appStore", () => {
     });
   });
 
+  describe("commitFilesLoading and commitFilesError", () => {
+    it("should default to not loading and no error", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      expect(result.current.isLoadingCommitFiles).toBe(false);
+      expect(result.current.commitFilesError).toBeNull();
+    });
+
+    it("should update loading state via setCommitFilesLoading", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setCommitFilesLoading(true);
+      });
+
+      expect(result.current.isLoadingCommitFiles).toBe(true);
+
+      act(() => {
+        result.current.setCommitFilesLoading(false);
+      });
+
+      expect(result.current.isLoadingCommitFiles).toBe(false);
+    });
+
+    it("should update error state via setCommitFilesError", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.setCommitFilesError("Something went wrong");
+      });
+
+      expect(result.current.commitFilesError).toBe("Something went wrong");
+
+      act(() => {
+        result.current.setCommitFilesError(null);
+      });
+
+      expect(result.current.commitFilesError).toBeNull();
+    });
+
+    it("should be cleared when repo selection changes", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo("/path/one");
+        result.current.addRepo("/path/two");
+      });
+
+      const [repo1, repo2] = result.current.repos;
+
+      act(() => {
+        result.current.selectRepo(repo1.id);
+        result.current.setCommitFilesLoading(true);
+        result.current.setCommitFilesError("error");
+      });
+
+      expect(result.current.isLoadingCommitFiles).toBe(true);
+      expect(result.current.commitFilesError).toBe("error");
+
+      act(() => {
+        result.current.selectRepo(repo2.id);
+      });
+
+      expect(result.current.isLoadingCommitFiles).toBe(false);
+      expect(result.current.commitFilesError).toBeNull();
+    });
+  });
+
   describe("toggleDiffMaximized focus behavior", () => {
     it("should set focusedRegion to diff when maximizing", () => {
       const { result } = renderHook(() => useAppStore());

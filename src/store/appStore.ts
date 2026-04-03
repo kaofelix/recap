@@ -24,6 +24,8 @@ export interface AppState {
   selectedFilePath: string | null;
   selectedChangeId: string | null;
   changedFiles: (ChangedFile | WorkingFile)[];
+  isLoadingCommitFiles: boolean;
+  commitFilesError: string | null;
   viewMode: ViewMode;
   focusedRegion: FocusRegion | null;
   isDiffMaximized: boolean;
@@ -58,6 +60,8 @@ export interface AppState {
   selectFile: (path: string | null) => void;
   selectChange: (id: string | null) => void;
   setChangedFiles: (files: (ChangedFile | WorkingFile)[]) => void;
+  setCommitFilesLoading: (isLoading: boolean) => void;
+  setCommitFilesError: (error: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setFocusedRegion: (region: FocusRegion | null) => void;
   setDiffMaximized: (maximized: boolean) => void;
@@ -107,6 +111,8 @@ export const useAppStore = create<AppState>()(
       selectedFilePath: null,
       selectedChangeId: null,
       changedFiles: [],
+      isLoadingCommitFiles: false,
+      commitFilesError: null,
       viewMode: "history" as ViewMode,
       focusedRegion: null,
       isDiffMaximized: false,
@@ -164,6 +170,8 @@ export const useAppStore = create<AppState>()(
             selectedFilePath: null,
             selectedChangeId: null,
             changedFiles: [],
+            isLoadingCommitFiles: false,
+            commitFilesError: null,
           }),
         });
       },
@@ -180,6 +188,8 @@ export const useAppStore = create<AppState>()(
             selectedFilePath: null,
             selectedChangeId: null,
             changedFiles: [],
+            isLoadingCommitFiles: false,
+            commitFilesError: null,
             authorFilter: [],
             commitLimit: 50,
             hasMoreCommits: true,
@@ -245,6 +255,11 @@ export const useAppStore = create<AppState>()(
         set({ changedFiles: files });
       },
 
+      setCommitFilesLoading: (isLoadingCommitFiles: boolean) =>
+        set({ isLoadingCommitFiles }),
+      setCommitFilesError: (commitFilesError: string | null) =>
+        set({ commitFilesError }),
+
       setViewMode: (mode: ViewMode) => {
         // Don't clear changedFiles — each mode's writer will manage it:
         // - history: useCommitFiles replaces changedFiles on fetch
@@ -290,6 +305,8 @@ export const useAppStore = create<AppState>()(
           selectedFilePath: null,
           selectedChangeId: null,
           changedFiles: [],
+          isLoadingCommitFiles: false,
+          commitFilesError: null,
           isDiffMaximized: false,
           workingChangesRevision: 0,
           commits: [],
@@ -412,6 +429,10 @@ export const useIsDiffMaximized = () =>
 export const useWorkingChangesRevision = () =>
   useAppStore((state) => state.workingChangesRevision);
 export const useChangedFiles = () => useAppStore((state) => state.changedFiles);
+export const useIsLoadingCommitFiles = () =>
+  useAppStore((state) => state.isLoadingCommitFiles);
+export const useCommitFilesError = () =>
+  useAppStore((state) => state.commitFilesError);
 
 // Polling state selectors
 export const useCommits = () => useAppStore((state) => state.commits);
