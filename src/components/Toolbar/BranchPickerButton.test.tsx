@@ -213,7 +213,9 @@ describe("BranchPickerButton", () => {
       useAppStore.getState().selectCommit("some-commit-id");
     });
 
-    expect(useAppStore.getState().selectedCommitId).toBe("some-commit-id");
+    expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBe(
+      "some-commit-id"
+    );
 
     render(<BranchPickerButton />);
 
@@ -228,7 +230,7 @@ describe("BranchPickerButton", () => {
     await user.click(featureAItem);
 
     await waitFor(() => {
-      expect(useAppStore.getState().selectedCommitId).toBeNull();
+      expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBeNull();
     });
   });
 

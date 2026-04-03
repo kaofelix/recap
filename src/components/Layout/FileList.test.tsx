@@ -21,7 +21,6 @@ describe("FileList", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
-      selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
       selectedChangeId: null,
@@ -39,7 +38,6 @@ describe("FileList", () => {
       useAppStore.setState({
         repos: [],
         selectedRepoId: null,
-        selectedCommitId: null,
         selectedCommitIds: [],
         selectedFilePath: null,
         selectedChangeId: null,
@@ -66,7 +64,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     // Make invoke hang indefinitely
@@ -220,7 +218,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     render(<FileList />);
@@ -259,7 +257,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/App.tsx",
       focusedRegion: "files",
     });
@@ -315,7 +313,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     render(<FileList />);
@@ -346,7 +344,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     render(<FileList />);
@@ -366,7 +364,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     render(<FileList />);
@@ -384,7 +382,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
     });
 
     render(<FileList />);
@@ -407,7 +405,7 @@ describe("FileList", () => {
         },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "def456abc",
+      selectedCommitIds: ["def456abc"],
     });
 
     render(<FileList />);
@@ -428,7 +426,27 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1", "commit2"],
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_commit_range_files", {
+        repoPath: "/test/repo",
+        commitIds: ["commit1", "commit2"],
+      });
+    });
+  });
+
+  it("calls get_commit_range_files when selection is driven only by selectedCommitIds", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+      ],
+      selectedRepoId: "1",
       selectedCommitIds: ["commit1", "commit2"],
     });
 
@@ -450,7 +468,6 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit1",
       selectedCommitIds: ["commit1", "commit2", "commit3"],
     });
 
@@ -471,7 +488,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1"],
     });
 
     const { rerender } = render(<FileList />);
@@ -486,7 +503,6 @@ describe("FileList", () => {
     // Change selected commit
     await act(async () => {
       useAppStore.setState({
-        selectedCommitId: "commit2",
         selectedCommitIds: ["commit2"],
       });
       rerender(<FileList />);
@@ -509,7 +525,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1"],
     });
 
     const { rerender } = render(<FileList />);
@@ -524,12 +540,12 @@ describe("FileList", () => {
     });
 
     await act(async () => {
-      useAppStore.setState({ selectedCommitId: "commit2" });
+      useAppStore.setState({ selectedCommitIds: ["commit2"] });
       rerender(<FileList />);
     });
 
     await act(async () => {
-      useAppStore.setState({ selectedCommitId: "commit3" });
+      useAppStore.setState({ selectedCommitIds: ["commit3"] });
       rerender(<FileList />);
     });
 
@@ -584,7 +600,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit1",
+      selectedCommitIds: ["commit1"],
     });
 
     const { rerender } = render(<FileList />);
@@ -596,7 +612,7 @@ describe("FileList", () => {
     expect(screen.getByText("first.ts")).toBeInTheDocument();
 
     await act(async () => {
-      useAppStore.setState({ selectedCommitId: "commit2" });
+      useAppStore.setState({ selectedCommitIds: ["commit2"] });
       rerender(<FileList />);
     });
 
@@ -657,7 +673,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: null,
     });
 
@@ -676,7 +692,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: null,
     });
 
@@ -714,7 +730,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       changedFiles: [],
     });
 
@@ -733,7 +749,7 @@ describe("FileList", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       changedFiles: [
         {
           path: "old-file.ts",

@@ -20,7 +20,6 @@ export interface PollingState {
 export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
-  selectedCommitId: string | null;
   selectedCommitIds: string[];
   selectedFilePath: string | null;
   selectedChangeId: string | null;
@@ -110,7 +109,6 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       repos: [],
       selectedRepoId: null,
-      selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
       selectedChangeId: null,
@@ -168,7 +166,6 @@ export const useAppStore = create<AppState>()(
           selectedRepoId: newSelectedId,
           // Clear commit/file selection when repo changes
           ...(newSelectedId !== selectedRepoId && {
-            selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
             selectedChangeId: null,
@@ -185,7 +182,6 @@ export const useAppStore = create<AppState>()(
           // Clear commit and file selection when repo changes
           set({
             selectedRepoId: id,
-            selectedCommitId: null,
             selectedCommitIds: [],
             selectedFilePath: null,
             selectedChangeId: null,
@@ -200,7 +196,6 @@ export const useAppStore = create<AppState>()(
       selectCommit: (id: string | null) => {
         // Clear file selection and changed files when commit changes
         set({
-          selectedCommitId: id,
           selectedCommitIds: id ? [id] : [],
           selectedFilePath: null,
           selectedChangeId: null,
@@ -211,7 +206,6 @@ export const useAppStore = create<AppState>()(
       selectCommitRange: (ids: string[]) => {
         const normalized = [...new Set(ids)];
         set({
-          selectedCommitId: normalized[0] ?? null,
           selectedCommitIds: normalized,
           selectedFilePath: null,
           selectedChangeId: null,
@@ -227,7 +221,6 @@ export const useAppStore = create<AppState>()(
             : [...state.selectedCommitIds, id];
 
           return {
-            selectedCommitId: selectedCommitIds[0] ?? null,
             selectedCommitIds,
             selectedFilePath: null,
             selectedChangeId: null,
@@ -335,7 +328,6 @@ export const useAppStore = create<AppState>()(
         set({
           repos: [],
           selectedRepoId: null,
-          selectedCommitId: null,
           selectedCommitIds: [],
           selectedFilePath: null,
           selectedChangeId: null,
@@ -396,6 +388,12 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "recap-storage",
+      version: 1,
+      migrate: (persistedState: Record<string, unknown>) => {
+        const { selectedCommitId: _selectedCommitId, ...state } =
+          persistedState;
+        return state;
+      },
     }
   )
 );
@@ -409,7 +407,7 @@ export const useSelectedRepo = () =>
     (state) => state.repos.find((r) => r.id === state.selectedRepoId) ?? null
   );
 export const useSelectedCommitId = () =>
-  useAppStore((state) => state.selectedCommitId);
+  useAppStore((state) => state.selectedCommitIds[0] ?? null);
 export const useSelectedCommitIds = () =>
   useAppStore((state) => state.selectedCommitIds);
 export const useSelectedFilePath = () =>

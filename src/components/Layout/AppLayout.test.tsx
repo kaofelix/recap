@@ -12,7 +12,6 @@ describe("AppLayout", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
-      selectedCommitId: null,
       selectedCommitIds: [],
       focusedRegion: null,
       commits: [],
@@ -194,7 +193,6 @@ describe("AppLayout", () => {
         },
       ],
       selectedCommitIds: ["commit-a", "commit-c"],
-      selectedCommitId: "commit-a",
       focusedRegion: null,
       viewMode: "history",
       isLoadingCommits: false,
@@ -245,7 +243,6 @@ describe("AppLayout", () => {
         },
       ],
       selectedCommitIds: ["commit-a"],
-      selectedCommitId: "commit-a",
       focusedRegion: "files",
       viewMode: "history",
       isLoadingCommits: false,

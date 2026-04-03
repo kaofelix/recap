@@ -27,7 +27,6 @@ import {
   useChangesError,
   useIsLoadingChanges,
   useSelectedChangeId,
-  useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedFilePath,
   useSelectedRepo,
@@ -71,7 +70,6 @@ async function fetchCommitRangeFiles(
 
 function useCommitFiles(): UseCommitFilesResult {
   const selectedRepo = useSelectedRepo();
-  const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectFile = useAppStore((state) => state.selectFile);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
@@ -87,7 +85,7 @@ function useCommitFiles(): UseCommitFilesResult {
   });
 
   useEffect(() => {
-    if (!(selectedRepo && selectedCommitId)) {
+    if (!(selectedRepo && selectedCommitIds.length > 0)) {
       previousSelectionRef.current = { repoPath: null, commitKey: null };
       setFiles([]);
       setError(null);
@@ -97,9 +95,7 @@ function useCommitFiles(): UseCommitFilesResult {
     let cancelled = false;
     let timeoutId: number | null = null;
     const repoPath = selectedRepo.path;
-    const activeCommitIds =
-      selectedCommitIds.length > 0 ? selectedCommitIds : [selectedCommitId];
-    const commitKey = activeCommitIds.join("::");
+    const commitKey = selectedCommitIds.join("::");
 
     const previousSelection = previousSelectionRef.current;
     const shouldDebounce =
@@ -114,9 +110,9 @@ function useCommitFiles(): UseCommitFilesResult {
 
     const runFetch = () => {
       const request =
-        activeCommitIds.length > 1
-          ? fetchCommitRangeFiles(repoPath, activeCommitIds)
-          : fetchCommitFiles(repoPath, activeCommitIds[0]);
+        selectedCommitIds.length > 1
+          ? fetchCommitRangeFiles(repoPath, selectedCommitIds)
+          : fetchCommitFiles(repoPath, selectedCommitIds[0]);
 
       request
         .then((result) => {
@@ -158,13 +154,7 @@ function useCommitFiles(): UseCommitFilesResult {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [
-    selectedRepo,
-    selectedCommitId,
-    selectedCommitIds,
-    selectFile,
-    setChangedFiles,
-  ]);
+  }, [selectedRepo, selectedCommitIds, selectFile, setChangedFiles]);
 
   return { files, isLoading, error };
 }
@@ -441,7 +431,6 @@ function WorkingChangesContent({
 
 export function FileList({ className }: FileListProps) {
   const selectedRepo = useSelectedRepo();
-  const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const selectedFilePath = useSelectedFilePath();
   const selectedChangeId = useSelectedChangeId();
@@ -463,14 +452,7 @@ export function FileList({ className }: FileListProps) {
   const isFocused = useIsFocused();
   const [commitFormOpen, setCommitFormOpen] = useState(false);
 
-  let activeCommitIds: string[] = [];
-  if (selectedCommitIds.length > 0) {
-    activeCommitIds = selectedCommitIds;
-  } else if (selectedCommitId) {
-    activeCommitIds = [selectedCommitId];
-  }
-
-  const isMultiCommitSelection = activeCommitIds.length > 1;
+  const isMultiCommitSelection = selectedCommitIds.length > 1;
   const isShowingWorkingChanges = viewMode === "changes";
   const hasStagedChanges = workingChanges.some((c) => c.section === "staged");
 
@@ -610,7 +592,7 @@ export function FileList({ className }: FileListProps) {
         )}
         {!isShowingWorkingChanges && isMultiCommitSelection && (
           <span className="min-w-0 truncate text-text-secondary text-xs">
-            Showing changes from {activeCommitIds.length} commits
+            Showing changes from {selectedCommitIds.length} commits
           </span>
         )}
       </div>
@@ -635,7 +617,7 @@ export function FileList({ className }: FileListProps) {
             error={error}
             files={files}
             getItemProps={getItemProps}
-            hasCommit={!!selectedCommitId}
+            hasCommit={selectedCommitIds.length > 0}
             isFocused={isFocused}
             isLoading={isLoading}
             onContextMenu={handleCommitFileContextMenu}

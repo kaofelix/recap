@@ -32,7 +32,6 @@ import {
   useCommits,
   useCommitsError,
   useIsLoadingCommits,
-  useSelectedCommitId,
   useSelectedCommitIds,
   useSelectedRepo,
   useUnpushedCount,
@@ -78,7 +77,6 @@ function getCommitRangeSelection(
 
 export function Sidebar({ className }: SidebarProps) {
   const selectedRepo = useSelectedRepo();
-  const selectedCommitId = useSelectedCommitId();
   const selectedCommitIds = useSelectedCommitIds();
   const viewMode = useViewMode();
   const selectCommit = useAppStore((state) => state.selectCommit);
@@ -193,7 +191,7 @@ export function Sidebar({ className }: SidebarProps) {
   );
 
   const effectiveSelectedCommitId =
-    selectedCommitIds[0] ?? selectedCommitId ?? commits[0]?.id ?? null;
+    selectedCommitIds[0] ?? commits[0]?.id ?? null;
   const selectedId =
     viewMode === "changes"
       ? UNCOMMITTED_CHANGES_ITEM_ID

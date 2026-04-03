@@ -266,7 +266,7 @@ describe("appStore", () => {
         result.current.selectCommit("abc123");
       });
 
-      expect(result.current.selectedCommitId).toBe("abc123");
+      expect(result.current.selectedCommitIds[0] ?? null).toBe("abc123");
       expect(result.current.selectedCommitIds).toEqual(["abc123"]);
     });
 
@@ -281,7 +281,7 @@ describe("appStore", () => {
         result.current.selectCommit(null);
       });
 
-      expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedCommitIds[0] ?? null).toBeNull();
       expect(result.current.selectedCommitIds).toEqual([]);
     });
 
@@ -297,7 +297,7 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedCommitIds).toEqual(["def456", "ghi789"]);
-      expect(result.current.selectedCommitId).toBe("def456");
+      expect(result.current.selectedCommitIds[0] ?? null).toBe("def456");
     });
 
     it("should toggle commit selection on and off", () => {
@@ -320,7 +320,7 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedCommitIds).toEqual(["def456"]);
-      expect(result.current.selectedCommitId).toBe("def456");
+      expect(result.current.selectedCommitIds[0] ?? null).toBe("def456");
     });
 
     it("should be cleared when repo selection changes", () => {
@@ -338,14 +338,14 @@ describe("appStore", () => {
         result.current.selectCommit("abc123");
       });
 
-      expect(result.current.selectedCommitId).toBe("abc123");
+      expect(result.current.selectedCommitIds[0] ?? null).toBe("abc123");
       expect(result.current.selectedCommitIds).toEqual(["abc123"]);
 
       act(() => {
         result.current.selectRepo(repo2.id);
       });
 
-      expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedCommitIds[0] ?? null).toBeNull();
       expect(result.current.selectedCommitIds).toEqual([]);
     });
   });
@@ -435,7 +435,7 @@ describe("appStore", () => {
 
       expect(result.current.repos).toHaveLength(2);
       expect(result.current.selectedRepoId).not.toBeNull();
-      expect(result.current.selectedCommitId).not.toBeNull();
+      expect(result.current.selectedCommitIds[0] ?? null).not.toBeNull();
       expect(result.current.selectedFilePath).not.toBeNull();
 
       act(() => {
@@ -444,7 +444,7 @@ describe("appStore", () => {
 
       expect(result.current.repos).toHaveLength(0);
       expect(result.current.selectedRepoId).toBeNull();
-      expect(result.current.selectedCommitId).toBeNull();
+      expect(result.current.selectedCommitIds[0] ?? null).toBeNull();
       expect(result.current.selectedFilePath).toBeNull();
     });
   });
@@ -513,6 +513,18 @@ describe("appStore", () => {
       });
 
       expect(selectedCommitResult.current).toBe("abc123def456");
+    });
+
+    it("useSelectedCommitId should derive the first selected commit id", () => {
+      const { result: selectedCommitResult } = renderHook(() =>
+        useSelectedCommitId()
+      );
+
+      act(() => {
+        useAppStore.setState({ selectedCommitIds: ["abc123", "def456"] });
+      });
+
+      expect(selectedCommitResult.current).toBe("abc123");
     });
 
     it("useSelectedCommitIds should return all selected commit ids", () => {

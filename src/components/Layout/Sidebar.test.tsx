@@ -65,7 +65,6 @@ describe("Sidebar", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
-      selectedCommitId: null,
       selectedCommitIds: [],
       selectedChangeId: null,
       viewMode: "history",
@@ -86,7 +85,6 @@ describe("Sidebar", () => {
       useAppStore.setState({
         repos: [],
         selectedRepoId: null,
-        selectedCommitId: null,
         selectedCommitIds: [],
         selectedChangeId: null,
         viewMode: "history",
@@ -1808,7 +1806,7 @@ describe("Sidebar", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit-a",
+      selectedCommitIds: ["commit-a"],
       focusedRegion: "sidebar",
       viewMode: "history",
     });
@@ -1823,7 +1821,9 @@ describe("Sidebar", () => {
       commandEmitter.emit("navigation.selectNext");
     });
 
-    expect(useAppStore.getState().selectedCommitId).toBe("commit-b");
+    expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBe(
+      "commit-b"
+    );
   });
 
   it("uses accent selected commit style when sidebar is focused", async () => {
@@ -1844,7 +1844,6 @@ describe("Sidebar", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit-a",
       selectedCommitIds: ["commit-a"],
       focusedRegion: "sidebar",
       viewMode: "history",
@@ -1875,7 +1874,6 @@ describe("Sidebar", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit-a",
       selectedCommitIds: ["commit-a"],
       focusedRegion: "files",
       viewMode: "history",
@@ -1907,7 +1905,7 @@ describe("Sidebar", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit-a",
+      selectedCommitIds: ["commit-a"],
       viewMode: "history",
     });
 
@@ -2263,7 +2261,9 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         expect(useAppStore.getState().viewMode).toBe("history");
-        expect(useAppStore.getState().selectedCommitId).toBe("commit-a");
+        expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBe(
+          "commit-a"
+        );
       });
     });
   });

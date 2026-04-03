@@ -38,7 +38,6 @@ describe("DiffView", () => {
     useAppStore.setState({
       repos: [],
       selectedRepoId: null,
-      selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: null,
       selectedChangeId: null,
@@ -53,7 +52,6 @@ describe("DiffView", () => {
       useAppStore.setState({
         repos: [],
         selectedRepoId: null,
-        selectedCommitId: null,
         selectedCommitIds: [],
         selectedFilePath: null,
         selectedChangeId: null,
@@ -108,7 +106,6 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
       selectedFilePath: "src/App.tsx",
     });
 
@@ -140,7 +137,6 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
       selectedFilePath: "src/App.tsx",
     });
 
@@ -164,7 +160,6 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: null,
       selectedCommitIds: [],
       selectedFilePath: "src/file.ts",
       selectedChangeId: "src/file.ts#unstaged",
@@ -219,7 +214,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/App.tsx",
     });
 
@@ -252,7 +247,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/App.tsx",
     });
 
@@ -276,7 +271,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "image.png",
     });
 
@@ -297,7 +292,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "missing.tsx",
     });
 
@@ -325,7 +320,7 @@ describe("DiffView", () => {
         },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "commit123",
+      selectedCommitIds: ["commit123"],
       selectedFilePath: "src/utils.ts",
     });
 
@@ -352,7 +347,6 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
       selectedCommitIds: ["abc123", "def456"],
       selectedFilePath: "src/first.ts",
       viewMode: "history",
@@ -382,7 +376,6 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
       selectedCommitIds: ["abc123", "def456"],
       selectedFilePath: "src/first.ts",
       viewMode: "history",
@@ -422,7 +415,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/first.ts",
     });
 
@@ -471,7 +464,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/App.tsx",
     });
 
@@ -543,7 +536,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/App.tsx",
     });
 
@@ -587,7 +580,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/components/Button.tsx",
     });
 
@@ -615,7 +608,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "unchanged.ts",
     });
 
@@ -640,7 +633,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "new-file.ts",
     });
 
@@ -665,7 +658,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "deleted-file.ts",
     });
 
@@ -690,7 +683,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "src/app.ts",
     });
 
@@ -720,7 +713,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "file.unknown",
     });
 
@@ -752,7 +745,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "new-file.ts",
     });
 
@@ -786,7 +779,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "deleted-file.ts",
     });
 
@@ -817,7 +810,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "new-file.ts",
     });
 
@@ -843,7 +836,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "new-file.ts",
     });
 
@@ -884,7 +877,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "deleted-file.ts",
     });
 
@@ -912,7 +905,7 @@ describe("DiffView", () => {
         { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
       ],
       selectedRepoId: "1",
-      selectedCommitId: "abc123",
+      selectedCommitIds: ["abc123"],
       selectedFilePath: "modified-file.ts",
     });
 
@@ -939,7 +932,7 @@ describe("DiffView", () => {
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        selectedCommitId: "abc123",
+        selectedCommitIds: ["abc123"],
         selectedFilePath: "package.json",
       });
 
@@ -965,7 +958,7 @@ describe("DiffView", () => {
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        selectedCommitId: "abc123",
+        selectedCommitIds: ["abc123"],
         selectedFilePath: "config.yml",
       });
 
@@ -991,7 +984,7 @@ describe("DiffView", () => {
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        selectedCommitId: "abc123",
+        selectedCommitIds: ["abc123"],
         selectedFilePath: "src/app.ts",
       });
 
@@ -1286,7 +1279,7 @@ describe("DiffView", () => {
           { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
         ],
         selectedRepoId: "1",
-        selectedCommitId: "abc123",
+        selectedCommitIds: ["abc123"],
         selectedFilePath: "src/app.ts",
       });
 
