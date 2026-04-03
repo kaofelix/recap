@@ -18,9 +18,10 @@ const POLL_INTERVAL_BACKGROUND_MS = 30_000;
  */
 function reconcileSelection(
   changes: WorkingFile[],
-  selectChange: (id: string | null) => void
+  selectChange: (id: string | null) => void,
+  selectedChangeId: string | null,
+  selectedFilePath: string | null
 ): void {
-  const { selectedChangeId, selectedFilePath } = useAppStore.getState();
   const listModel = buildWorkingChangesListModel(changes);
 
   if (listModel.items.length === 0) {
@@ -77,6 +78,8 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   const setWorkingChanges = useAppStore((state) => state.setWorkingChanges);
   const setChangesLoading = useAppStore((state) => state.setChangesLoading);
   const setChangesError = useAppStore((state) => state.setChangesError);
+  const selectedChangeId = useAppStore((state) => state.selectedChangeId);
+  const selectedFilePath = useAppStore((state) => state.selectedFilePath);
   const setChangedFiles = useAppStore((state) => state.setChangedFiles);
 
   const setUnpushedCount = useAppStore((state) => state.setUnpushedCount);
@@ -182,7 +185,12 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       });
       setWorkingChanges(result);
       if (viewMode === "changes") {
-        reconcileSelection(result, selectChange);
+        reconcileSelection(
+          result,
+          selectChange,
+          selectedChangeId,
+          selectedFilePath
+        );
       }
       setChangesError(null);
 
@@ -218,6 +226,8 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   }, [
     selectedRepo,
     viewMode,
+    selectedChangeId,
+    selectedFilePath,
     setWorkingChanges,
     setChangesLoading,
     setChangesError,
