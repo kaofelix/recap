@@ -345,11 +345,43 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "recap-storage",
-      version: 1,
-      migrate: (persistedState: Record<string, unknown>) => {
-        const { selectedCommitId: _selectedCommitId, ...state } =
+      version: 2,
+      partialize: (state) => ({
+        repos: state.repos,
+        selectedRepoId: state.selectedRepoId,
+        viewMode: state.viewMode,
+        authorFilter: state.authorFilter,
+      }),
+      migrate: (persisted: unknown, version: number) => {
+        const persistedState = (persisted ?? {}) as Record<string, unknown>;
+        if (version < 1) {
+          // v0 → v1: remove old selectedCommitId field
+          const { selectedCommitId: _selectedCommitId, ...state } =
+            persistedState;
+          return state;
+        }
+        // v1 → v2: strip volatile fields (now handled by partialize,
+        // but clean up any stale data from old persisted state)
+        const { repos, selectedRepoId, viewMode, authorFilter } =
           persistedState;
-        return state;
+        return {
+          repos: repos ?? [],
+          selectedRepoId: selectedRepoId ?? null,
+          viewMode: viewMode ?? "history",
+          authorFilter: authorFilter ?? [],
+        };
+      },
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (!state) {
+            return;
+          }
+          // Reconcile: clear selectedRepoId if it references a nonexistent repo
+          const { selectedRepoId, repos } = state;
+          if (selectedRepoId && !repos.some((r) => r.id === selectedRepoId)) {
+            state.selectedRepoId = null;
+          }
+        };
       },
     }
   )

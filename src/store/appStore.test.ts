@@ -1098,6 +1098,117 @@ describe("appStore", () => {
     });
   });
 
+  describe("persistence (partialize)", () => {
+    function getPersistedState(): Record<string, unknown> | null {
+      const raw = localStorage.getItem("recap-storage");
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      return parsed.state;
+    }
+
+    it("should persist repos, selectedRepoId, viewMode, and authorFilter", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/path/to/repo");
+        useAppStore.getState().setViewMode("changes");
+        useAppStore.getState().toggleAuthorFilter("alice@example.com");
+      });
+
+      const persisted = getPersistedState();
+      expect(persisted).not.toBeNull();
+      expect(persisted?.repos).toHaveLength(1);
+      expect(persisted?.selectedRepoId).toBe(
+        useAppStore.getState().repos[0].id
+      );
+      expect(persisted?.viewMode).toBe("changes");
+      expect(persisted?.authorFilter).toEqual(["alice@example.com"]);
+    });
+
+    it("should NOT persist volatile polling state", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/path/to/repo");
+        useAppStore.getState().setCommits([
+          {
+            hash: "abc123",
+            short_hash: "abc",
+            author_name: "Test",
+            author_email: "test@test.com",
+            date: "2024-01-01",
+            message: "Test commit",
+          },
+        ]);
+        useAppStore.getState().setCommitsLoading(true);
+        useAppStore.getState().setCommitsError("some error");
+        useAppStore.getState().setWorkingChanges([]);
+        useAppStore.getState().setChangesLoading(true);
+        useAppStore.getState().setChangesError("change error");
+        useAppStore.getState().setUnpushedCount(5);
+        useAppStore.getState().setBehindCount(3);
+        useAppStore.getState().setCurrentBranchName("main");
+      });
+
+      const persisted = getPersistedState();
+      expect(persisted).not.toBeNull();
+
+      // Volatile fields should NOT be in persisted state
+      expect(persisted).not.toHaveProperty("commits");
+      expect(persisted).not.toHaveProperty("isLoadingCommits");
+      expect(persisted).not.toHaveProperty("commitsError");
+      expect(persisted).not.toHaveProperty("workingChanges");
+      expect(persisted).not.toHaveProperty("isLoadingChanges");
+      expect(persisted).not.toHaveProperty("changesError");
+      expect(persisted).not.toHaveProperty("unpushedCount");
+      expect(persisted).not.toHaveProperty("behindCount");
+      expect(persisted).not.toHaveProperty("currentBranchName");
+    });
+
+    it("should NOT persist transient UI state", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/path/to/repo");
+        useAppStore.getState().selectCommit("abc123");
+        useAppStore.getState().selectFile("src/App.tsx");
+        useAppStore.getState().setChangedFiles([
+          {
+            path: "f.ts",
+            status: "Modified",
+            additions: 1,
+            deletions: 0,
+            old_path: null,
+          },
+        ]);
+        useAppStore.getState().setDiffMaximized(true);
+        useAppStore.getState().setFocusedRegion("diff");
+      });
+
+      const persisted = getPersistedState();
+      expect(persisted).not.toBeNull();
+
+      expect(persisted).not.toHaveProperty("selectedCommitIds");
+      expect(persisted).not.toHaveProperty("selectedFilePath");
+      expect(persisted).not.toHaveProperty("selectedChangeId");
+      expect(persisted).not.toHaveProperty("changedFiles");
+      expect(persisted).not.toHaveProperty("isDiffMaximized");
+      expect(persisted).not.toHaveProperty("focusedRegion");
+      expect(persisted).not.toHaveProperty("workingChangesRevision");
+      expect(persisted).not.toHaveProperty("commitLimit");
+      expect(persisted).not.toHaveProperty("hasMoreCommits");
+    });
+
+    it("should only contain the four persistent keys", () => {
+      act(() => {
+        useAppStore.getState().addRepo("/path/to/repo");
+      });
+
+      const persisted = getPersistedState();
+      expect(persisted).not.toBeNull();
+      // biome-ignore lint/style/noNonNullAssertion: guarded by the assertion above
+      expect(Object.keys(persisted!).sort()).toEqual(
+        ["authorFilter", "repos", "selectedRepoId", "viewMode"].sort()
+      );
+    });
+  });
+
   describe("hasMoreCommits", () => {
     it("should default to true", () => {
       expect(useAppStore.getState().hasMoreCommits).toBe(true);
