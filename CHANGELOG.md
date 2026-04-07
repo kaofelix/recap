@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-04-03
+
+### Fixed
+
+- **Keyboard shortcuts no longer leak into open dropdowns** — Arrow keys and other hotkeys no longer navigate the main commit/file lists while a dropdown or context menu is open.
+- **Dropdowns no longer reopen after closing** — Pressing arrow keys immediately after closing a dropdown no longer inadvertently reopens it.
+
 ## [0.5.4] - 2026-04-01
 
 ### Improved

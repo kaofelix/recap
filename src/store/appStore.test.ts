@@ -1256,12 +1256,12 @@ describe("appStore", () => {
         useAppStore.getState().addRepo("/path/to/repo");
         useAppStore.getState().setCommits([
           {
-            hash: "abc123",
-            short_hash: "abc",
-            author_name: "Test",
-            author_email: "test@test.com",
-            date: "2024-01-01",
+            id: "abc123",
+            author: "Test",
+            email: "test@test.com",
+            timestamp: 1_704_067_200,
             message: "Test commit",
+            is_pushed: false,
           },
         ]);
         useAppStore.getState().setCommitsLoading(true);
