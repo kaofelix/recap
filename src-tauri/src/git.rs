@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::time::SystemTime;
 
 use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, Repository};
@@ -184,9 +183,7 @@ pub struct Author {
 }
 
 /// Lists unique authors from a git repository
-pub fn list_authors(repo_path: &str) -> Result<Vec<Author>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn list_authors(repo: &Repository) -> Result<Vec<Author>, String> {
 
     let mut revwalk =
         repo.revwalk()
@@ -243,12 +240,10 @@ pub fn list_authors(repo_path: &str) -> Result<Vec<Author>, String> {
 /// # Returns
 /// A vector of Commit structs or an error message
 pub fn list_commits(
-    repo_path: &str,
+    repo: &Repository,
     limit: Option<usize>,
     author_emails: Option<Vec<String>>,
 ) -> Result<Vec<Commit>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
 
     let mut revwalk =
         repo.revwalk()
@@ -415,9 +410,7 @@ fn resolve_commit_selection_range(
 ///
 /// # Returns
 /// A vector of ChangedFile structs or an error message
-pub fn get_commit_files(repo_path: &str, commit_id: &str) -> Result<Vec<ChangedFile>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_commit_files(repo: &Repository, commit_id: &str) -> Result<Vec<ChangedFile>, String> {
 
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
@@ -503,9 +496,7 @@ pub fn get_commit_files(repo_path: &str, commit_id: &str) -> Result<Vec<ChangedF
 ///
 /// The range uses the oldest selected commit's parent tree as the baseline,
 /// and the newest selected commit's tree as the target.
-pub fn get_commit_range_files(repo_path: &str, commit_ids: &[String]) -> Result<Vec<ChangedFile>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_commit_range_files(repo: &Repository, commit_ids: &[String]) -> Result<Vec<ChangedFile>, String> {
 
     let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
 
@@ -594,12 +585,10 @@ pub fn get_commit_range_files(repo_path: &str, commit_ids: &[String]) -> Result<
 /// # Returns
 /// A FileDiff struct or an error message
 pub fn get_file_diff(
-    repo_path: &str,
+    repo: &Repository,
     commit_id: &str,
     file_path: &str,
 ) -> Result<FileDiff, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
 
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
@@ -725,12 +714,10 @@ pub fn get_file_diff(
 /// # Returns
 /// A FileContents struct with old and new content, or an error message
 pub fn get_file_contents(
-    repo_path: &str,
+    repo: &Repository,
     commit_id: &str,
     file_path: &str,
 ) -> Result<FileContents, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
 
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
@@ -826,12 +813,10 @@ pub fn get_file_contents(
 /// The old content comes from the parent of the oldest selected commit.
 /// The new content comes from the newest selected commit.
 pub fn get_commit_range_file_contents(
-    repo_path: &str,
+    repo: &Repository,
     commit_ids: &[String],
     file_path: &str,
 ) -> Result<FileContents, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
 
     let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
 
@@ -927,9 +912,7 @@ pub fn get_commit_range_file_contents(
 ///
 /// # Returns
 /// The branch name or an error message
-pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_current_branch(repo: &Repository) -> Result<String, String> {
 
     let head = repo
         .head()
@@ -954,12 +937,10 @@ pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
 ///
 /// # Returns
 /// A vector of Branch structs or an error message
-pub fn list_branches(repo_path: &str) -> Result<Vec<Branch>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
 
     // Get current branch name for comparison
-    let current_branch = get_current_branch(repo_path).ok();
+    let current_branch = get_current_branch(repo).ok();
 
     let mut branches = Vec::new();
 
@@ -1047,9 +1028,7 @@ pub fn list_branches(repo_path: &str) -> Result<Vec<Branch>, String> {
 ///
 /// # Returns
 /// Ok(()) on success, or an error message
-pub fn checkout_branch(repo_path: &str, branch_name: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), String> {
 
     // Check for uncommitted changes that would be overwritten
     let statuses = repo
@@ -1108,9 +1087,7 @@ pub fn checkout_branch(repo_path: &str, branch_name: &str) -> Result<(), String>
 ///
 /// # Returns
 /// A RepoInfo struct or an error message
-pub fn validate_repo(path: &str) -> Result<RepoInfo, String> {
-    let repo = Repository::open(path).map_err(|e| format!("Not a valid git repository: {}", e))?;
-
+pub fn validate_repo(repo: &Repository) -> Result<RepoInfo, String> {
     // Get repository root path
     let repo_path = repo
         .workdir()
@@ -1126,7 +1103,7 @@ pub fn validate_repo(path: &str) -> Result<RepoInfo, String> {
         .to_string();
 
     // Get current branch
-    let branch = get_current_branch(path)?;
+    let branch = get_current_branch(repo)?;
 
     Ok(RepoInfo {
         path: repo_path,
@@ -1142,9 +1119,7 @@ pub fn validate_repo(path: &str) -> Result<RepoInfo, String> {
 ///
 /// # Returns
 /// A vector of ChangedFile structs representing working directory changes
-pub fn get_working_changes(repo_path: &str) -> Result<Vec<ChangedFile>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_working_changes(repo: &Repository) -> Result<Vec<ChangedFile>, String> {
 
     let statuses = repo
         .statuses(None)
@@ -1228,9 +1203,7 @@ pub fn get_working_changes(repo_path: &str) -> Result<Vec<ChangedFile>, String> 
 /// # Returns
 /// A vector of WorkingFile structs, where each file can appear up to twice:
 /// once for staged changes and once for unstaged changes
-pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_working_changes_ex(repo: &Repository) -> Result<Vec<WorkingFile>, String> {
 
     let statuses = repo
         .statuses(None)
@@ -1328,8 +1301,10 @@ pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, Strin
         };
 
         // Get file modification time for change detection
-        let mtime_ms = std::fs::metadata(Path::new(repo_path).join(&path))
-            .ok()
+        let mtime_ms = repo
+            .workdir()
+            .map(|wd| wd.join(&path))
+            .and_then(|p| std::fs::metadata(p).ok())
             .and_then(|m| m.modified().ok())
             .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as u64);
@@ -1378,9 +1353,7 @@ pub fn get_working_changes_ex(repo_path: &str) -> Result<Vec<WorkingFile>, Strin
 ///
 /// # Returns
 /// A FileDiff struct or an error message
-pub fn get_working_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_working_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
 
     // Get HEAD tree (if it exists)
     let head_tree = match repo.head() {
@@ -1493,9 +1466,7 @@ pub fn get_working_file_diff(repo_path: &str, file_path: &str) -> Result<FileDif
 ///
 /// # Returns
 /// A FileDiff struct showing staged changes, or an error if file has no staged changes
-pub fn get_staged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_staged_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
 
     // Get HEAD tree (if it exists)
     let head_tree = match repo.head() {
@@ -1614,9 +1585,7 @@ pub fn get_staged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff
 ///
 /// # Returns
 /// A FileDiff struct showing unstaged changes
-pub fn get_unstaged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDiff, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_unstaged_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
 
     let mut diff_opts = DiffOptions::new();
     diff_opts.pathspec(file_path);
@@ -1721,9 +1690,7 @@ pub fn get_unstaged_file_diff(repo_path: &str, file_path: &str) -> Result<FileDi
 ///
 /// # Returns
 /// A FileContents struct with old (HEAD) and new (working dir) content
-pub fn get_working_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_working_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
 
     // Get old content from HEAD (if it exists)
     let old_content = match repo.head() {
@@ -1811,9 +1778,7 @@ pub fn get_working_file_contents(repo_path: &str, file_path: &str) -> Result<Fil
 ///
 /// # Returns
 /// A FileContents struct with old (HEAD) and new (staged/index) content
-pub fn get_staged_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_staged_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
 
     // Get old content from HEAD (if it exists)
     let old_content = match repo.head() {
@@ -1900,9 +1865,7 @@ pub fn get_staged_file_contents(repo_path: &str, file_path: &str) -> Result<File
 ///
 /// # Returns
 /// A FileContents struct with old (index/staged) and new (working dir) content
-pub fn get_unstaged_file_contents(repo_path: &str, file_path: &str) -> Result<FileContents, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_unstaged_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
 
     // Get old content from index (staged)
     let old_content = match repo.index() {
@@ -2018,9 +1981,7 @@ pub fn get_unstaged_file_contents(repo_path: &str, file_path: &str) -> Result<Fi
 ///
 /// # Returns
 /// Ok(()) on success, or an error message
-pub fn unstage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn unstage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
 
     let mut index = repo
         .index()
@@ -2088,9 +2049,7 @@ pub fn unstage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
 ///
 /// # Returns
 /// Ok(()) on success, or an error message
-pub fn discard_file(repo_path: &str, file_path: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn discard_file(repo: &Repository, file_path: &str) -> Result<(), String> {
 
     // Check the status of the file
     let statuses = repo
@@ -2149,9 +2108,7 @@ pub struct AheadBehind {
 /// # Arguments
 /// * `repo_path` - Path to the git repository
 /// * `file_path` - Relative path to the file within the repository
-pub fn stage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn stage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
 
     let mut index = repo
         .index()
@@ -2188,9 +2145,7 @@ pub fn stage_file(repo_path: &str, file_path: &str) -> Result<(), String> {
 ///
 /// # Arguments
 /// * `repo_path` - Path to the git repository
-pub fn stage_all(repo_path: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn stage_all(repo: &Repository) -> Result<(), String> {
 
     let mut index = repo
         .index()
@@ -2238,9 +2193,7 @@ pub fn stage_all(repo_path: &str) -> Result<(), String> {
 ///
 /// # Arguments
 /// * `repo_path` - Path to the git repository
-pub fn unstage_all(repo_path: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn unstage_all(repo: &Repository) -> Result<(), String> {
 
     let head = repo
         .head()
@@ -2267,9 +2220,7 @@ pub fn unstage_all(repo_path: &str) -> Result<(), String> {
 ///
 /// # Returns
 /// Ok(()) on success, or an error if there are no staged changes or the commit fails
-pub fn create_commit(repo_path: &str, message: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn create_commit(repo: &Repository, message: &str) -> Result<(), String> {
 
     let mut index = repo
         .index()
@@ -2325,9 +2276,7 @@ pub fn create_commit(repo_path: &str, message: &str) -> Result<(), String> {
 ///
 /// # Returns
 /// An AheadBehind struct, or an error if the branch has no upstream
-pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_ahead_behind(repo: &Repository) -> Result<AheadBehind, String> {
 
     let head = repo
         .head()
@@ -2373,9 +2322,7 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
 ///
 /// # Returns
 /// The full commit message string, or an error message
-pub fn get_commit_message(repo_path: &str, commit_id: &str) -> Result<String, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_commit_message(repo: &Repository, commit_id: &str) -> Result<String, String> {
 
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
@@ -2399,9 +2346,7 @@ pub fn get_commit_message(repo_path: &str, commit_id: &str) -> Result<String, St
 ///
 /// # Returns
 /// Ok(()) on success, or an error message
-pub fn reword_commit(repo_path: &str, commit_id: &str, new_message: &str) -> Result<(), String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn reword_commit(repo: &Repository, commit_id: &str, new_message: &str) -> Result<(), String> {
 
     let target_oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
@@ -2518,9 +2463,7 @@ pub fn reword_commit(repo_path: &str, commit_id: &str, new_message: &str) -> Res
 ///
 /// # Returns
 /// The remote URL string, or an error if no origin remote is configured
-pub fn get_remote_url(repo_path: &str) -> Result<String, String> {
-    let repo =
-        Repository::open(repo_path).map_err(|e| format!("Failed to open repository: {}", e))?;
+pub fn get_remote_url(repo: &Repository) -> Result<String, String> {
 
     let remote = repo
         .find_remote("origin")
@@ -2595,8 +2538,9 @@ mod tests {
     fn test_list_commits_returns_commits() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
         assert_eq!(commits.len(), 2);
         assert_eq!(commits[0].message, "Add file");
@@ -2607,8 +2551,9 @@ mod tests {
     fn test_list_commits_respects_limit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, Some(1), None).expect("Should return commits");
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].message, "Add file");
@@ -2618,8 +2563,9 @@ mod tests {
     fn test_list_commits_includes_author_info() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
         assert_eq!(commits[0].author, "Test User");
         assert_eq!(commits[0].email, "test@example.com");
@@ -2627,9 +2573,8 @@ mod tests {
 
     #[test]
     fn test_list_commits_invalid_path() {
-        let result = list_commits("/nonexistent/path", None, None);
+        let result = Repository::open("/nonexistent/path");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Failed to open repository"));
     }
 
     #[test]
@@ -2637,7 +2582,7 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let path = temp_dir.path().to_str().unwrap();
 
-        let result = list_commits(path, None, None);
+        let result = Repository::open(path);
         assert!(result.is_err());
     }
 
@@ -2670,14 +2615,15 @@ mod tests {
             .expect("Failed to commit");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Without filter: 3 commits (Alice + 2 from Test User)
-        let all = list_commits(path_str, None, None).expect("Should return commits");
+        let all = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(all.len(), 3);
 
         // Filter to alice only
         let alice_only = list_commits(
-            path_str,
+            &repo,
             None,
             Some(vec!["alice@example.com".to_string()]),
         )
@@ -2688,7 +2634,7 @@ mod tests {
 
         // Filter to test@example.com only
         let test_only = list_commits(
-            path_str,
+            &repo,
             None,
             Some(vec!["test@example.com".to_string()]),
         )
@@ -2700,10 +2646,11 @@ mod tests {
     fn test_list_commits_author_filter_respects_limit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // Both existing commits are by test@example.com — limit to 1
         let result = list_commits(
-            path,
+            &repo,
             Some(1),
             Some(vec!["test@example.com".to_string()]),
         )
@@ -2716,9 +2663,10 @@ mod tests {
     fn test_list_commits_author_filter_empty_vec_returns_all() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // Empty filter should behave like no filter
-        let result = list_commits(path, None, Some(vec![]))
+        let result = list_commits(&repo, None, Some(vec![]))
             .expect("Should return commits");
         assert_eq!(result.len(), 2);
     }
@@ -2772,7 +2720,8 @@ mod tests {
             .output()
             .expect("Failed to commit");
 
-        let authors = list_authors(path.to_str().unwrap()).expect("Should return authors");
+        let repo = Repository::open(path.to_str().unwrap()).unwrap();
+        let authors = list_authors(&repo).expect("Should return authors");
 
         assert_eq!(authors.len(), 2);
 
@@ -2797,6 +2746,7 @@ mod tests {
         let (local_dir, _remote_dir) = create_test_repo_with_remote();
         let path = local_dir.path();
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Add an unpushed commit
         std::fs::write(path.join("unpushed.txt"), "local only").expect("Failed to write");
@@ -2811,7 +2761,7 @@ mod tests {
             .output()
             .expect("Failed to commit");
 
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 2);
 
         // First commit (most recent) is unpushed
@@ -2827,8 +2777,9 @@ mod tests {
     fn test_list_commits_all_pushed() {
         let (local_dir, _remote_dir) = create_test_repo_with_remote();
         let path_str = local_dir.path().to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].is_pushed, true);
     }
@@ -2838,6 +2789,7 @@ mod tests {
         let (local_dir, remote_dir) = create_test_repo_with_remote();
         let path = local_dir.path();
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Add a local unpushed commit
         std::fs::write(path.join("local.txt"), "local change").expect("Failed to write");
@@ -2896,7 +2848,7 @@ mod tests {
 
         // Now local is diverged: 1 local commit, 1 remote-only commit
         // The merge base (Initial commit) should be marked pushed
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 2); // Local unpushed + Initial commit
 
         assert_eq!(commits[0].message, "Local unpushed");
@@ -2910,9 +2862,10 @@ mod tests {
     fn test_list_commits_no_upstream_marks_all_unpushed() {
         let temp_dir = create_test_repo();
         let path_str = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // No remote configured — all commits should be marked as not pushed
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         for commit in &commits {
             assert_eq!(commit.is_pushed, false, "Commit '{}' should not be marked pushed without upstream", commit.message);
         }
@@ -2923,6 +2876,7 @@ mod tests {
         let (local_dir, _remote_dir) = create_test_repo_with_remote();
         let path = local_dir.path();
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Add unpushed commit by a different author
         Command::new("git")
@@ -2950,7 +2904,7 @@ mod tests {
         // Add a pushed commit by alice (push everything, then add another unpushed one by test user)
         // Actually simpler: just verify that alice's filtered commit has is_pushed = false
         let alice_commits = list_commits(
-            path_str,
+            &repo,
             None,
             Some(vec!["alice@example.com".to_string()]),
         )
@@ -2964,8 +2918,9 @@ mod tests {
     fn test_commit_has_valid_sha() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
         // SHA should be 40 hex characters
         assert_eq!(commits[0].id.len(), 40);
@@ -2976,8 +2931,9 @@ mod tests {
     fn test_commit_has_timestamp() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
         // Timestamp should be a reasonable Unix timestamp (after 2020)
         assert!(commits[0].timestamp > 1577836800); // 2020-01-01
@@ -2989,12 +2945,13 @@ mod tests {
     fn test_get_commit_files_returns_added_file() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let latest_commit = &commits[0]; // "Add file" commit
 
         let files =
-            get_commit_files(path, &latest_commit.id).expect("Should return changed files");
+            get_commit_files(&repo, &latest_commit.id).expect("Should return changed files");
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "file.txt");
@@ -3006,12 +2963,13 @@ mod tests {
     fn test_get_commit_files_initial_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let initial_commit = &commits[1]; // "Initial commit"
 
         let files =
-            get_commit_files(path, &initial_commit.id).expect("Should return changed files");
+            get_commit_files(&repo, &initial_commit.id).expect("Should return changed files");
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "README.md");
@@ -3037,11 +2995,12 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
         let modify_commit = &commits[0];
 
         let files =
-            get_commit_files(path_str, &modify_commit.id).expect("Should return changed files");
+            get_commit_files(&repo, &modify_commit.id).expect("Should return changed files");
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "file.txt");
@@ -3067,11 +3026,12 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
         let delete_commit = &commits[0];
 
         let files =
-            get_commit_files(path_str, &delete_commit.id).expect("Should return changed files");
+            get_commit_files(&repo, &delete_commit.id).expect("Should return changed files");
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "file.txt");
@@ -3082,8 +3042,9 @@ mod tests {
     fn test_get_commit_files_invalid_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_commit_files(path, "0000000000000000000000000000000000000000");
+        let result = get_commit_files(&repo, "0000000000000000000000000000000000000000");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to find commit"));
     }
@@ -3092,8 +3053,9 @@ mod tests {
     fn test_get_commit_files_invalid_commit_id_format() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_commit_files(path, "not-a-valid-sha");
+        let result = get_commit_files(&repo, "not-a-valid-sha");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid commit ID"));
     }
@@ -3102,11 +3064,12 @@ mod tests {
     fn test_get_commit_range_files_for_consecutive_commits() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let commit_ids = vec![commits[1].id.clone(), commits[0].id.clone()];
 
-        let files = get_commit_range_files(path, &commit_ids).expect("Should return changed files");
+        let files = get_commit_range_files(&repo, &commit_ids).expect("Should return changed files");
 
         assert!(!files.is_empty());
         assert!(files.iter().any(|file| file.path == "README.md"));
@@ -3131,10 +3094,11 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let non_consecutive_ids = vec![commits[0].id.clone(), commits[2].id.clone()];
 
-        let result = get_commit_range_files(path_str, &non_consecutive_ids);
+        let result = get_commit_range_files(&repo, &non_consecutive_ids);
 
         assert!(result.is_err());
         assert!(result
@@ -3148,11 +3112,12 @@ mod tests {
     fn test_get_file_diff_returns_diff() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let latest_commit = &commits[0]; // "Add file" commit
 
-        let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
+        let diff = get_file_diff(&repo, &latest_commit.id, "file.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "file.txt");
         assert!(!diff.is_binary);
@@ -3190,10 +3155,11 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
         let diff =
-            get_file_diff(path_str, &commits[0].id, "file.txt").expect("Should return diff");
+            get_file_diff(&repo, &commits[0].id, "file.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "file.txt");
         assert!(!diff.is_binary);
@@ -3215,11 +3181,12 @@ mod tests {
     fn test_get_file_diff_file_not_in_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let latest_commit = &commits[0];
 
-        let result = get_file_diff(path, &latest_commit.id, "nonexistent.txt");
+        let result = get_file_diff(&repo, &latest_commit.id, "nonexistent.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found in commit"));
     }
@@ -3228,11 +3195,12 @@ mod tests {
     fn test_get_file_diff_line_numbers() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let latest_commit = &commits[0];
 
-        let diff = get_file_diff(path, &latest_commit.id, "file.txt").expect("Should return diff");
+        let diff = get_file_diff(&repo, &latest_commit.id, "file.txt").expect("Should return diff");
 
         // For added file, lines should have new_line_no set
         for hunk in &diff.hunks {
@@ -3250,8 +3218,9 @@ mod tests {
     fn test_get_current_branch_returns_branch_name() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let branch = get_current_branch(path).expect("Should return branch name");
+        let branch = get_current_branch(&repo).expect("Should return branch name");
 
         // Default branch could be "master" or "main" depending on git config
         assert!(branch == "master" || branch == "main");
@@ -3270,7 +3239,8 @@ mod tests {
             .expect("Failed to create branch");
 
         let path_str = path.to_str().unwrap();
-        let branch = get_current_branch(path_str).expect("Should return branch name");
+        let repo = Repository::open(path_str).unwrap();
+        let branch = get_current_branch(&repo).expect("Should return branch name");
 
         assert_eq!(branch, "feature-branch");
     }
@@ -3281,7 +3251,8 @@ mod tests {
         let path = temp_dir.path();
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
         // Checkout specific commit (detached HEAD)
         Command::new("git")
@@ -3290,7 +3261,7 @@ mod tests {
             .output()
             .expect("Failed to checkout commit");
 
-        let branch = get_current_branch(path_str).expect("Should return something");
+        let branch = get_current_branch(&repo).expect("Should return something");
 
         // Should return the commit SHA when in detached HEAD
         assert_eq!(branch.len(), 40);
@@ -3299,7 +3270,7 @@ mod tests {
 
     #[test]
     fn test_get_current_branch_invalid_path() {
-        let result = get_current_branch("/nonexistent/path");
+        let result = Repository::open("/nonexistent/path");
         assert!(result.is_err());
     }
 
@@ -3309,8 +3280,9 @@ mod tests {
     fn test_validate_repo_returns_info() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let info = validate_repo(path).expect("Should return repo info");
+        let info = validate_repo(&repo).expect("Should return repo info");
 
         assert!(info.path.len() > 0);
         assert!(info.name.len() > 0);
@@ -3319,9 +3291,8 @@ mod tests {
 
     #[test]
     fn test_validate_repo_invalid_path() {
-        let result = validate_repo("/nonexistent/path");
+        let result = Repository::open("/nonexistent/path");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Not a valid git repository"));
     }
 
     #[test]
@@ -3329,7 +3300,7 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let path = temp_dir.path().to_str().unwrap();
 
-        let result = validate_repo(path);
+        let result = Repository::open(path);
         assert!(result.is_err());
     }
 
@@ -3337,8 +3308,9 @@ mod tests {
     fn test_validate_repo_path_is_normalized() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let info = validate_repo(path).expect("Should return repo info");
+        let info = validate_repo(&repo).expect("Should return repo info");
 
         // Path should be absolute
         assert!(info.path.starts_with('/'));
@@ -3350,12 +3322,13 @@ mod tests {
     fn test_get_file_contents_added_file() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let add_commit = &commits[0]; // "Add file" commit
 
         let contents =
-            get_file_contents(path, &add_commit.id, "file.txt").expect("Should return contents");
+            get_file_contents(&repo, &add_commit.id, "file.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert!(contents.old_content.is_none()); // File didn't exist before
@@ -3381,9 +3354,10 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
-        let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
+        let contents = get_file_contents(&repo, &commits[0].id, "file.txt")
             .expect("Should return contents");
 
         assert!(!contents.is_binary);
@@ -3410,9 +3384,10 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, Some(1), None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
-        let contents = get_file_contents(path_str, &commits[0].id, "file.txt")
+        let contents = get_file_contents(&repo, &commits[0].id, "file.txt")
             .expect("Should return contents");
 
         assert!(!contents.is_binary);
@@ -3424,10 +3399,11 @@ mod tests {
     fn test_get_file_contents_file_not_in_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
-        let result = get_file_contents(path, &commits[0].id, "nonexistent.txt");
+        let result = get_file_contents(&repo, &commits[0].id, "nonexistent.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found in commit"));
     }
@@ -3438,8 +3414,9 @@ mod tests {
     fn test_get_working_changes_no_changes() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let changes = get_working_changes(path).expect("Should return changes");
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert!(changes.is_empty());
     }
@@ -3453,7 +3430,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "file.txt");
@@ -3469,7 +3447,8 @@ mod tests {
         std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "newfile.txt");
@@ -3490,7 +3469,8 @@ mod tests {
             .expect("Failed to add file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "staged.txt");
@@ -3506,7 +3486,8 @@ mod tests {
         std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "file.txt");
@@ -3523,7 +3504,8 @@ mod tests {
         std::fs::write(path.join("new.txt"), "new").expect("Failed to write");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 2);
     }
@@ -3539,7 +3521,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "line1\nline2\nnew line").expect("Failed to write");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_working_file_diff(path_str, "file.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_working_file_diff(&repo, "file.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "file.txt");
         assert!(!diff.is_binary);
@@ -3562,7 +3545,8 @@ mod tests {
         std::fs::write(path.join("untracked.txt"), "new file content").expect("Failed to write");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_working_file_diff(path_str, "untracked.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_working_file_diff(&repo, "untracked.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "untracked.txt");
         assert!(!diff.is_binary);
@@ -3579,8 +3563,9 @@ mod tests {
     fn test_get_working_file_diff_no_changes() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_working_file_diff(path, "file.txt");
+        let result = get_working_file_diff(&repo, "file.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no changes"));
     }
@@ -3589,8 +3574,9 @@ mod tests {
     fn test_get_working_file_diff_nonexistent() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_working_file_diff(path, "nonexistent.txt");
+        let result = get_working_file_diff(&repo, "nonexistent.txt");
         assert!(result.is_err());
     }
 
@@ -3605,8 +3591,9 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
         let contents =
-            get_working_file_contents(path_str, "file.txt").expect("Should return contents");
+            get_working_file_contents(&repo, "file.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert_eq!(contents.old_content, Some("content".to_string()));
@@ -3622,8 +3609,9 @@ mod tests {
         std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
         let contents =
-            get_working_file_contents(path_str, "newfile.txt").expect("Should return contents");
+            get_working_file_contents(&repo, "newfile.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert!(contents.old_content.is_none()); // File didn't exist in HEAD
@@ -3639,8 +3627,9 @@ mod tests {
         std::fs::remove_file(path.join("file.txt")).expect("Failed to delete");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
         let contents =
-            get_working_file_contents(path_str, "file.txt").expect("Should return contents");
+            get_working_file_contents(&repo, "file.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert_eq!(contents.old_content, Some("content".to_string()));
@@ -3651,8 +3640,9 @@ mod tests {
     fn test_get_working_file_contents_nonexistent() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_working_file_contents(path, "nonexistent.txt");
+        let result = get_working_file_contents(&repo, "nonexistent.txt");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
     }
@@ -3663,8 +3653,9 @@ mod tests {
     fn test_list_branches_returns_current_branch() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let branches = list_branches(path).expect("Should return branches");
+        let branches = list_branches(&repo).expect("Should return branches");
 
         assert!(!branches.is_empty());
         // Should have at least one branch marked as current
@@ -3693,7 +3684,8 @@ mod tests {
             .expect("Failed to create branch");
 
         let path_str = path.to_str().unwrap();
-        let branches = list_branches(path_str).expect("Should return branches");
+        let repo = Repository::open(path_str).unwrap();
+        let branches = list_branches(&repo).expect("Should return branches");
 
         // Should have 3 local branches
         let local_branches: Vec<_> = branches.iter().filter(|b| !b.is_remote).collect();
@@ -3713,7 +3705,8 @@ mod tests {
             .expect("Failed to create branch");
 
         let path_str = path.to_str().unwrap();
-        let branches = list_branches(path_str).expect("Should return branches");
+        let repo = Repository::open(path_str).unwrap();
+        let branches = list_branches(&repo).expect("Should return branches");
 
         // Current branch should be first
         assert!(branches[0].is_current);
@@ -3723,8 +3716,9 @@ mod tests {
     fn test_list_branches_has_commit_id() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let branches = list_branches(path).expect("Should return branches");
+        let branches = list_branches(&repo).expect("Should return branches");
 
         // All branches should have a commit ID
         for branch in &branches {
@@ -3735,7 +3729,7 @@ mod tests {
 
     #[test]
     fn test_list_branches_invalid_path() {
-        let result = list_branches("/nonexistent/path");
+        let result = Repository::open("/nonexistent/path");
         assert!(result.is_err());
     }
 
@@ -3754,12 +3748,13 @@ mod tests {
             .expect("Failed to create branch");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Checkout the new branch
-        checkout_branch(path_str, "feature").expect("Should checkout branch");
+        checkout_branch(&repo, "feature").expect("Should checkout branch");
 
         // Verify we're on the new branch
-        let current = get_current_branch(path_str).expect("Should get current branch");
+        let current = get_current_branch(&repo).expect("Should get current branch");
         assert_eq!(current, "feature");
     }
 
@@ -3767,8 +3762,9 @@ mod tests {
     fn test_checkout_branch_nonexistent() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = checkout_branch(path, "nonexistent-branch");
+        let result = checkout_branch(&repo, "nonexistent-branch");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
     }
@@ -3789,7 +3785,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let result = checkout_branch(path_str, "feature");
+        let repo = Repository::open(path_str).unwrap();
+        let result = checkout_branch(&repo, "feature");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("uncommitted changes"));
@@ -3811,7 +3808,8 @@ mod tests {
         std::fs::write(path.join("untracked.txt"), "new file").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let result = checkout_branch(path_str, "feature");
+        let repo = Repository::open(path_str).unwrap();
+        let result = checkout_branch(&repo, "feature");
 
         // Untracked files should not block checkout
         assert!(result.is_ok());
@@ -3822,9 +3820,10 @@ mod tests {
         let temp_dir = create_test_repo();
         let path = temp_dir.path();
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Get the current branch name (master or main)
-        let main_branch = get_current_branch(path_str).expect("Should get branch");
+        let main_branch = get_current_branch(&repo).expect("Should get branch");
 
         // Create a new branch and add a file
         Command::new("git")
@@ -3857,7 +3856,7 @@ mod tests {
         assert!(!path.join("feature-file.txt").exists());
 
         // Checkout feature branch using our function
-        checkout_branch(path_str, "feature").expect("Should checkout branch");
+        checkout_branch(&repo, "feature").expect("Should checkout branch");
 
         // File should now exist
         assert!(path.join("feature-file.txt").exists());
@@ -3865,7 +3864,7 @@ mod tests {
 
     #[test]
     fn test_checkout_branch_invalid_path() {
-        let result = checkout_branch("/nonexistent/path", "main");
+        let result = Repository::open("/nonexistent/path");
         assert!(result.is_err());
     }
 
@@ -3875,8 +3874,9 @@ mod tests {
     fn test_get_working_changes_ex_returns_empty_when_no_changes() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let changes = get_working_changes_ex(path).expect("Should return changes");
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert!(changes.is_empty());
     }
@@ -3890,7 +3890,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "file.txt");
@@ -3913,7 +3914,8 @@ mod tests {
             .expect("Failed to stage file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "file.txt");
@@ -3940,7 +3942,8 @@ mod tests {
             .expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 2);
 
@@ -3980,7 +3983,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "line1\nline2\nline3").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 2);
 
@@ -4010,7 +4014,8 @@ mod tests {
             .expect("Failed to stage file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "newfile.txt");
@@ -4027,7 +4032,8 @@ mod tests {
         std::fs::write(path.join("untracked.txt"), "untracked content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let changes = get_working_changes_ex(path_str).expect("Should return changes");
+        let repo = Repository::open(path_str).unwrap();
+        let changes = get_working_changes_ex(&repo).expect("Should return changes");
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, "untracked.txt");
@@ -4055,7 +4061,8 @@ mod tests {
             .expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_staged_file_diff(path_str, "file.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_staged_file_diff(&repo, "file.txt").expect("Should return diff");
 
         // Staged diff should only show "staged content", not the unstaged changes
         assert_eq!(diff.new_path, "file.txt");
@@ -4082,7 +4089,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "unstaged changes").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let result = get_staged_file_diff(path_str, "file.txt");
+        let repo = Repository::open(path_str).unwrap();
+        let result = get_staged_file_diff(&repo, "file.txt");
 
         assert!(result.is_err());
     }
@@ -4101,7 +4109,8 @@ mod tests {
             .expect("Failed to stage file");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_staged_file_diff(path_str, "newfile.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_staged_file_diff(&repo, "newfile.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "newfile.txt");
         assert!(!diff.is_binary);
@@ -4136,7 +4145,8 @@ mod tests {
             .expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_unstaged_file_diff(path_str, "file.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_unstaged_file_diff(&repo, "file.txt").expect("Should return diff");
 
         // Unstaged diff should show the difference between staged and working
         assert_eq!(diff.new_path, "file.txt");
@@ -4160,7 +4170,8 @@ mod tests {
         std::fs::write(path.join("file.txt"), "only unstaged").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_unstaged_file_diff(path_str, "file.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_unstaged_file_diff(&repo, "file.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "file.txt");
         assert!(!diff.is_binary);
@@ -4170,9 +4181,10 @@ mod tests {
     fn test_get_unstaged_file_diff_returns_error_when_no_changes() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // No changes to file.txt
-        let result = get_unstaged_file_diff(path, "file.txt");
+        let result = get_unstaged_file_diff(&repo, "file.txt");
 
         assert!(result.is_err());
     }
@@ -4186,7 +4198,8 @@ mod tests {
         std::fs::write(path.join("untracked.txt"), "new untracked").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
-        let diff = get_unstaged_file_diff(path_str, "untracked.txt").expect("Should return diff");
+        let repo = Repository::open(path_str).unwrap();
+        let diff = get_unstaged_file_diff(&repo, "untracked.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "untracked.txt");
         assert!(!diff.is_binary);
@@ -4208,16 +4221,17 @@ mod tests {
             .expect("Failed to stage file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file is staged
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before.iter().any(|c| c.staged_status.is_some()));
 
         // Unstage the file
-        unstage_file(path_str, "file.txt").expect("Should unstage file");
+        unstage_file(&repo, "file.txt").expect("Should unstage file");
 
         // Verify file is now unstaged only
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         let staged_count = changes_after
             .iter()
             .filter(|c| c.staged_status.is_some())
@@ -4246,18 +4260,19 @@ mod tests {
             .expect("Failed to stage file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file is staged as Added
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before
             .iter()
             .any(|c| c.path == "newfile.txt" && c.staged_status == Some(FileStatus::Added)));
 
         // Unstage the file
-        unstage_file(path_str, "newfile.txt").expect("Should unstage file");
+        unstage_file(&repo, "newfile.txt").expect("Should unstage file");
 
         // File should now be untracked
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after
             .iter()
             .any(|c| c.path == "newfile.txt" && c.unstaged_status == Some(FileStatus::Untracked)));
@@ -4274,22 +4289,23 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file has unstaged changes
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before
             .iter()
             .any(|c| c.path == "file.txt" && c.unstaged_status.is_some()));
 
         // Discard changes
-        discard_file(path_str, "file.txt").expect("Should discard changes");
+        discard_file(&repo, "file.txt").expect("Should discard changes");
 
         // Verify file content is restored
         let content = std::fs::read_to_string(path.join("file.txt")).expect("Should read file");
         assert_eq!(content, "content");
 
         // No more changes
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after.iter().all(|c| c.path != "file.txt"));
     }
 
@@ -4303,21 +4319,22 @@ mod tests {
             .expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file exists and is untracked
         assert!(path.join("untracked.txt").exists());
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before.iter().any(|c| c.path == "untracked.txt"
             && c.unstaged_status == Some(FileStatus::Untracked)));
 
         // Discard (delete) the file
-        discard_file(path_str, "untracked.txt").expect("Should discard file");
+        discard_file(&repo, "untracked.txt").expect("Should discard file");
 
         // Verify file is deleted
         assert!(!path.join("untracked.txt").exists());
 
         // No more changes for this file
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after.iter().all(|c| c.path != "untracked.txt"));
     }
 
@@ -4338,16 +4355,17 @@ mod tests {
         std::fs::write(path.join("file.txt"), "unstaged version").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Discard unstaged changes
-        discard_file(path_str, "file.txt").expect("Should discard changes");
+        discard_file(&repo, "file.txt").expect("Should discard changes");
 
         // File should now match staged version
         let content = std::fs::read_to_string(path.join("file.txt")).expect("Should read file");
         assert_eq!(content, "staged version");
 
         // Should still have staged changes
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after
             .iter()
             .any(|c| c.path == "file.txt" && c.staged_status.is_some()));
@@ -4361,9 +4379,10 @@ mod tests {
     fn test_discard_file_error_when_no_changes() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // File exists but has no changes
-        let result = discard_file(path, "file.txt");
+        let result = discard_file(&repo, "file.txt");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no changes to discard"));
@@ -4442,8 +4461,9 @@ mod tests {
     fn test_get_ahead_behind_returns_zero_when_in_sync() {
         let (local_dir, _remote_dir) = create_test_repo_with_remote();
         let path = local_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_ahead_behind(path).expect("Should return ahead/behind");
+        let result = get_ahead_behind(&repo).expect("Should return ahead/behind");
         assert_eq!(result.ahead, 0);
         assert_eq!(result.behind, 0);
     }
@@ -4479,7 +4499,8 @@ mod tests {
             .expect("Failed to commit");
 
         let path_str = path.to_str().unwrap();
-        let result = get_ahead_behind(path_str).expect("Should return ahead/behind");
+        let repo = Repository::open(path_str).unwrap();
+        let result = get_ahead_behind(&repo).expect("Should return ahead/behind");
         assert_eq!(result.ahead, 2);
         assert_eq!(result.behind, 0);
     }
@@ -4488,8 +4509,9 @@ mod tests {
     fn test_get_ahead_behind_error_when_no_upstream() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_ahead_behind(path);
+        let result = get_ahead_behind(&repo);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("No upstream tracking branch"));
     }
@@ -4498,6 +4520,7 @@ mod tests {
     fn test_get_remote_url_returns_origin_url() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // Add a remote
         Command::new("git")
@@ -4506,7 +4529,7 @@ mod tests {
             .output()
             .expect("Failed to add remote");
 
-        let result = get_remote_url(path);
+        let result = get_remote_url(&repo);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "https://github.com/owner/repo.git");
     }
@@ -4515,8 +4538,9 @@ mod tests {
     fn test_get_remote_url_error_when_no_origin() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_remote_url(path);
+        let result = get_remote_url(&repo);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("No 'origin' remote configured"));
     }
@@ -4544,9 +4568,10 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
-        let full_message = get_commit_message(path_str, &commits[0].id)
+        let full_message = get_commit_message(&repo, &commits[0].id)
             .expect("Should return full message");
 
         assert!(full_message.starts_with("Summary line"));
@@ -4558,10 +4583,11 @@ mod tests {
     fn test_get_commit_message_single_line() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
 
-        let message = get_commit_message(path, &commits[0].id)
+        let message = get_commit_message(&repo, &commits[0].id)
             .expect("Should return message");
 
         assert_eq!(message.trim(), "Add file");
@@ -4571,8 +4597,9 @@ mod tests {
     fn test_get_commit_message_invalid_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = get_commit_message(path, "0000000000000000000000000000000000000000");
+        let result = get_commit_message(&repo, "0000000000000000000000000000000000000000");
         assert!(result.is_err());
     }
 
@@ -4582,15 +4609,16 @@ mod tests {
     fn test_reword_commit_head() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let head_commit = &commits[0];
         assert_eq!(head_commit.message, "Add file");
 
-        reword_commit(path, &head_commit.id, "Reworded message")
+        reword_commit(&repo, &head_commit.id, "Reworded message")
             .expect("Should reword HEAD commit");
 
-        let commits_after = list_commits(path, None, None).expect("Should return commits");
+        let commits_after = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits_after[0].message, "Reworded message");
         // Other commits should be unchanged
         assert_eq!(commits_after[1].message, "Initial commit");
@@ -4616,15 +4644,16 @@ mod tests {
             .expect("Failed to create commit");
 
         let path_str = path.to_str().unwrap();
-        let commits = list_commits(path_str, None, None).expect("Should return commits");
+        let repo = Repository::open(path_str).unwrap();
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits.len(), 3);
         // commits[0] = "Third commit", commits[1] = "Add file", commits[2] = "Initial commit"
 
         let middle_commit_id = commits[1].id.clone();
-        reword_commit(path_str, &middle_commit_id, "Reworded middle")
+        reword_commit(&repo, &middle_commit_id, "Reworded middle")
             .expect("Should reword non-HEAD commit");
 
-        let commits_after = list_commits(path_str, None, None).expect("Should return commits");
+        let commits_after = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits_after.len(), 3);
         assert_eq!(commits_after[0].message, "Third commit");
         assert_eq!(commits_after[1].message, "Reworded middle");
@@ -4640,15 +4669,16 @@ mod tests {
     fn test_reword_commit_preserves_tree() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
-        let files_before = get_commit_files(path, &commits[0].id).expect("Should get files");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
+        let files_before = get_commit_files(&repo, &commits[0].id).expect("Should get files");
 
-        reword_commit(path, &commits[0].id, "New message")
+        reword_commit(&repo, &commits[0].id, "New message")
             .expect("Should reword commit");
 
-        let commits_after = list_commits(path, None, None).expect("Should return commits");
-        let files_after = get_commit_files(path, &commits_after[0].id).expect("Should get files");
+        let commits_after = list_commits(&repo, None, None).expect("Should return commits");
+        let files_after = get_commit_files(&repo, &commits_after[0].id).expect("Should get files");
 
         assert_eq!(files_before.len(), files_after.len());
         assert_eq!(files_before[0].path, files_after[0].path);
@@ -4658,8 +4688,9 @@ mod tests {
     fn test_reword_commit_not_found() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = reword_commit(path, "0000000000000000000000000000000000000000", "New msg");
+        let result = reword_commit(&repo, "0000000000000000000000000000000000000000", "New msg");
         assert!(result.is_err());
     }
 
@@ -4667,15 +4698,16 @@ mod tests {
     fn test_reword_commit_root_commit() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let commits = list_commits(path, None, None).expect("Should return commits");
+        let commits = list_commits(&repo, None, None).expect("Should return commits");
         let root_commit = &commits[commits.len() - 1]; // "Initial commit"
         assert_eq!(root_commit.message, "Initial commit");
 
-        reword_commit(path, &root_commit.id, "Reworded root")
+        reword_commit(&repo, &root_commit.id, "Reworded root")
             .expect("Should reword root commit");
 
-        let commits_after = list_commits(path, None, None).expect("Should return commits");
+        let commits_after = list_commits(&repo, None, None).expect("Should return commits");
         assert_eq!(commits_after[commits_after.len() - 1].message, "Reworded root");
         // All commits should have new IDs since root was rewritten
         assert_ne!(commits_after[0].id, commits[0].id);
@@ -4692,18 +4724,19 @@ mod tests {
         std::fs::write(path.join("file.txt"), "modified content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file has unstaged changes only
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before
             .iter()
             .any(|c| c.path == "file.txt" && c.unstaged_status.is_some() && c.staged_status.is_none()));
 
         // Stage the file
-        stage_file(path_str, "file.txt").expect("Should stage file");
+        stage_file(&repo, "file.txt").expect("Should stage file");
 
         // Verify file is now staged
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after
             .iter()
             .any(|c| c.path == "file.txt" && c.staged_status == Some(FileStatus::Modified)));
@@ -4722,18 +4755,19 @@ mod tests {
         std::fs::write(path.join("newfile.txt"), "new content").expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file is untracked
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before
             .iter()
             .any(|c| c.path == "newfile.txt" && c.unstaged_status == Some(FileStatus::Untracked)));
 
         // Stage the file
-        stage_file(path_str, "newfile.txt").expect("Should stage file");
+        stage_file(&repo, "newfile.txt").expect("Should stage file");
 
         // Verify file is now staged as Added
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after
             .iter()
             .any(|c| c.path == "newfile.txt" && c.staged_status == Some(FileStatus::Added)));
@@ -4748,18 +4782,19 @@ mod tests {
         std::fs::remove_file(path.join("file.txt")).expect("Failed to delete file");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify file has unstaged deletion
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_before
             .iter()
             .any(|c| c.path == "file.txt" && c.unstaged_status == Some(FileStatus::Deleted)));
 
         // Stage the deletion
-        stage_file(path_str, "file.txt").expect("Should stage file");
+        stage_file(&repo, "file.txt").expect("Should stage file");
 
         // Verify file is now staged as Deleted
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         assert!(changes_after
             .iter()
             .any(|c| c.path == "file.txt" && c.staged_status == Some(FileStatus::Deleted)));
@@ -4782,9 +4817,10 @@ mod tests {
         std::fs::remove_file(path.join("README.md")).expect("Failed to delete");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify all changes are unstaged
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         let unstaged_count = changes_before
             .iter()
             .filter(|c| c.unstaged_status.is_some())
@@ -4792,10 +4828,10 @@ mod tests {
         assert_eq!(unstaged_count, 3);
 
         // Stage all
-        stage_all(path_str).expect("Should stage all");
+        stage_all(&repo).expect("Should stage all");
 
         // Verify all changes are now staged
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         let staged_count = changes_after
             .iter()
             .filter(|c| c.staged_status.is_some())
@@ -4814,9 +4850,10 @@ mod tests {
     fn test_stage_all_with_no_changes_succeeds() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // No changes — should succeed without error
-        let result = stage_all(path);
+        let result = stage_all(&repo);
         assert!(result.is_ok());
     }
 
@@ -4837,9 +4874,10 @@ mod tests {
             .expect("Failed to stage all");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
         // Verify changes are staged
-        let changes_before = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
         let staged_count = changes_before
             .iter()
             .filter(|c| c.staged_status.is_some())
@@ -4847,10 +4885,10 @@ mod tests {
         assert!(staged_count >= 2);
 
         // Unstage all
-        unstage_all(path_str).expect("Should unstage all");
+        unstage_all(&repo).expect("Should unstage all");
 
         // Verify no changes are staged
-        let changes_after = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes_after = get_working_changes_ex(&repo).expect("Should get changes");
         let staged_count = changes_after
             .iter()
             .filter(|c| c.staged_status.is_some())
@@ -4869,9 +4907,10 @@ mod tests {
     fn test_unstage_all_with_no_staged_changes_succeeds() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
         // No staged changes — should succeed without error
-        let result = unstage_all(path);
+        let result = unstage_all(&repo);
         assert!(result.is_ok());
     }
 
@@ -4891,15 +4930,16 @@ mod tests {
             .expect("Failed to stage");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
 
-        create_commit(path_str, "New commit message").expect("Should create commit");
+        create_commit(&repo, "New commit message").expect("Should create commit");
 
         // New HEAD should have the correct message
-        let commits = list_commits(path_str, Some(1), None).expect("Should list commits");
+        let commits = list_commits(&repo, Some(1), None).expect("Should list commits");
         assert_eq!(commits[0].message, "New commit message");
 
         // No staged changes should remain
-        let changes = get_working_changes_ex(path_str).expect("Should get changes");
+        let changes = get_working_changes_ex(&repo).expect("Should get changes");
         let staged_count = changes.iter().filter(|c| c.staged_status.is_some()).count();
         assert_eq!(staged_count, 0);
     }
@@ -4908,8 +4948,9 @@ mod tests {
     fn test_create_commit_with_no_staged_changes_fails() {
         let temp_dir = create_test_repo();
         let path = temp_dir.path().to_str().unwrap();
+        let repo = Repository::open(path).unwrap();
 
-        let result = create_commit(path, "Empty commit");
+        let result = create_commit(&repo, "Empty commit");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("No staged changes"));
     }
@@ -4927,14 +4968,15 @@ mod tests {
             .expect("Failed to stage");
 
         let path_str = path.to_str().unwrap();
+        let repo = Repository::open(path_str).unwrap();
         let message = "Summary line\n\nDetailed body paragraph\nwith multiple lines.";
 
-        create_commit(path_str, message).expect("Should create commit");
+        create_commit(&repo, message).expect("Should create commit");
 
         // Verify the full message is preserved
-        let commits = list_commits(path_str, Some(1), None).expect("Should list commits");
+        let commits = list_commits(&repo, Some(1), None).expect("Should list commits");
         let full_message =
-            get_commit_message(path_str, &commits[0].id).expect("Should get message");
+            get_commit_message(&repo, &commits[0].id).expect("Should get message");
         assert!(full_message.starts_with("Summary line\n\nDetailed body paragraph"));
     }
 }

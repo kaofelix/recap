@@ -1,192 +1,296 @@
 use crate::git as git_service;
+use crate::repo_cache::RepoCache;
 
 #[tauri::command]
 pub fn list_commits(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     limit: Option<usize>,
     author_emails: Option<Vec<String>>,
 ) -> Result<Vec<git_service::Commit>, String> {
-    git_service::list_commits(&repo_path, limit, author_emails)
+    state.with_repo(&repo_path, |repo| {
+        git_service::list_commits(repo, limit, author_emails.clone())
+    })
 }
 
 #[tauri::command]
-pub fn list_authors(repo_path: String) -> Result<Vec<git_service::Author>, String> {
-    git_service::list_authors(&repo_path)
+pub fn list_authors(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<Vec<git_service::Author>, String> {
+    state.with_repo(&repo_path, |repo| git_service::list_authors(repo))
 }
 
 #[tauri::command]
 pub fn get_commit_files(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_id: String,
 ) -> Result<Vec<git_service::ChangedFile>, String> {
-    git_service::get_commit_files(&repo_path, &commit_id)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_commit_files(repo, &commit_id)
+    })
 }
 
 #[tauri::command]
 pub fn get_commit_range_files(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_ids: Vec<String>,
 ) -> Result<Vec<git_service::ChangedFile>, String> {
-    git_service::get_commit_range_files(&repo_path, &commit_ids)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_commit_range_files(repo, &commit_ids)
+    })
 }
 
 #[tauri::command]
 pub fn get_file_diff(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_id: String,
     file_path: String,
 ) -> Result<git_service::FileDiff, String> {
-    git_service::get_file_diff(&repo_path, &commit_id, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_file_diff(repo, &commit_id, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_file_contents(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_id: String,
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
-    git_service::get_file_contents(&repo_path, &commit_id, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_file_contents(repo, &commit_id, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_commit_range_file_contents(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_ids: Vec<String>,
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
-    git_service::get_commit_range_file_contents(&repo_path, &commit_ids, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_commit_range_file_contents(repo, &commit_ids, &file_path)
+    })
 }
 
 #[tauri::command]
-pub fn get_current_branch(repo_path: String) -> Result<String, String> {
-    git_service::get_current_branch(&repo_path)
+pub fn get_current_branch(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<String, String> {
+    state.with_repo(&repo_path, |repo| git_service::get_current_branch(repo))
 }
 
 #[tauri::command]
-pub fn list_branches(repo_path: String) -> Result<Vec<git_service::Branch>, String> {
-    git_service::list_branches(&repo_path)
+pub fn list_branches(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<Vec<git_service::Branch>, String> {
+    state.with_repo(&repo_path, |repo| git_service::list_branches(repo))
 }
 
 #[tauri::command]
-pub fn checkout_branch(repo_path: String, branch_name: String) -> Result<(), String> {
-    git_service::checkout_branch(&repo_path, &branch_name)
+pub fn checkout_branch(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    branch_name: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::checkout_branch(repo, &branch_name)
+    })
 }
 
 #[tauri::command]
-pub fn validate_repo(path: String) -> Result<git_service::RepoInfo, String> {
-    git_service::validate_repo(&path)
+pub fn validate_repo(
+    state: tauri::State<'_, RepoCache>,
+    path: String,
+) -> Result<git_service::RepoInfo, String> {
+    state.with_repo(&path, |repo| git_service::validate_repo(repo))
 }
 
 #[tauri::command]
-pub fn get_working_changes(repo_path: String) -> Result<Vec<git_service::ChangedFile>, String> {
-    git_service::get_working_changes(&repo_path)
+pub fn get_working_changes(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<Vec<git_service::ChangedFile>, String> {
+    state.with_repo(&repo_path, |repo| git_service::get_working_changes(repo))
 }
 
 #[tauri::command]
 pub fn get_working_file_diff(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileDiff, String> {
-    git_service::get_working_file_diff(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_working_file_diff(repo, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_working_file_contents(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
-    git_service::get_working_file_contents(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_working_file_contents(repo, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_working_changes_ex(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<Vec<git_service::WorkingFile>, String> {
-    git_service::get_working_changes_ex(&repo_path)
+    state.with_repo(&repo_path, |repo| git_service::get_working_changes_ex(repo))
 }
 
 #[tauri::command]
 pub fn get_staged_file_diff(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileDiff, String> {
-    git_service::get_staged_file_diff(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_staged_file_diff(repo, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_unstaged_file_diff(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileDiff, String> {
-    git_service::get_unstaged_file_diff(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_unstaged_file_diff(repo, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_staged_file_contents(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
-    git_service::get_staged_file_contents(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_staged_file_contents(repo, &file_path)
+    })
 }
 
 #[tauri::command]
 pub fn get_unstaged_file_contents(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     file_path: String,
 ) -> Result<git_service::FileContents, String> {
-    git_service::get_unstaged_file_contents(&repo_path, &file_path)
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_unstaged_file_contents(repo, &file_path)
+    })
 }
 
 #[tauri::command]
-pub fn stage_file(repo_path: String, file_path: String) -> Result<(), String> {
-    git_service::stage_file(&repo_path, &file_path)
+pub fn stage_file(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    file_path: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::stage_file(repo, &file_path)
+    })
 }
 
 #[tauri::command]
-pub fn stage_all(repo_path: String) -> Result<(), String> {
-    git_service::stage_all(&repo_path)
+pub fn stage_all(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| git_service::stage_all(repo))
 }
 
 #[tauri::command]
-pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
-    git_service::unstage_file(&repo_path, &file_path)
+pub fn unstage_file(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    file_path: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::unstage_file(repo, &file_path)
+    })
 }
 
 #[tauri::command]
-pub fn unstage_all(repo_path: String) -> Result<(), String> {
-    git_service::unstage_all(&repo_path)
+pub fn unstage_all(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| git_service::unstage_all(repo))
 }
 
 #[tauri::command]
-pub fn discard_file(repo_path: String, file_path: String) -> Result<(), String> {
-    git_service::discard_file(&repo_path, &file_path)
+pub fn discard_file(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    file_path: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::discard_file(repo, &file_path)
+    })
 }
 
 #[tauri::command]
-pub fn create_commit(repo_path: String, message: String) -> Result<(), String> {
-    git_service::create_commit(&repo_path, &message)
+pub fn create_commit(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    message: String,
+) -> Result<(), String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::create_commit(repo, &message)
+    })
 }
 
 #[tauri::command]
-pub fn get_remote_url(repo_path: String) -> Result<String, String> {
-    git_service::get_remote_url(&repo_path)
+pub fn get_remote_url(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<String, String> {
+    state.with_repo(&repo_path, |repo| git_service::get_remote_url(repo))
 }
 
 #[tauri::command]
-pub fn get_ahead_behind(repo_path: String) -> Result<git_service::AheadBehind, String> {
-    git_service::get_ahead_behind(&repo_path)
+pub fn get_ahead_behind(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<git_service::AheadBehind, String> {
+    state.with_repo(&repo_path, |repo| git_service::get_ahead_behind(repo))
 }
 
 #[tauri::command]
-pub fn get_commit_message(repo_path: String, commit_id: String) -> Result<String, String> {
-    git_service::get_commit_message(&repo_path, &commit_id)
+pub fn get_commit_message(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+    commit_id: String,
+) -> Result<String, String> {
+    state.with_repo(&repo_path, |repo| {
+        git_service::get_commit_message(repo, &commit_id)
+    })
 }
 
 #[tauri::command]
 pub fn reword_commit(
+    state: tauri::State<'_, RepoCache>,
     repo_path: String,
     commit_id: String,
     new_message: String,
 ) -> Result<(), String> {
-    git_service::reword_commit(&repo_path, &commit_id, &new_message)
+    state.with_repo(&repo_path, |repo| {
+        git_service::reword_commit(repo, &commit_id, &new_message)
+    })
 }

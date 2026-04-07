@@ -1,5 +1,6 @@
 mod commands;
 mod git;
+pub mod repo_cache;
 
 use tauri::image::Image;
 use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -18,6 +19,7 @@ pub fn run() {
     }
 
     builder
+        .manage(repo_cache::RepoCache::new())
         .setup(|app| {
             let check_for_updates =
                 MenuItemBuilder::with_id(CHECK_FOR_UPDATES_MENU_ID, "Check for Updates…")
