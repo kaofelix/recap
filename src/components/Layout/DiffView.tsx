@@ -5,6 +5,7 @@ import {
   Root,
   Trigger,
 } from "@radix-ui/react-tooltip";
+import { useHotkeys } from "@tanstack/react-hotkeys";
 import {
   ChevronDown,
   ChevronUp,
@@ -18,9 +19,7 @@ import type { ReactElement } from "react";
 import { useCallback, useMemo } from "react";
 import ReactDiffViewer, { type DiffMethod } from "react-diff-viewer-continued";
 import { useIsFocused } from "../../context/FocusContext";
-import { useCommand } from "../../hooks/useCommand";
 import { useFileContents } from "../../hooks/useFileContents";
-import { useGlobalCommand } from "../../hooks/useGlobalCommand";
 import { useTheme } from "../../hooks/useTheme";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
 import {
@@ -35,6 +34,7 @@ import {
   useChangedFiles,
   useDiffDisplayMode,
   useIsDiffMaximized,
+  useOverlayOpen,
   useSelectedChangeId,
   useSelectedCommitId,
   useSelectedCommitIds,
@@ -511,6 +511,41 @@ function DiffContent({
   );
 }
 
+/** Extracted hotkey registrations to keep DiffView below complexity threshold */
+function useDiffViewHotkeys({
+  toggleDiffDisplayMode,
+  selectNextFile,
+  selectPreviousFile,
+  isFocused,
+}: {
+  toggleDiffDisplayMode: () => void;
+  selectNextFile: () => void;
+  selectPreviousFile: () => void;
+  isFocused: boolean;
+}) {
+  const overlayOpen = useOverlayOpen();
+
+  useHotkeys(
+    [
+      {
+        hotkey: { key: "\\", shift: true },
+        callback: toggleDiffDisplayMode,
+      },
+      {
+        hotkey: "ArrowDown",
+        callback: selectNextFile,
+        options: { enabled: isFocused && !overlayOpen },
+      },
+      {
+        hotkey: "ArrowUp",
+        callback: selectPreviousFile,
+        options: { enabled: isFocused && !overlayOpen },
+      },
+    ],
+    { enabled: !overlayOpen, conflictBehavior: "allow" }
+  );
+}
+
 export function DiffView({ className }: DiffViewProps) {
   const selectedRepo = useSelectedRepo();
   const selectedCommitId = useSelectedCommitId();
@@ -593,11 +628,12 @@ export function DiffView({ className }: DiffViewProps) {
     setDiffDisplayMode(diffDisplayMode === "split" ? "unified" : "split");
   };
 
-  useGlobalCommand("layout.toggleDiffDisplayMode", toggleDiffDisplayMode);
-
-  // Keyboard navigation for files when diff view is focused
-  useCommand("navigation.selectNext", selectNextFile);
-  useCommand("navigation.selectPrev", selectPreviousFile);
+  useDiffViewHotkeys({
+    toggleDiffDisplayMode,
+    selectNextFile,
+    selectPreviousFile,
+    isFocused,
+  });
 
   // Memoize the syntax highlighting render function
   const renderContent = useMemo(() => {

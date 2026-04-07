@@ -1,15 +1,15 @@
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/Layout";
 import { Toaster } from "./components/Toaster";
-import { ContextMenuProvider } from "./context/ContextMenuContext";
 
 function App() {
   return (
     <AppErrorBoundary>
-      <ContextMenuProvider>
+      <HotkeysProvider>
         <AppLayout />
         <Toaster />
-      </ContextMenuProvider>
+      </HotkeysProvider>
     </AppErrorBoundary>
   );
 }

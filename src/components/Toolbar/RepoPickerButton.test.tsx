@@ -1,4 +1,4 @@
-import { act } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "../../store/appStore";
 import { render, screen, userEvent } from "../../test/utils";
@@ -313,6 +313,32 @@ describe("RepoPickerButton", () => {
         screen.queryByRole("button", { name: /select repository/i })
       ).not.toBeInTheDocument();
       expect(useAppStore.getState().selectedRepoId).toBeNull();
+    });
+  });
+
+  it("sets overlayOpen to true when dropdown opens and false when it closes", async () => {
+    const user = userEvent.setup();
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/repo");
+    });
+
+    render(<RepoPickerButton />);
+
+    expect(useAppStore.getState().overlayOpen).toBe(false);
+
+    const button = screen.getByRole("button", { name: /select repository/i });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(true);
+    });
+
+    // Press Escape to close
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(false);
     });
   });
 });

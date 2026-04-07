@@ -75,6 +75,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   const handleOpenChange = useCallback(
     (open: boolean) => {
       setIsOpen(open);
+      useAppStore.getState().setOverlayOpen(open);
       if (open) {
         // Defer the refresh so the dropdown is fully interactive before state updates
         queueMicrotask(() => {

@@ -1,8 +1,20 @@
-import { act, render, screen } from "@testing-library/react";
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { commandEmitter } from "../../commands";
 import { useAppStore } from "../../store/appStore";
 import { AppLayout } from "./AppLayout";
+
+function renderAppLayout(props?: { className?: string }) {
+  return render(
+    <HotkeysProvider>
+      <AppLayout {...props} />
+    </HotkeysProvider>
+  );
+}
+
+function pressKey(key: string, options?: KeyboardEventInit) {
+  fireEvent.keyDown(document, { key, ...options });
+}
 
 describe("AppLayout", () => {
   beforeEach(() => {
@@ -19,18 +31,19 @@ describe("AppLayout", () => {
       commitsError: null,
       viewMode: "history",
       isDiffMaximized: false,
+      overlayOpen: false,
     });
   });
 
   it("renders the toolbar", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByText("Repository:")).toBeInTheDocument();
     expect(screen.getByText("Branch:")).toBeInTheDocument();
   });
 
   it("places commit list toggle button to the left of repository label", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const repositoryLabel = screen.getByText("Repository:");
     expect(repositoryLabel.previousElementSibling).toHaveAttribute(
@@ -40,7 +53,7 @@ describe("AppLayout", () => {
   });
 
   it("renders a unified history sidebar without a changes tab", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByText("History")).toBeInTheDocument();
     expect(
@@ -49,13 +62,13 @@ describe("AppLayout", () => {
   });
 
   it("renders the file list panel", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByText("Files")).toBeInTheDocument();
   });
 
   it("shows empty state when no commit is selected", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(
       screen.getByText("Select a commit to view changed files")
@@ -63,7 +76,7 @@ describe("AppLayout", () => {
   });
 
   it("renders the diff view panel", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByText("Diff")).toBeInTheDocument();
     expect(
@@ -75,13 +88,13 @@ describe("AppLayout", () => {
   });
 
   it("shows empty state when no file is selected", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByText("Select a file to view diff")).toBeInTheDocument();
   });
 
   it("shows empty state when no repo is selected", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     // When no repo is selected, show prompt to select one
     expect(
@@ -90,7 +103,7 @@ describe("AppLayout", () => {
   });
 
   it("renders all resizable panels", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     // With our mock, panels have data-testid="panel-{id}"
     expect(screen.getByTestId("panel-sidebar")).toBeInTheDocument();
@@ -100,7 +113,7 @@ describe("AppLayout", () => {
   });
 
   it("renders separator handles between panels", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     // With our mock, separators have data-testid="panel-separator"
     // In history mode: 1 outer (sidebar|right-content) + 1 inner (file-list|diff-view)
@@ -110,20 +123,20 @@ describe("AppLayout", () => {
 
   it("keeps the file list panel visible when uncommitted changes are selected", () => {
     useAppStore.setState({ viewMode: "changes" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     const separators = screen.getAllByTestId("panel-separator");
     expect(separators.length).toBe(2);
     expect(screen.getByTestId("panel-file-list")).toBeInTheDocument();
   });
 
-  it("advances to the next panel on consecutive navigation commands", () => {
+  it("advances to the next panel on consecutive ArrowRight presses", () => {
     useAppStore.setState({ focusedRegion: null, viewMode: "history" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
+      pressKey("ArrowRight");
     });
 
     expect(useAppStore.getState().focusedRegion).toBe("files");
@@ -131,31 +144,31 @@ describe("AppLayout", () => {
 
   it("skips commit list when panel is collapsed during panel navigation", () => {
     useAppStore.setState({ focusedRegion: null, viewMode: "history" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     act(() => {
       screen.getByRole("button", { name: /hide commit list/i }).click();
     });
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("files");
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("diff");
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("files");
   });
 
   it("moves focus away from commit list when panel is collapsed", () => {
     useAppStore.setState({ focusedRegion: "sidebar", viewMode: "history" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     act(() => {
       screen.getByRole("button", { name: /hide commit list/i }).click();
@@ -199,17 +212,17 @@ describe("AppLayout", () => {
       commitsError: null,
     });
 
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.queryByTestId("panel-file-list")).not.toBeInTheDocument();
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("sidebar");
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("diff");
   });
@@ -249,7 +262,7 @@ describe("AppLayout", () => {
       commitsError: null,
     });
 
-    render(<AppLayout />);
+    renderAppLayout();
 
     act(() => {
       useAppStore.getState().selectCommitRange(["commit-a", "commit-c"]);
@@ -261,7 +274,7 @@ describe("AppLayout", () => {
 
   it("restricts panel navigation to diff when diff view is maximized", () => {
     useAppStore.setState({ focusedRegion: "diff", viewMode: "history" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     act(() => {
       screen.getByRole("button", { name: "Maximize diff view" }).click();
@@ -271,18 +284,18 @@ describe("AppLayout", () => {
     expect(useAppStore.getState().focusedRegion).toBe("diff");
 
     act(() => {
-      commandEmitter.emit("navigation.focusNextPanel");
+      pressKey("ArrowRight");
     });
     expect(useAppStore.getState().focusedRegion).toBe("diff");
 
     act(() => {
-      commandEmitter.emit("navigation.focusPrevPanel");
+      pressKey("ArrowLeft");
     });
     expect(useAppStore.getState().focusedRegion).toBe("diff");
   });
 
   it("collapses and restores side panels when diff view is maximized", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
     const fileListPanel = screen.getByTestId("panel-file-list");
@@ -306,47 +319,43 @@ describe("AppLayout", () => {
   });
 
   it("toggles diff maximize via keyboard shortcut", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
 
     act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", metaKey: true })
-      );
+      pressKey("Enter", { ctrlKey: true });
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
 
     act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", metaKey: true })
-      );
+      pressKey("Enter", { ctrlKey: true });
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 
   it("toggles diff maximize via ] keyboard shortcut", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "]" }));
+      pressKey("]");
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "]" }));
+      pressKey("]");
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 
   it("toggles commit list from toolbar button", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
 
@@ -365,30 +374,26 @@ describe("AppLayout", () => {
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 
-  it("toggles commit list via Cmd+[ keyboard shortcut", () => {
-    render(<AppLayout />);
+  it("toggles commit list via Mod+[ keyboard shortcut", () => {
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
 
     act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "[", metaKey: true })
-      );
+      pressKey("[", { ctrlKey: true });
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "true");
 
     act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "[", metaKey: true })
-      );
+      pressKey("[", { ctrlKey: true });
     });
 
     expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 
   it("does not toggle commit list when diff view is maximized", () => {
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
 
@@ -405,9 +410,7 @@ describe("AppLayout", () => {
     expect(toggleButton).toBeDisabled();
 
     act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "[", metaKey: true })
-      );
+      pressKey("[", { ctrlKey: true });
     });
 
     expect(useAppStore.getState().isDiffMaximized).toBe(true);
@@ -426,7 +429,7 @@ describe("AppLayout", () => {
       JSON.stringify({ "file-list": 17, "diff-view": 83 })
     );
 
-    render(<AppLayout />);
+    renderAppLayout();
 
     const sidebarPanel = screen.getByTestId("panel-sidebar");
     const fileListPanel = screen.getByTestId("panel-file-list");
@@ -453,7 +456,7 @@ describe("AppLayout", () => {
     );
 
     useAppStore.setState({ viewMode: "history" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
       "data-size",
@@ -478,7 +481,7 @@ describe("AppLayout", () => {
     );
 
     useAppStore.setState({ viewMode: "changes" });
-    render(<AppLayout />);
+    renderAppLayout();
 
     expect(screen.getByTestId("panel-sidebar")).toHaveAttribute(
       "data-size",
@@ -496,9 +499,42 @@ describe("AppLayout", () => {
   });
 
   it("applies custom className", () => {
-    const { container } = render(<AppLayout className="test-class" />);
+    const { container } = renderAppLayout({ className: "test-class" });
 
-    const layout = container.firstChild;
-    expect(layout).toHaveClass("test-class");
+    // Find the layout div with the test-class (may be nested under provider wrappers)
+    const layout = container.querySelector(".test-class");
+    expect(layout).toBeInTheDocument();
+  });
+
+  it("suppresses panel navigation when overlay is open", () => {
+    useAppStore.setState({
+      focusedRegion: "sidebar",
+      viewMode: "history",
+      overlayOpen: true,
+    });
+    renderAppLayout();
+
+    act(() => {
+      pressKey("ArrowRight");
+    });
+
+    expect(useAppStore.getState().focusedRegion).toBe("sidebar");
+  });
+
+  it("suppresses layout shortcuts when overlay is open", () => {
+    useAppStore.setState({
+      viewMode: "history",
+      overlayOpen: true,
+    });
+    renderAppLayout();
+
+    const sidebarPanel = screen.getByTestId("panel-sidebar");
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
+
+    act(() => {
+      pressKey("]");
+    });
+
+    expect(sidebarPanel).toHaveAttribute("data-collapsed", "false");
   });
 });

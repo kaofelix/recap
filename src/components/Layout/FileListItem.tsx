@@ -6,8 +6,8 @@ import {
   Trigger,
 } from "@radix-ui/react-tooltip";
 import { useState } from "react";
-import { useContextMenuState } from "../../context/ContextMenuContext";
 import { cn, splitPath } from "../../lib/utils";
+import { useOverlayOpen } from "../../store/appStore";
 import type { ChangedFile, FileStatus, WorkingFile } from "../../types/file";
 
 export interface FileListItemProps {
@@ -139,8 +139,8 @@ export function FileListItem({
   const { additions, deletions } = getDisplayStats(file);
   const tooltipText = `${file.path}${formatStatsTooltip(additions, deletions)}`;
 
-  // Global context menu state to disable tooltips when any menu is open
-  const { isOpen: isAnyContextMenuOpen } = useContextMenuState();
+  // Disable tooltips when any overlay (dropdown/context menu) is open
+  const isAnyOverlayOpen = useOverlayOpen();
 
   const handleContextMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     // Clear text selection before showing context menu
@@ -178,7 +178,7 @@ export function FileListItem({
       >
         {getStatusLetter(displayStatus)}
       </span>
-      {isAnyContextMenuOpen ? (
+      {isAnyOverlayOpen ? (
         // Skip tooltip entirely when context menu is open (avoids timer issues)
         <span className="flex min-w-0 flex-1 overflow-hidden text-sm">
           {dir && (

@@ -1,6 +1,6 @@
-import { act, fireEvent, render } from "@testing-library/react";
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
+import { fireEvent, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { commandEmitter } from "../commands";
 import { FocusProvider } from "../context/FocusContext";
 import { useAppStore } from "../store/appStore";
 import { useNavigableList } from "./useNavigableList";
@@ -34,15 +34,19 @@ function NavigableListTest({
   );
 }
 
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<HotkeysProvider>{ui}</HotkeysProvider>);
+}
+
 describe("useNavigableList", () => {
   beforeEach(() => {
-    useAppStore.setState({ focusedRegion: "sidebar" });
+    useAppStore.setState({ focusedRegion: "sidebar", overlayOpen: false });
   });
 
-  it("selects next item when navigation.selectNext is emitted", () => {
+  it("selects next item when ArrowDown is pressed", () => {
     const onSelect = vi.fn();
 
-    render(
+    renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -52,9 +56,25 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    act(() => {
-      commandEmitter.emit("navigation.selectNext");
-    });
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+
+    expect(onSelect).toHaveBeenCalledWith("b");
+  });
+
+  it("selects next item when Ctrl+N is pressed", () => {
+    const onSelect = vi.fn();
+
+    renderWithProviders(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="a"
+        />
+      </FocusProvider>
+    );
+
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
 
     expect(onSelect).toHaveBeenCalledWith("b");
   });
@@ -62,7 +82,7 @@ describe("useNavigableList", () => {
   it("clamps at end of list when selecting next", () => {
     const onSelect = vi.fn();
 
-    render(
+    renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -72,17 +92,15 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    act(() => {
-      commandEmitter.emit("navigation.selectNext");
-    });
+    fireEvent.keyDown(document, { key: "ArrowDown" });
 
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("selects previous item when navigation.selectPrev is emitted", () => {
+  it("selects previous item when ArrowUp is pressed", () => {
     const onSelect = vi.fn();
 
-    render(
+    renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -92,9 +110,25 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    act(() => {
-      commandEmitter.emit("navigation.selectPrev");
-    });
+    fireEvent.keyDown(document, { key: "ArrowUp" });
+
+    expect(onSelect).toHaveBeenCalledWith("a");
+  });
+
+  it("selects previous item when Ctrl+P is pressed", () => {
+    const onSelect = vi.fn();
+
+    renderWithProviders(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="b"
+        />
+      </FocusProvider>
+    );
+
+    fireEvent.keyDown(document, { key: "p", ctrlKey: true });
 
     expect(onSelect).toHaveBeenCalledWith("a");
   });
@@ -102,7 +136,7 @@ describe("useNavigableList", () => {
   it("clamps at start of list when selecting previous", () => {
     const onSelect = vi.fn();
 
-    render(
+    renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -112,18 +146,16 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    act(() => {
-      commandEmitter.emit("navigation.selectPrev");
-    });
+    fireEvent.keyDown(document, { key: "ArrowUp" });
 
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("calls onActivate when navigation.activate is emitted", () => {
+  it("calls onActivate when Enter is pressed", () => {
     const onSelect = vi.fn();
     const onActivate = vi.fn();
 
-    render(
+    renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -134,17 +166,55 @@ describe("useNavigableList", () => {
       </FocusProvider>
     );
 
-    act(() => {
-      commandEmitter.emit("navigation.activate");
-    });
+    fireEvent.keyDown(document, { key: "Enter" });
 
     expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not navigate when overlayOpen is true", () => {
+    const onSelect = vi.fn();
+
+    useAppStore.setState({ overlayOpen: true });
+
+    renderWithProviders(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="a"
+        />
+      </FocusProvider>
+    );
+
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate when region is not focused", () => {
+    const onSelect = vi.fn();
+
+    useAppStore.setState({ focusedRegion: "diff" });
+
+    renderWithProviders(
+      <FocusProvider region="sidebar">
+        <NavigableListTest
+          itemIds={["a", "b", "c"]}
+          onSelect={onSelect}
+          selectedId="a"
+        />
+      </FocusProvider>
+    );
+
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("returns clickable item props", () => {
     const onSelect = vi.fn();
 
-    const { getByRole } = render(
+    const { getByRole } = renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -162,7 +232,7 @@ describe("useNavigableList", () => {
   it("sets aria-selected on items based on selectedId", () => {
     const onSelect = vi.fn();
 
-    const { getByRole } = render(
+    const { getByRole } = renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -185,7 +255,7 @@ describe("useNavigableList", () => {
   it("sets listbox role on the container", () => {
     const onSelect = vi.fn();
 
-    const { getByRole } = render(
+    const { getByRole } = renderWithProviders(
       <FocusProvider region="sidebar">
         <NavigableListTest
           itemIds={["a", "b", "c"]}
@@ -203,13 +273,15 @@ describe("useNavigableList", () => {
     const scrollIntoView = vi.fn();
 
     const { rerender, getByRole } = render(
-      <FocusProvider region="sidebar">
-        <NavigableListTest
-          itemIds={["a", "b", "c"]}
-          onSelect={onSelect}
-          selectedId="a"
-        />
-      </FocusProvider>
+      <HotkeysProvider>
+        <FocusProvider region="sidebar">
+          <NavigableListTest
+            itemIds={["a", "b", "c"]}
+            onSelect={onSelect}
+            selectedId="a"
+          />
+        </FocusProvider>
+      </HotkeysProvider>
     );
 
     const bButton = getByRole("option", { name: "b" });
@@ -219,13 +291,15 @@ describe("useNavigableList", () => {
     });
 
     rerender(
-      <FocusProvider region="sidebar">
-        <NavigableListTest
-          itemIds={["a", "b", "c"]}
-          onSelect={onSelect}
-          selectedId="b"
-        />
-      </FocusProvider>
+      <HotkeysProvider>
+        <FocusProvider region="sidebar">
+          <NavigableListTest
+            itemIds={["a", "b", "c"]}
+            onSelect={onSelect}
+            selectedId="b"
+          />
+        </FocusProvider>
+      </HotkeysProvider>
     );
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });

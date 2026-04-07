@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import { stageAll, unstageAll } from "../../api/commands";
-import { useContextMenuState } from "../../context/ContextMenuContext";
+
 import { useIsFocused } from "../../context/FocusContext";
 import { useCommitFiles } from "../../hooks/useCommitFiles";
 import { useEffectiveSelectedChangeId } from "../../hooks/useEffectiveSelectedChangeId";
@@ -361,9 +361,6 @@ export function FileList({ className }: FileListProps) {
       : effectiveSelectedFilePath,
   });
 
-  const { setOpen: setContextMenuOpen, setClosed: setContextMenuClosed } =
-    useContextMenuState();
-
   const [contextMenuTargetId, setContextMenuTargetId] = useState<string | null>(
     null
   );
@@ -377,7 +374,7 @@ export function FileList({ className }: FileListProps) {
         return;
       }
       event.preventDefault();
-      setContextMenuOpen();
+      useAppStore.getState().setOverlayOpen(true);
       setContextMenuTargetId(filePath);
       const element = event.currentTarget;
       showFileContextMenu({
@@ -388,7 +385,7 @@ export function FileList({ className }: FileListProps) {
         onClose: () => {
           setContextMenuTargetId((current) => {
             if (current === filePath) {
-              setContextMenuClosed();
+              useAppStore.getState().setOverlayOpen(false);
               return null;
             }
             return current;
@@ -396,7 +393,7 @@ export function FileList({ className }: FileListProps) {
         },
       });
     },
-    [selectedRepo, setContextMenuOpen, setContextMenuClosed]
+    [selectedRepo]
   );
 
   const handleWorkingChangesContextMenu = useCallback(
@@ -408,7 +405,7 @@ export function FileList({ className }: FileListProps) {
         return;
       }
       event.preventDefault();
-      setContextMenuOpen();
+      useAppStore.getState().setOverlayOpen(true);
       setContextMenuTargetId(item.id);
       const element = event.currentTarget;
       showChangesContextMenu({
@@ -421,7 +418,7 @@ export function FileList({ className }: FileListProps) {
         onClose: () => {
           setContextMenuTargetId((current) => {
             if (current === item.id) {
-              setContextMenuClosed();
+              useAppStore.getState().setOverlayOpen(false);
               return null;
             }
             return current;
@@ -429,12 +426,7 @@ export function FileList({ className }: FileListProps) {
         },
       });
     },
-    [
-      selectedRepo,
-      setContextMenuOpen,
-      setContextMenuClosed,
-      requestWorkingChangesPoll,
-    ]
+    [selectedRepo, requestWorkingChangesPoll]
   );
 
   const handleSectionAction = useCallback(

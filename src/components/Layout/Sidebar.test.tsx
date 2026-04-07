@@ -1,3 +1,4 @@
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import {
   act,
   fireEvent,
@@ -7,7 +8,6 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { commandEmitter } from "../../commands";
 import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
 import { Sidebar } from "./Sidebar";
@@ -50,11 +50,13 @@ function renderWithPolling() {
  */
 function renderWithPollingAndFocus(region: "sidebar" | "files" | "diff") {
   return render(
-    <SidebarWithPolling>
-      <FocusProvider region={region}>
-        <Sidebar />
-      </FocusProvider>
-    </SidebarWithPolling>
+    <HotkeysProvider>
+      <SidebarWithPolling>
+        <FocusProvider region={region}>
+          <Sidebar />
+        </FocusProvider>
+      </SidebarWithPolling>
+    </HotkeysProvider>
   );
 }
 
@@ -68,6 +70,7 @@ describe("Sidebar", () => {
       selectedCommitIds: [],
       selectedChangeId: null,
       viewMode: "history",
+      overlayOpen: false,
       // Reset polling state
       commits: [],
       isLoadingCommits: false,
@@ -1818,7 +1821,7 @@ describe("Sidebar", () => {
     });
 
     act(() => {
-      commandEmitter.emit("navigation.selectNext");
+      fireEvent.keyDown(document, { key: "ArrowDown" });
     });
 
     expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBe(

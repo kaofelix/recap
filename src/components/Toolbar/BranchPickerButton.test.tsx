@@ -479,4 +479,31 @@ describe("BranchPickerButton", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("sets overlayOpen to true when dropdown opens and false when it closes", async () => {
+    const user = userEvent.setup();
+
+    // Need a selected repo for the button to render
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/repo");
+    });
+
+    render(<BranchPickerButton />);
+
+    expect(useAppStore.getState().overlayOpen).toBe(false);
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(true);
+    });
+
+    // Press Escape to close
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(false);
+    });
+  });
 });

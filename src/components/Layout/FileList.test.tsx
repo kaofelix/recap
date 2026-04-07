@@ -1,6 +1,12 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { commandEmitter } from "../../commands";
 import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
 import type { WorkingFile } from "../../types/file";
@@ -267,9 +273,11 @@ describe("FileList", () => {
     });
 
     render(
-      <FocusProvider region="files">
-        <FileList />
-      </FocusProvider>
+      <HotkeysProvider>
+        <FocusProvider region="files">
+          <FileList />
+        </FocusProvider>
+      </HotkeysProvider>
     );
 
     await waitFor(() => {
@@ -277,7 +285,7 @@ describe("FileList", () => {
     });
 
     act(() => {
-      commandEmitter.emit("navigation.selectNext");
+      fireEvent.keyDown(document, { key: "ArrowDown" });
     });
 
     expect(useAppStore.getState().selectedFilePath).toBe(

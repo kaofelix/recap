@@ -1,5 +1,7 @@
+import { useHotkeys } from "@tanstack/react-hotkeys";
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
-import { useCommand } from "./useCommand";
+import { useIsFocused } from "../context/FocusContext";
+import { useOverlayOpen } from "../store/appStore";
 
 interface UseNavigableListOptions {
   itemIds: string[];
@@ -30,6 +32,8 @@ export function useNavigableList({
   onActivate,
 }: UseNavigableListOptions): UseNavigableListResult {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isFocused = useIsFocused();
+  const overlayOpen = useOverlayOpen();
 
   const indexById = useMemo(() => {
     const map = new Map<string, number>();
@@ -71,9 +75,18 @@ export function useNavigableList({
     }
   }, [onActivate]);
 
-  useCommand("navigation.selectNext", selectNext);
-  useCommand("navigation.selectPrev", selectPrev);
-  useCommand("navigation.activate", handleActivate);
+  const enabled = isFocused && !overlayOpen;
+
+  useHotkeys(
+    [
+      { hotkey: "ArrowDown", callback: selectNext },
+      { hotkey: { key: "N", ctrl: true }, callback: selectNext },
+      { hotkey: "ArrowUp", callback: selectPrev },
+      { hotkey: { key: "P", ctrl: true }, callback: selectPrev },
+      { hotkey: "Enter", callback: handleActivate },
+    ],
+    { enabled, conflictBehavior: "allow" }
+  );
 
   useEffect(() => {
     if (!selectedId) {

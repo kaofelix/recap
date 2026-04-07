@@ -164,6 +164,7 @@ export function AuthorFilterDropdown() {
     <Root
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
+        useAppStore.getState().setOverlayOpen(nextOpen);
         if (!nextOpen) {
           setSearch("");
         }

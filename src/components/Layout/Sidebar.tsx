@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { getCommitMessage } from "../../api/commands";
-import { useContextMenuState } from "../../context/ContextMenuContext";
+
 import { useIsFocused } from "../../context/FocusContext";
 import { useGravatar } from "../../hooks/useGravatar";
 import { useInView } from "../../hooks/useInView";
@@ -203,8 +203,6 @@ export function Sidebar({ className }: SidebarProps) {
     selectedId,
   });
 
-  const { setOpen: setContextMenuOpen, setClosed: setContextMenuClosed } =
-    useContextMenuState();
   const [contextMenuTargetId, setContextMenuTargetId] = useState<string | null>(
     null
   );
@@ -240,7 +238,7 @@ export function Sidebar({ className }: SidebarProps) {
       }
       event.preventDefault();
       clearTextSelection();
-      setContextMenuOpen();
+      useAppStore.getState().setOverlayOpen(true);
       setContextMenuTargetId(commitId);
       const element = event.currentTarget;
       showHistoryContextMenu({
@@ -254,7 +252,7 @@ export function Sidebar({ className }: SidebarProps) {
         onClose: () => {
           setContextMenuTargetId((current) => {
             if (current === commitId) {
-              setContextMenuClosed();
+              useAppStore.getState().setOverlayOpen(false);
               return null;
             }
             return current;
@@ -262,12 +260,7 @@ export function Sidebar({ className }: SidebarProps) {
         },
       });
     },
-    [
-      selectedRepo,
-      setContextMenuOpen,
-      setContextMenuClosed,
-      handleRewriteMessage,
-    ]
+    [selectedRepo, handleRewriteMessage]
   );
 
   const isInitialLoading =

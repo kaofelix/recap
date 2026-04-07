@@ -53,6 +53,9 @@ export interface AppState {
   /** Whether there are more commits to load beyond the current limit */
   hasMoreCommits: boolean;
 
+  /** Whether any overlay (dropdown, context menu) is currently open */
+  overlayOpen: boolean;
+
   // DiffView preferences
   /** Whether the diff viewer shows split or unified mode */
   diffDisplayMode: DiffDisplayMode;
@@ -92,6 +95,7 @@ export interface AppState {
   clearAuthorFilter: () => void;
   loadMoreCommits: () => void;
   setHasMoreCommits: (hasMore: boolean) => void;
+  setOverlayOpen: (open: boolean) => void;
   setDiffDisplayMode: (mode: DiffDisplayMode) => void;
   toggleWordWrap: () => void;
 }
@@ -143,6 +147,8 @@ export const useAppStore = create<AppState>()(
       authorFilter: [],
       commitLimit: 50,
       hasMoreCommits: true,
+
+      overlayOpen: false,
 
       // DiffView preferences
       diffDisplayMode: "split" as DiffDisplayMode,
@@ -342,6 +348,7 @@ export const useAppStore = create<AppState>()(
           authorFilter: [],
           commitLimit: 50,
           hasMoreCommits: true,
+          overlayOpen: false,
         });
       },
 
@@ -381,6 +388,7 @@ export const useAppStore = create<AppState>()(
           return { commitLimit: state.commitLimit + 50 };
         }),
       setHasMoreCommits: (hasMoreCommits: boolean) => set({ hasMoreCommits }),
+      setOverlayOpen: (overlayOpen: boolean) => set({ overlayOpen }),
       setDiffDisplayMode: (diffDisplayMode: DiffDisplayMode) =>
         set({ diffDisplayMode }),
       toggleWordWrap: () => set((state) => ({ wordWrap: !state.wordWrap })),
@@ -486,6 +494,9 @@ export const useBehindCount = () => useAppStore((state) => state.behindCount);
 export const useCurrentBranchName = () =>
   useAppStore((state) => state.currentBranchName);
 export const useAuthorFilter = () => useAppStore((state) => state.authorFilter);
+
+// Overlay state selector
+export const useOverlayOpen = () => useAppStore((state) => state.overlayOpen);
 
 // DiffView preference selectors
 export const useDiffDisplayMode = () =>

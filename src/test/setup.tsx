@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { HotkeyManager } from "@tanstack/react-hotkeys";
 import { act, cleanup } from "@testing-library/react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
@@ -16,6 +17,8 @@ afterEach(async () => {
   await act(async () => {
     cleanup();
   });
+  // Reset TanStack Hotkeys singleton to avoid leaking registrations between tests
+  HotkeyManager.resetInstance();
   vi.clearAllMocks();
 });
 

@@ -39,7 +39,9 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
 
   return (
     <>
-      <Root>
+      <Root
+        onOpenChange={(open) => useAppStore.getState().setOverlayOpen(open)}
+      >
         <Trigger asChild>
           <button
             aria-label="Select repository"

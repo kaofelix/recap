@@ -6,6 +6,7 @@ import {
   useCurrentBranchName,
   useDiffDisplayMode,
   useIsDiffMaximized,
+  useOverlayOpen,
   useRepos,
   useSelectedCommitId,
   useSelectedCommitIds,
@@ -1439,6 +1440,43 @@ describe("appStore", () => {
       });
 
       expect(useAppStore.getState().hasMoreCommits).toBe(true);
+    });
+  });
+
+  describe("overlayOpen", () => {
+    it("should default to false", () => {
+      expect(useAppStore.getState().overlayOpen).toBe(false);
+    });
+
+    it("should set overlayOpen to true", () => {
+      act(() => {
+        useAppStore.getState().setOverlayOpen(true);
+      });
+
+      expect(useAppStore.getState().overlayOpen).toBe(true);
+    });
+
+    it("should set overlayOpen back to false", () => {
+      act(() => {
+        useAppStore.getState().setOverlayOpen(true);
+      });
+      act(() => {
+        useAppStore.getState().setOverlayOpen(false);
+      });
+
+      expect(useAppStore.getState().overlayOpen).toBe(false);
+    });
+
+    it("should expose useOverlayOpen selector hook", () => {
+      const { result } = renderHook(() => useOverlayOpen());
+
+      expect(result.current).toBe(false);
+
+      act(() => {
+        useAppStore.getState().setOverlayOpen(true);
+      });
+
+      expect(result.current).toBe(true);
     });
   });
 });

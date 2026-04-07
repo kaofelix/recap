@@ -1,3 +1,4 @@
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import {
   act,
   fireEvent,
@@ -6,7 +7,6 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { commandEmitter } from "../../commands";
 import { FocusProvider } from "../../context/FocusContext";
 import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
@@ -554,7 +554,7 @@ describe("DiffView", () => {
     });
 
     act(() => {
-      commandEmitter.emit("layout.toggleDiffDisplayMode");
+      useAppStore.getState().setDiffDisplayMode("unified");
     });
 
     expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
@@ -563,7 +563,7 @@ describe("DiffView", () => {
     );
 
     act(() => {
-      commandEmitter.emit("layout.toggleDiffDisplayMode");
+      useAppStore.getState().setDiffDisplayMode("split");
     });
 
     expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
@@ -852,15 +852,18 @@ describe("DiffView", () => {
       expect(useAppStore.getState().diffDisplayMode).toBe("split");
     });
 
+    // Try to toggle via keyboard — should be no-op for one-sided files
     act(() => {
-      commandEmitter.emit("layout.toggleDiffDisplayMode");
+      fireEvent.keyDown(document, { key: "|", shiftKey: true });
     });
 
     await waitFor(() => {
+      // Still shows unified because one-sided files force unified
       expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
         "data-split-view",
         "false"
       );
+      // Store still "split" because toggle was blocked by isOneSided guard
       expect(useAppStore.getState().diffDisplayMode).toBe("split");
     });
   });
@@ -1134,7 +1137,7 @@ describe("DiffView", () => {
       expect(screen.getByRole("button", { name: "Next file" })).toBeDisabled();
     });
 
-    it("navigates to next file on navigation.selectNext command when focused", () => {
+    it("navigates to next file on ArrowDown when focused", () => {
       useAppStore.setState({
         changedFiles: [
           makeFile("src/a.ts"),
@@ -1146,19 +1149,21 @@ describe("DiffView", () => {
       });
 
       render(
-        <FocusProvider region="diff">
-          <DiffView />
-        </FocusProvider>
+        <HotkeysProvider>
+          <FocusProvider region="diff">
+            <DiffView />
+          </FocusProvider>
+        </HotkeysProvider>
       );
 
       act(() => {
-        commandEmitter.emit("navigation.selectNext");
+        fireEvent.keyDown(document, { key: "ArrowDown" });
       });
 
       expect(useAppStore.getState().selectedFilePath).toBe("src/b.ts");
     });
 
-    it("navigates to previous file on navigation.selectPrev command when focused", () => {
+    it("navigates to previous file on ArrowUp when focused", () => {
       useAppStore.setState({
         changedFiles: [
           makeFile("src/a.ts"),
@@ -1170,13 +1175,15 @@ describe("DiffView", () => {
       });
 
       render(
-        <FocusProvider region="diff">
-          <DiffView />
-        </FocusProvider>
+        <HotkeysProvider>
+          <FocusProvider region="diff">
+            <DiffView />
+          </FocusProvider>
+        </HotkeysProvider>
       );
 
       act(() => {
-        commandEmitter.emit("navigation.selectPrev");
+        fireEvent.keyDown(document, { key: "ArrowUp" });
       });
 
       expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
@@ -1194,20 +1201,22 @@ describe("DiffView", () => {
       });
 
       render(
-        <FocusProvider region="diff">
-          <DiffView />
-        </FocusProvider>
+        <HotkeysProvider>
+          <FocusProvider region="diff">
+            <DiffView />
+          </FocusProvider>
+        </HotkeysProvider>
       );
 
       act(() => {
-        commandEmitter.emit("navigation.selectNext");
+        fireEvent.keyDown(document, { key: "ArrowDown" });
       });
 
       // Should NOT change because diff is not focused
       expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
     });
 
-    it("does not navigate past first file on selectPrev", () => {
+    it("does not navigate past first file on ArrowUp", () => {
       useAppStore.setState({
         changedFiles: [
           makeFile("src/a.ts"),
@@ -1219,20 +1228,22 @@ describe("DiffView", () => {
       });
 
       render(
-        <FocusProvider region="diff">
-          <DiffView />
-        </FocusProvider>
+        <HotkeysProvider>
+          <FocusProvider region="diff">
+            <DiffView />
+          </FocusProvider>
+        </HotkeysProvider>
       );
 
       act(() => {
-        commandEmitter.emit("navigation.selectPrev");
+        fireEvent.keyDown(document, { key: "ArrowUp" });
       });
 
       // Should stay on first file
       expect(useAppStore.getState().selectedFilePath).toBe("src/a.ts");
     });
 
-    it("does not navigate past last file on selectNext", () => {
+    it("does not navigate past last file on ArrowDown", () => {
       useAppStore.setState({
         changedFiles: [
           makeFile("src/a.ts"),
@@ -1244,13 +1255,15 @@ describe("DiffView", () => {
       });
 
       render(
-        <FocusProvider region="diff">
-          <DiffView />
-        </FocusProvider>
+        <HotkeysProvider>
+          <FocusProvider region="diff">
+            <DiffView />
+          </FocusProvider>
+        </HotkeysProvider>
       );
 
       act(() => {
-        commandEmitter.emit("navigation.selectNext");
+        fireEvent.keyDown(document, { key: "ArrowDown" });
       });
 
       // Should stay on last file

@@ -1,3 +1,4 @@
+import { useHotkeys } from "@tanstack/react-hotkeys";
 import { GitGraph } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -9,16 +10,14 @@ import {
   useDefaultLayout,
 } from "react-resizable-panels";
 import { FocusProvider } from "../../context/FocusContext";
-import { useGlobalCommand } from "../../hooks/useGlobalCommand";
-import { useKeyboardHandler } from "../../hooks/useKeyboardHandler";
 import { useRepoPolling } from "../../hooks/useRepoPolling";
-import { defaultKeymap } from "../../keymaps/defaults";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
   useCommits,
   useCommitsError,
   useIsLoadingCommits,
+  useOverlayOpen,
   useSelectedCommitIds,
   useSelectedRepo,
   useViewMode,
@@ -463,14 +462,21 @@ export function AppLayout({ className }: AppLayoutProps) {
     }
   }, [focusedRegion, isDiffMaximized, setFocusedRegion, showFileList]);
 
-  // Set up keyboard handler
-  useKeyboardHandler(defaultKeymap);
+  const overlayOpen = useOverlayOpen();
+  const enabled = !overlayOpen;
 
-  // Panel navigation commands
-  useGlobalCommand("navigation.focusNextPanel", focusNextPanel);
-  useGlobalCommand("navigation.focusPrevPanel", focusPrevPanel);
-  useGlobalCommand("layout.toggleDiffMaximized", toggleDiffMaximized);
-  useGlobalCommand("layout.toggleCommitList", toggleCommitList);
+  useHotkeys(
+    [
+      // Panel navigation
+      { hotkey: "ArrowRight", callback: focusNextPanel },
+      { hotkey: "ArrowLeft", callback: focusPrevPanel },
+      // Layout controls
+      { hotkey: { key: "Enter", mod: true }, callback: toggleDiffMaximized },
+      { hotkey: "]", callback: toggleDiffMaximized },
+      { hotkey: { key: "[", mod: true }, callback: toggleCommitList },
+    ],
+    { enabled, conflictBehavior: "allow" }
+  );
 
   return (
     <div
