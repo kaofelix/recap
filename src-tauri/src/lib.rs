@@ -11,6 +11,7 @@ const CHECK_FOR_UPDATES_EVENT: &str = "menu://check-for-updates";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default();
 
     #[cfg(feature = "webdriver")]

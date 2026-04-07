@@ -18,7 +18,7 @@ pub fn list_authors(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<Vec<git_service::Author>, String> {
-    state.with_repo(&repo_path, |repo| git_service::list_authors(repo))
+    state.with_repo(&repo_path, git_service::list_authors)
 }
 
 #[tauri::command]
@@ -84,7 +84,7 @@ pub fn get_current_branch(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<String, String> {
-    state.with_repo(&repo_path, |repo| git_service::get_current_branch(repo))
+    state.with_repo(&repo_path, git_service::get_current_branch)
 }
 
 #[tauri::command]
@@ -92,7 +92,7 @@ pub fn list_branches(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<Vec<git_service::Branch>, String> {
-    state.with_repo(&repo_path, |repo| git_service::list_branches(repo))
+    state.with_repo(&repo_path, git_service::list_branches)
 }
 
 #[tauri::command]
@@ -111,7 +111,7 @@ pub fn validate_repo(
     state: tauri::State<'_, RepoCache>,
     path: String,
 ) -> Result<git_service::RepoInfo, String> {
-    state.with_repo(&path, |repo| git_service::validate_repo(repo))
+    state.with_repo(&path, git_service::validate_repo)
 }
 
 #[tauri::command]
@@ -119,7 +119,7 @@ pub fn get_working_changes(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<Vec<git_service::ChangedFile>, String> {
-    state.with_repo(&repo_path, |repo| git_service::get_working_changes(repo))
+    state.with_repo(&repo_path, git_service::get_working_changes)
 }
 
 #[tauri::command]
@@ -149,7 +149,7 @@ pub fn get_working_changes_ex(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<Vec<git_service::WorkingFile>, String> {
-    state.with_repo(&repo_path, |repo| git_service::get_working_changes_ex(repo))
+    state.with_repo(&repo_path, git_service::get_working_changes_ex)
 }
 
 #[tauri::command]
@@ -202,17 +202,12 @@ pub fn stage_file(
     repo_path: String,
     file_path: String,
 ) -> Result<(), String> {
-    state.with_repo(&repo_path, |repo| {
-        git_service::stage_file(repo, &file_path)
-    })
+    state.with_repo(&repo_path, |repo| git_service::stage_file(repo, &file_path))
 }
 
 #[tauri::command]
-pub fn stage_all(
-    state: tauri::State<'_, RepoCache>,
-    repo_path: String,
-) -> Result<(), String> {
-    state.with_repo(&repo_path, |repo| git_service::stage_all(repo))
+pub fn stage_all(state: tauri::State<'_, RepoCache>, repo_path: String) -> Result<(), String> {
+    state.with_repo(&repo_path, git_service::stage_all)
 }
 
 #[tauri::command]
@@ -227,11 +222,8 @@ pub fn unstage_file(
 }
 
 #[tauri::command]
-pub fn unstage_all(
-    state: tauri::State<'_, RepoCache>,
-    repo_path: String,
-) -> Result<(), String> {
-    state.with_repo(&repo_path, |repo| git_service::unstage_all(repo))
+pub fn unstage_all(state: tauri::State<'_, RepoCache>, repo_path: String) -> Result<(), String> {
+    state.with_repo(&repo_path, git_service::unstage_all)
 }
 
 #[tauri::command]
@@ -261,7 +253,7 @@ pub fn get_remote_url(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<String, String> {
-    state.with_repo(&repo_path, |repo| git_service::get_remote_url(repo))
+    state.with_repo(&repo_path, git_service::get_remote_url)
 }
 
 #[tauri::command]
@@ -269,7 +261,7 @@ pub fn get_ahead_behind(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
 ) -> Result<git_service::AheadBehind, String> {
-    state.with_repo(&repo_path, |repo| git_service::get_ahead_behind(repo))
+    state.with_repo(&repo_path, git_service::get_ahead_behind)
 }
 
 #[tauri::command]

@@ -184,10 +184,9 @@ pub struct Author {
 
 /// Lists unique authors from a git repository
 pub fn list_authors(repo: &Repository) -> Result<Vec<Author>, String> {
-
-    let mut revwalk =
-        repo.revwalk()
-            .map_err(|e| format!("Failed to create revwalk: {}", e))?;
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| format!("Failed to create revwalk: {}", e))?;
 
     revwalk
         .push_head()
@@ -208,8 +207,7 @@ pub fn list_authors(repo: &Repository) -> Result<Vec<Author>, String> {
             .entry(email.clone())
             .and_modify(|existing| {
                 existing.commit_count += 1;
-                existing.last_commit_timestamp =
-                    existing.last_commit_timestamp.max(timestamp);
+                existing.last_commit_timestamp = existing.last_commit_timestamp.max(timestamp);
             })
             .or_insert_with(|| Author {
                 name: author.name().unwrap_or("Unknown").to_string(),
@@ -244,10 +242,9 @@ pub fn list_commits(
     limit: Option<usize>,
     author_emails: Option<Vec<String>>,
 ) -> Result<Vec<Commit>, String> {
-
-    let mut revwalk =
-        repo.revwalk()
-            .map_err(|e| format!("Failed to create revwalk: {}", e))?;
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| format!("Failed to create revwalk: {}", e))?;
 
     // Start from HEAD
     revwalk
@@ -359,7 +356,10 @@ fn resolve_commit_selection_range(
 
     for commit_id in commit_ids {
         let index = commit_indices.get(commit_id).ok_or_else(|| {
-            format!("Unable to find selected commit '{}' in current history", commit_id)
+            format!(
+                "Unable to find selected commit '{}' in current history",
+                commit_id
+            )
         })?;
         selected_indices.push(*index);
     }
@@ -392,11 +392,9 @@ fn resolve_commit_selection_range(
     let oldest_oid = git2::Oid::from_str(oldest_commit)
         .map_err(|e| format!("Invalid commit ID '{}': {}", oldest_commit, e))?;
 
-    repo
-        .find_commit(newest_oid)
+    repo.find_commit(newest_oid)
         .map_err(|e| format!("Failed to find commit: {}", e))?;
-    repo
-        .find_commit(oldest_oid)
+    repo.find_commit(oldest_oid)
         .map_err(|e| format!("Failed to find commit: {}", e))?;
 
     Ok((oldest_oid, newest_oid))
@@ -411,7 +409,6 @@ fn resolve_commit_selection_range(
 /// # Returns
 /// A vector of ChangedFile structs or an error message
 pub fn get_commit_files(repo: &Repository, commit_id: &str) -> Result<Vec<ChangedFile>, String> {
-
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
 
@@ -472,12 +469,10 @@ pub fn get_commit_files(repo: &Repository, commit_id: &str) -> Result<Vec<Change
         let mut deletions = 0u32;
 
         // Use a patch to get accurate line counts
-        if let Ok(patch) = git2::Patch::from_diff(&diff, delta_idx) {
-            if let Some(patch) = patch {
-                let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
-                additions = adds as u32;
-                deletions = dels as u32;
-            }
+        if let Ok(Some(patch)) = git2::Patch::from_diff(&diff, delta_idx) {
+            let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+            additions = adds as u32;
+            deletions = dels as u32;
         }
 
         files.push(ChangedFile {
@@ -496,9 +491,11 @@ pub fn get_commit_files(repo: &Repository, commit_id: &str) -> Result<Vec<Change
 ///
 /// The range uses the oldest selected commit's parent tree as the baseline,
 /// and the newest selected commit's tree as the target.
-pub fn get_commit_range_files(repo: &Repository, commit_ids: &[String]) -> Result<Vec<ChangedFile>, String> {
-
-    let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
+pub fn get_commit_range_files(
+    repo: &Repository,
+    commit_ids: &[String],
+) -> Result<Vec<ChangedFile>, String> {
+    let (oldest_oid, newest_oid) = resolve_commit_selection_range(repo, commit_ids)?;
 
     let newest_commit = repo
         .find_commit(newest_oid)
@@ -555,12 +552,10 @@ pub fn get_commit_range_files(repo: &Repository, commit_ids: &[String]) -> Resul
         let mut additions = 0u32;
         let mut deletions = 0u32;
 
-        if let Ok(patch) = git2::Patch::from_diff(&diff, delta_idx) {
-            if let Some(patch) = patch {
-                let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
-                additions = adds as u32;
-                deletions = dels as u32;
-            }
+        if let Ok(Some(patch)) = git2::Patch::from_diff(&diff, delta_idx) {
+            let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+            additions = adds as u32;
+            deletions = dels as u32;
         }
 
         files.push(ChangedFile {
@@ -589,7 +584,6 @@ pub fn get_file_diff(
     commit_id: &str,
     file_path: &str,
 ) -> Result<FileDiff, String> {
-
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
 
@@ -718,7 +712,6 @@ pub fn get_file_contents(
     commit_id: &str,
     file_path: &str,
 ) -> Result<FileContents, String> {
-
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
 
@@ -746,7 +739,7 @@ pub fn get_file_contents(
     let get_content = |tree: &git2::Tree, path: &str| -> Option<Result<String, String>> {
         match tree.get_path(std::path::Path::new(path)) {
             Ok(entry) => {
-                let object = match entry.to_object(&repo) {
+                let object = match entry.to_object(repo) {
                     Ok(obj) => obj,
                     Err(e) => return Some(Err(format!("Failed to get object: {}", e))),
                 };
@@ -768,9 +761,11 @@ pub fn get_file_contents(
 
     // Get new content (in the commit)
     let new_result = get_content(&tree, file_path);
-    
+
     // Get old content (in parent, if exists)
-    let old_result = parent_tree.as_ref().and_then(|pt| get_content(pt, file_path));
+    let old_result = parent_tree
+        .as_ref()
+        .and_then(|pt| get_content(pt, file_path));
 
     // Check if either is binary
     let is_binary = matches!(&new_result, Some(Err(e)) if e == "Binary file")
@@ -817,8 +812,7 @@ pub fn get_commit_range_file_contents(
     commit_ids: &[String],
     file_path: &str,
 ) -> Result<FileContents, String> {
-
-    let (oldest_oid, newest_oid) = resolve_commit_selection_range(&repo, commit_ids)?;
+    let (oldest_oid, newest_oid) = resolve_commit_selection_range(repo, commit_ids)?;
 
     let newest_commit = repo
         .find_commit(newest_oid)
@@ -846,7 +840,7 @@ pub fn get_commit_range_file_contents(
     let get_content = |tree: &git2::Tree, path: &str| -> Option<Result<String, String>> {
         match tree.get_path(std::path::Path::new(path)) {
             Ok(entry) => {
-                let object = match entry.to_object(&repo) {
+                let object = match entry.to_object(repo) {
                     Ok(obj) => obj,
                     Err(e) => return Some(Err(format!("Failed to get object: {}", e))),
                 };
@@ -883,7 +877,10 @@ pub fn get_commit_range_file_contents(
     }
 
     if new_result.is_none() && old_result.is_none() {
-        return Err(format!("File '{}' not found in selected commit range", file_path));
+        return Err(format!(
+            "File '{}' not found in selected commit range",
+            file_path
+        ));
     }
 
     let old_content = match old_result {
@@ -913,7 +910,6 @@ pub fn get_commit_range_file_contents(
 /// # Returns
 /// The branch name or an error message
 pub fn get_current_branch(repo: &Repository) -> Result<String, String> {
-
     let head = repo
         .head()
         .map_err(|e| format!("Failed to get HEAD: {}", e))?;
@@ -938,7 +934,6 @@ pub fn get_current_branch(repo: &Repository) -> Result<String, String> {
 /// # Returns
 /// A vector of Branch structs or an error message
 pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
-
     // Get current branch name for comparison
     let current_branch = get_current_branch(repo).ok();
 
@@ -1029,7 +1024,6 @@ pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
 /// # Returns
 /// Ok(()) on success, or an error message
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), String> {
-
     // Check for uncommitted changes that would be overwritten
     let statuses = repo
         .statuses(None)
@@ -1120,7 +1114,6 @@ pub fn validate_repo(repo: &Repository) -> Result<RepoInfo, String> {
 /// # Returns
 /// A vector of ChangedFile structs representing working directory changes
 pub fn get_working_changes(repo: &Repository) -> Result<Vec<ChangedFile>, String> {
-
     let statuses = repo
         .statuses(None)
         .map_err(|e| format!("Failed to get statuses: {}", e))?;
@@ -1135,10 +1128,7 @@ pub fn get_working_changes(repo: &Repository) -> Result<Vec<ChangedFile>, String
             continue;
         }
 
-        let path = entry
-            .path()
-            .map(|p| p.to_string())
-            .unwrap_or_default();
+        let path = entry.path().map(|p| p.to_string()).unwrap_or_default();
 
         // Determine the file status
         // We combine index (staged) and worktree (unstaged) status since we're showing all changes
@@ -1170,10 +1160,9 @@ pub fn get_working_changes(repo: &Repository) -> Result<Vec<ChangedFile>, String
                     diff_opts.pathspec(&path);
                     diff_opts.include_untracked(true);
 
-                    if let Ok(diff) = repo.diff_tree_to_workdir_with_index(
-                        Some(&head_tree),
-                        Some(&mut diff_opts),
-                    ) {
+                    if let Ok(diff) =
+                        repo.diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_opts))
+                    {
                         if let Ok(stats) = diff.stats() {
                             additions = stats.insertions() as u32;
                             deletions = stats.deletions() as u32;
@@ -1204,7 +1193,6 @@ pub fn get_working_changes(repo: &Repository) -> Result<Vec<ChangedFile>, String
 /// A vector of WorkingFile structs, where each file can appear up to twice:
 /// once for staged changes and once for unstaged changes
 pub fn get_working_changes_ex(repo: &Repository) -> Result<Vec<WorkingFile>, String> {
-
     let statuses = repo
         .statuses(None)
         .map_err(|e| format!("Failed to get statuses: {}", e))?;
@@ -1213,10 +1201,7 @@ pub fn get_working_changes_ex(repo: &Repository) -> Result<Vec<WorkingFile>, Str
 
     // Get HEAD tree for diff calculations
     let head_tree = match repo.head() {
-        Ok(head) => head
-            .peel_to_commit()
-            .ok()
-            .and_then(|c| c.tree().ok()),
+        Ok(head) => head.peel_to_commit().ok().and_then(|c| c.tree().ok()),
         Err(_) => None,
     };
 
@@ -1228,10 +1213,7 @@ pub fn get_working_changes_ex(repo: &Repository) -> Result<Vec<WorkingFile>, Str
             continue;
         }
 
-        let path = entry
-            .path()
-            .map(|p| p.to_string())
-            .unwrap_or_default();
+        let path = entry.path().map(|p| p.to_string()).unwrap_or_default();
 
         // Determine staged (index) status
         let staged_status = if status.is_index_new() {
@@ -1354,7 +1336,6 @@ pub fn get_working_changes_ex(repo: &Repository) -> Result<Vec<WorkingFile>, Str
 /// # Returns
 /// A FileDiff struct or an error message
 pub fn get_working_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
-
     // Get HEAD tree (if it exists)
     let head_tree = match repo.head() {
         Ok(head) => Some(
@@ -1467,7 +1448,6 @@ pub fn get_working_file_diff(repo: &Repository, file_path: &str) -> Result<FileD
 /// # Returns
 /// A FileDiff struct showing staged changes, or an error if file has no staged changes
 pub fn get_staged_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
-
     // Get HEAD tree (if it exists)
     let head_tree = match repo.head() {
         Ok(head) => Some(
@@ -1586,7 +1566,6 @@ pub fn get_staged_file_diff(repo: &Repository, file_path: &str) -> Result<FileDi
 /// # Returns
 /// A FileDiff struct showing unstaged changes
 pub fn get_unstaged_file_diff(repo: &Repository, file_path: &str) -> Result<FileDiff, String> {
-
     let mut diff_opts = DiffOptions::new();
     diff_opts.pathspec(file_path);
     diff_opts.include_untracked(true);
@@ -1690,8 +1669,10 @@ pub fn get_unstaged_file_diff(repo: &Repository, file_path: &str) -> Result<File
 ///
 /// # Returns
 /// A FileContents struct with old (HEAD) and new (working dir) content
-pub fn get_working_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
-
+pub fn get_working_file_contents(
+    repo: &Repository,
+    file_path: &str,
+) -> Result<FileContents, String> {
     // Get old content from HEAD (if it exists)
     let old_content = match repo.head() {
         Ok(head) => {
@@ -1702,7 +1683,7 @@ pub fn get_working_file_contents(repo: &Repository, file_path: &str) -> Result<F
             match tree.get_path(std::path::Path::new(file_path)) {
                 Ok(entry) => {
                     let object = entry
-                        .to_object(&repo)
+                        .to_object(repo)
                         .map_err(|e| format!("Failed to get object: {}", e))?;
 
                     if let Some(blob) = object.as_blob() {
@@ -1737,8 +1718,8 @@ pub fn get_working_file_contents(repo: &Repository, file_path: &str) -> Result<F
     let file_full_path = workdir.join(file_path);
 
     let new_content = if file_full_path.exists() {
-        let content = std::fs::read(&file_full_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let content =
+            std::fs::read(&file_full_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
         // Check if binary (contains null bytes in first 8000 bytes)
         let check_len = std::cmp::min(content.len(), 8000);
@@ -1778,8 +1759,10 @@ pub fn get_working_file_contents(repo: &Repository, file_path: &str) -> Result<F
 ///
 /// # Returns
 /// A FileContents struct with old (HEAD) and new (staged/index) content
-pub fn get_staged_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
-
+pub fn get_staged_file_contents(
+    repo: &Repository,
+    file_path: &str,
+) -> Result<FileContents, String> {
     // Get old content from HEAD (if it exists)
     let old_content = match repo.head() {
         Ok(head) => {
@@ -1790,7 +1773,7 @@ pub fn get_staged_file_contents(repo: &Repository, file_path: &str) -> Result<Fi
             match tree.get_path(std::path::Path::new(file_path)) {
                 Ok(entry) => {
                     let object = entry
-                        .to_object(&repo)
+                        .to_object(repo)
                         .map_err(|e| format!("Failed to get object: {}", e))?;
 
                     if let Some(blob) = object.as_blob() {
@@ -1821,24 +1804,22 @@ pub fn get_staged_file_contents(repo: &Repository, file_path: &str) -> Result<Fi
     let new_content = match repo.index() {
         Ok(index) => {
             match index.get_path(std::path::Path::new(file_path), 0) {
-                Some(entry) => {
-                    match repo.find_blob(entry.id) {
-                        Ok(blob) => {
-                            if blob.is_binary() {
-                                return Ok(FileContents {
-                                    old_content: None,
-                                    new_content: None,
-                                    is_binary: true,
-                                });
-                            }
-                            match std::str::from_utf8(blob.content()) {
-                                Ok(s) => Some(s.to_string()),
-                                Err(_) => return Err("File is not valid UTF-8".to_string()),
-                            }
+                Some(entry) => match repo.find_blob(entry.id) {
+                    Ok(blob) => {
+                        if blob.is_binary() {
+                            return Ok(FileContents {
+                                old_content: None,
+                                new_content: None,
+                                is_binary: true,
+                            });
                         }
-                        Err(_) => None,
+                        match std::str::from_utf8(blob.content()) {
+                            Ok(s) => Some(s.to_string()),
+                            Err(_) => return Err("File is not valid UTF-8".to_string()),
+                        }
                     }
-                }
+                    Err(_) => None,
+                },
                 None => None, // File not in index
             }
         }
@@ -1865,30 +1846,30 @@ pub fn get_staged_file_contents(repo: &Repository, file_path: &str) -> Result<Fi
 ///
 /// # Returns
 /// A FileContents struct with old (index/staged) and new (working dir) content
-pub fn get_unstaged_file_contents(repo: &Repository, file_path: &str) -> Result<FileContents, String> {
-
+pub fn get_unstaged_file_contents(
+    repo: &Repository,
+    file_path: &str,
+) -> Result<FileContents, String> {
     // Get old content from index (staged)
     let old_content = match repo.index() {
         Ok(index) => {
             match index.get_path(std::path::Path::new(file_path), 0) {
-                Some(entry) => {
-                    match repo.find_blob(entry.id) {
-                        Ok(blob) => {
-                            if blob.is_binary() {
-                                return Ok(FileContents {
-                                    old_content: None,
-                                    new_content: None,
-                                    is_binary: true,
-                                });
-                            }
-                            match std::str::from_utf8(blob.content()) {
-                                Ok(s) => Some(s.to_string()),
-                                Err(_) => return Err("File is not valid UTF-8".to_string()),
-                            }
+                Some(entry) => match repo.find_blob(entry.id) {
+                    Ok(blob) => {
+                        if blob.is_binary() {
+                            return Ok(FileContents {
+                                old_content: None,
+                                new_content: None,
+                                is_binary: true,
+                            });
                         }
-                        Err(_) => None,
+                        match std::str::from_utf8(blob.content()) {
+                            Ok(s) => Some(s.to_string()),
+                            Err(_) => return Err("File is not valid UTF-8".to_string()),
+                        }
                     }
-                }
+                    Err(_) => None,
+                },
                 None => None, // File not in index (check HEAD as fallback)
             }
         }
@@ -1899,14 +1880,16 @@ pub fn get_unstaged_file_contents(repo: &Repository, file_path: &str) -> Result<
     let old_content = if old_content.is_none() {
         match repo.head() {
             Ok(head) => {
-                let tree = head.peel_to_tree()
+                let tree = head
+                    .peel_to_tree()
                     .map_err(|e| format!("Failed to get HEAD tree: {}", e))?;
-                
+
                 match tree.get_path(std::path::Path::new(file_path)) {
                     Ok(entry) => {
-                        let object = entry.to_object(&repo)
+                        let object = entry
+                            .to_object(repo)
                             .map_err(|e| format!("Failed to get object: {}", e))?;
-                        
+
                         if let Some(blob) = object.as_blob() {
                             if blob.is_binary() {
                                 return Ok(FileContents {
@@ -1940,8 +1923,8 @@ pub fn get_unstaged_file_contents(repo: &Repository, file_path: &str) -> Result<
     let file_full_path = workdir.join(file_path);
 
     let new_content = if file_full_path.exists() {
-        let content = std::fs::read(&file_full_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let content =
+            std::fs::read(&file_full_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
         // Check if binary (contains null bytes in first 8000 bytes)
         let check_len = std::cmp::min(content.len(), 8000);
@@ -1982,13 +1965,14 @@ pub fn get_unstaged_file_contents(repo: &Repository, file_path: &str) -> Result<
 /// # Returns
 /// Ok(()) on success, or an error message
 pub fn unstage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
-
     let mut index = repo
         .index()
         .map_err(|e| format!("Failed to get index: {}", e))?;
 
     // Get HEAD tree to reset the file to
-    let head = repo.head().map_err(|e| format!("Failed to get HEAD: {}", e))?;
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {}", e))?;
     let head_commit = head
         .peel_to_commit()
         .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
@@ -2050,18 +2034,14 @@ pub fn unstage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
 /// # Returns
 /// Ok(()) on success, or an error message
 pub fn discard_file(repo: &Repository, file_path: &str) -> Result<(), String> {
-
     // Check the status of the file
     let statuses = repo
         .statuses(None)
         .map_err(|e| format!("Failed to get statuses: {}", e))?;
 
-    let file_status = statuses.iter().find(|entry| {
-        entry
-            .path()
-            .map(|p| p == file_path)
-            .unwrap_or(false)
-    });
+    let file_status = statuses
+        .iter()
+        .find(|entry| entry.path().map(|p| p == file_path).unwrap_or(false));
 
     let status = file_status
         .map(|e| e.status())
@@ -2109,7 +2089,6 @@ pub struct AheadBehind {
 /// * `repo_path` - Path to the git repository
 /// * `file_path` - Relative path to the file within the repository
 pub fn stage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
-
     let mut index = repo
         .index()
         .map_err(|e| format!("Failed to get index: {}", e))?;
@@ -2146,7 +2125,6 @@ pub fn stage_file(repo: &Repository, file_path: &str) -> Result<(), String> {
 /// # Arguments
 /// * `repo_path` - Path to the git repository
 pub fn stage_all(repo: &Repository) -> Result<(), String> {
-
     let mut index = repo
         .index()
         .map_err(|e| format!("Failed to get index: {}", e))?;
@@ -2194,7 +2172,6 @@ pub fn stage_all(repo: &Repository) -> Result<(), String> {
 /// # Arguments
 /// * `repo_path` - Path to the git repository
 pub fn unstage_all(repo: &Repository) -> Result<(), String> {
-
     let head = repo
         .head()
         .map_err(|e| format!("Failed to get HEAD: {}", e))?;
@@ -2203,8 +2180,7 @@ pub fn unstage_all(repo: &Repository) -> Result<(), String> {
         .peel_to_commit()
         .map_err(|e| format!("Failed to get HEAD commit: {}", e))?;
 
-    let head_object = head_commit
-        .as_object();
+    let head_object = head_commit.as_object();
 
     repo.reset(head_object, git2::ResetType::Mixed, None)
         .map_err(|e| format!("Failed to unstage all: {}", e))?;
@@ -2221,7 +2197,6 @@ pub fn unstage_all(repo: &Repository) -> Result<(), String> {
 /// # Returns
 /// Ok(()) on success, or an error if there are no staged changes or the commit fails
 pub fn create_commit(repo: &Repository, message: &str) -> Result<(), String> {
-
     let mut index = repo
         .index()
         .map_err(|e| format!("Failed to get index: {}", e))?;
@@ -2277,7 +2252,6 @@ pub fn create_commit(repo: &Repository, message: &str) -> Result<(), String> {
 /// # Returns
 /// An AheadBehind struct, or an error if the branch has no upstream
 pub fn get_ahead_behind(repo: &Repository) -> Result<AheadBehind, String> {
-
     let head = repo
         .head()
         .map_err(|e| format!("Failed to get HEAD: {}", e))?;
@@ -2323,7 +2297,6 @@ pub fn get_ahead_behind(repo: &Repository) -> Result<AheadBehind, String> {
 /// # Returns
 /// The full commit message string, or an error message
 pub fn get_commit_message(repo: &Repository, commit_id: &str) -> Result<String, String> {
-
     let oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
 
@@ -2347,7 +2320,6 @@ pub fn get_commit_message(repo: &Repository, commit_id: &str) -> Result<String, 
 /// # Returns
 /// Ok(()) on success, or an error message
 pub fn reword_commit(repo: &Repository, commit_id: &str, new_message: &str) -> Result<(), String> {
-
     let target_oid = git2::Oid::from_str(commit_id)
         .map_err(|e| format!("Invalid commit ID '{}': {}", commit_id, e))?;
 
@@ -2464,7 +2436,6 @@ pub fn reword_commit(repo: &Repository, commit_id: &str, new_message: &str) -> R
 /// # Returns
 /// The remote URL string, or an error if no origin remote is configured
 pub fn get_remote_url(repo: &Repository) -> Result<String, String> {
-
     let remote = repo
         .find_remote("origin")
         .map_err(|_| "No 'origin' remote configured".to_string())?;
@@ -2622,23 +2593,15 @@ mod tests {
         assert_eq!(all.len(), 3);
 
         // Filter to alice only
-        let alice_only = list_commits(
-            &repo,
-            None,
-            Some(vec!["alice@example.com".to_string()]),
-        )
-        .expect("Should return commits");
+        let alice_only = list_commits(&repo, None, Some(vec!["alice@example.com".to_string()]))
+            .expect("Should return commits");
         assert_eq!(alice_only.len(), 1);
         assert_eq!(alice_only[0].message, "Alice's commit");
         assert_eq!(alice_only[0].email, "alice@example.com");
 
         // Filter to test@example.com only
-        let test_only = list_commits(
-            &repo,
-            None,
-            Some(vec!["test@example.com".to_string()]),
-        )
-        .expect("Should return commits");
+        let test_only = list_commits(&repo, None, Some(vec!["test@example.com".to_string()]))
+            .expect("Should return commits");
         assert_eq!(test_only.len(), 2);
     }
 
@@ -2649,12 +2612,8 @@ mod tests {
         let repo = Repository::open(path).unwrap();
 
         // Both existing commits are by test@example.com — limit to 1
-        let result = list_commits(
-            &repo,
-            Some(1),
-            Some(vec!["test@example.com".to_string()]),
-        )
-        .expect("Should return commits");
+        let result = list_commits(&repo, Some(1), Some(vec!["test@example.com".to_string()]))
+            .expect("Should return commits");
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].message, "Add file");
     }
@@ -2666,8 +2625,7 @@ mod tests {
         let repo = Repository::open(path).unwrap();
 
         // Empty filter should behave like no filter
-        let result = list_commits(&repo, None, Some(vec![]))
-            .expect("Should return commits");
+        let result = list_commits(&repo, None, Some(vec![])).expect("Should return commits");
         assert_eq!(result.len(), 2);
     }
 
@@ -2867,7 +2825,11 @@ mod tests {
         // No remote configured — all commits should be marked as not pushed
         let commits = list_commits(&repo, None, None).expect("Should return commits");
         for commit in &commits {
-            assert_eq!(commit.is_pushed, false, "Commit '{}' should not be marked pushed without upstream", commit.message);
+            assert_eq!(
+                commit.is_pushed, false,
+                "Commit '{}' should not be marked pushed without upstream",
+                commit.message
+            );
         }
     }
 
@@ -2903,12 +2865,8 @@ mod tests {
 
         // Add a pushed commit by alice (push everything, then add another unpushed one by test user)
         // Actually simpler: just verify that alice's filtered commit has is_pushed = false
-        let alice_commits = list_commits(
-            &repo,
-            None,
-            Some(vec!["alice@example.com".to_string()]),
-        )
-        .expect("Should return commits");
+        let alice_commits = list_commits(&repo, None, Some(vec!["alice@example.com".to_string()]))
+            .expect("Should return commits");
         assert_eq!(alice_commits.len(), 1);
         assert_eq!(alice_commits[0].message, "Alice unpushed");
         assert_eq!(alice_commits[0].is_pushed, false);
@@ -3069,7 +3027,8 @@ mod tests {
         let commits = list_commits(&repo, None, None).expect("Should return commits");
         let commit_ids = vec![commits[1].id.clone(), commits[0].id.clone()];
 
-        let files = get_commit_range_files(&repo, &commit_ids).expect("Should return changed files");
+        let files =
+            get_commit_range_files(&repo, &commit_ids).expect("Should return changed files");
 
         assert!(!files.is_empty());
         assert!(files.iter().any(|file| file.path == "README.md"));
@@ -3158,8 +3117,7 @@ mod tests {
         let repo = Repository::open(path_str).unwrap();
         let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
-        let diff =
-            get_file_diff(&repo, &commits[0].id, "file.txt").expect("Should return diff");
+        let diff = get_file_diff(&repo, &commits[0].id, "file.txt").expect("Should return diff");
 
         assert_eq!(diff.new_path, "file.txt");
         assert!(!diff.is_binary);
@@ -3357,8 +3315,8 @@ mod tests {
         let repo = Repository::open(path_str).unwrap();
         let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
-        let contents = get_file_contents(&repo, &commits[0].id, "file.txt")
-            .expect("Should return contents");
+        let contents =
+            get_file_contents(&repo, &commits[0].id, "file.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert_eq!(contents.old_content, Some("content".to_string()));
@@ -3387,8 +3345,8 @@ mod tests {
         let repo = Repository::open(path_str).unwrap();
         let commits = list_commits(&repo, Some(1), None).expect("Should return commits");
 
-        let contents = get_file_contents(&repo, &commits[0].id, "file.txt")
-            .expect("Should return contents");
+        let contents =
+            get_file_contents(&repo, &commits[0].id, "file.txt").expect("Should return contents");
 
         assert!(!contents.is_binary);
         assert_eq!(contents.old_content, Some("content".to_string()));
@@ -3989,7 +3947,10 @@ mod tests {
         assert_eq!(changes.len(), 2);
 
         let staged = changes.iter().find(|c| c.staged_status.is_some()).unwrap();
-        let unstaged = changes.iter().find(|c| c.unstaged_status.is_some()).unwrap();
+        let unstaged = changes
+            .iter()
+            .find(|c| c.unstaged_status.is_some())
+            .unwrap();
 
         // Staged should have counts for staging "line1\nline2"
         assert!(staged.staged_additions > 0);
@@ -4029,7 +3990,8 @@ mod tests {
         let path = temp_dir.path();
 
         // Create new file without adding
-        std::fs::write(path.join("untracked.txt"), "untracked content").expect("Failed to write file");
+        std::fs::write(path.join("untracked.txt"), "untracked content")
+            .expect("Failed to write file");
 
         let path_str = path.to_str().unwrap();
         let repo = Repository::open(path_str).unwrap();
@@ -4324,8 +4286,12 @@ mod tests {
         // Verify file exists and is untracked
         assert!(path.join("untracked.txt").exists());
         let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
-        assert!(changes_before.iter().any(|c| c.path == "untracked.txt"
-            && c.unstaged_status == Some(FileStatus::Untracked)));
+        assert!(
+            changes_before
+                .iter()
+                .any(|c| c.path == "untracked.txt"
+                    && c.unstaged_status == Some(FileStatus::Untracked))
+        );
 
         // Discard (delete) the file
         discard_file(&repo, "untracked.txt").expect("Should discard file");
@@ -4524,7 +4490,12 @@ mod tests {
 
         // Add a remote
         Command::new("git")
-            .args(["remote", "add", "origin", "https://github.com/owner/repo.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/owner/repo.git",
+            ])
             .current_dir(path)
             .output()
             .expect("Failed to add remote");
@@ -4542,7 +4513,9 @@ mod tests {
 
         let result = get_remote_url(&repo);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("No 'origin' remote configured"));
+        assert!(result
+            .unwrap_err()
+            .contains("No 'origin' remote configured"));
     }
 
     // Tests for reword_commit
@@ -4562,7 +4535,11 @@ mod tests {
             .output()
             .expect("Failed to add files");
         Command::new("git")
-            .args(["commit", "-m", "Summary line\n\nDetailed body paragraph.\nSecond line of body."])
+            .args([
+                "commit",
+                "-m",
+                "Summary line\n\nDetailed body paragraph.\nSecond line of body.",
+            ])
             .current_dir(path)
             .output()
             .expect("Failed to create commit");
@@ -4571,8 +4548,8 @@ mod tests {
         let repo = Repository::open(path_str).unwrap();
         let commits = list_commits(&repo, None, None).expect("Should return commits");
 
-        let full_message = get_commit_message(&repo, &commits[0].id)
-            .expect("Should return full message");
+        let full_message =
+            get_commit_message(&repo, &commits[0].id).expect("Should return full message");
 
         assert!(full_message.starts_with("Summary line"));
         assert!(full_message.contains("Detailed body paragraph."));
@@ -4587,8 +4564,7 @@ mod tests {
 
         let commits = list_commits(&repo, None, None).expect("Should return commits");
 
-        let message = get_commit_message(&repo, &commits[0].id)
-            .expect("Should return message");
+        let message = get_commit_message(&repo, &commits[0].id).expect("Should return message");
 
         assert_eq!(message.trim(), "Add file");
     }
@@ -4674,8 +4650,7 @@ mod tests {
         let commits = list_commits(&repo, None, None).expect("Should return commits");
         let files_before = get_commit_files(&repo, &commits[0].id).expect("Should get files");
 
-        reword_commit(&repo, &commits[0].id, "New message")
-            .expect("Should reword commit");
+        reword_commit(&repo, &commits[0].id, "New message").expect("Should reword commit");
 
         let commits_after = list_commits(&repo, None, None).expect("Should return commits");
         let files_after = get_commit_files(&repo, &commits_after[0].id).expect("Should get files");
@@ -4704,11 +4679,13 @@ mod tests {
         let root_commit = &commits[commits.len() - 1]; // "Initial commit"
         assert_eq!(root_commit.message, "Initial commit");
 
-        reword_commit(&repo, &root_commit.id, "Reworded root")
-            .expect("Should reword root commit");
+        reword_commit(&repo, &root_commit.id, "Reworded root").expect("Should reword root commit");
 
         let commits_after = list_commits(&repo, None, None).expect("Should return commits");
-        assert_eq!(commits_after[commits_after.len() - 1].message, "Reworded root");
+        assert_eq!(
+            commits_after[commits_after.len() - 1].message,
+            "Reworded root"
+        );
         // All commits should have new IDs since root was rewritten
         assert_ne!(commits_after[0].id, commits[0].id);
     }
@@ -4728,9 +4705,9 @@ mod tests {
 
         // Verify file has unstaged changes only
         let changes_before = get_working_changes_ex(&repo).expect("Should get changes");
-        assert!(changes_before
-            .iter()
-            .any(|c| c.path == "file.txt" && c.unstaged_status.is_some() && c.staged_status.is_none()));
+        assert!(changes_before.iter().any(|c| c.path == "file.txt"
+            && c.unstaged_status.is_some()
+            && c.staged_status.is_none()));
 
         // Stage the file
         stage_file(&repo, "file.txt").expect("Should stage file");
@@ -4975,8 +4952,7 @@ mod tests {
 
         // Verify the full message is preserved
         let commits = list_commits(&repo, Some(1), None).expect("Should list commits");
-        let full_message =
-            get_commit_message(&repo, &commits[0].id).expect("Should get message");
+        let full_message = get_commit_message(&repo, &commits[0].id).expect("Should get message");
         assert!(full_message.starts_with("Summary line\n\nDetailed body paragraph"));
     }
 }

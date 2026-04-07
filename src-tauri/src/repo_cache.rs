@@ -12,6 +12,12 @@ pub struct RepoCache {
     repos: Mutex<HashMap<String, Repository>>,
 }
 
+impl Default for RepoCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RepoCache {
     pub fn new() -> Self {
         Self {
@@ -44,8 +50,8 @@ impl RepoCache {
         }
 
         if !repos.contains_key(path) {
-            let repo = Repository::open(path)
-                .map_err(|e| format!("Failed to open repository: {}", e))?;
+            let repo =
+                Repository::open(path).map_err(|e| format!("Failed to open repository: {}", e))?;
             repos.insert(path.to_string(), repo);
         }
 

@@ -10,6 +10,10 @@ pre-commit:
         - "**/*.jsonc"
         - "**/*.css"
       stage_fixed: true
+    - name: cargo fmt
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      glob:
+        - "src-tauri/**/*.rs"
 
 pre-push:
   jobs:
@@ -17,5 +21,17 @@ pre-push:
       run: bun run build
     - name: Test (with act() warning check)
       run: ./scripts/check-act-warnings.sh
+    - name: Clippy
+      run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      glob:
+        - "src-tauri/**/*.rs"
+        - "src-tauri/Cargo.toml"
+        - "src-tauri/Cargo.lock"
+    - name: Rust tests
+      run: cargo test --manifest-path src-tauri/Cargo.toml
+      glob:
+        - "src-tauri/**/*.rs"
+        - "src-tauri/Cargo.toml"
+        - "src-tauri/Cargo.lock"
     - name: Validate release versions
       run: ./scripts/check-release-version.sh
