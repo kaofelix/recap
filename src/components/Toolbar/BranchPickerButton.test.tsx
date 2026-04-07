@@ -506,4 +506,36 @@ describe("BranchPickerButton", () => {
       expect(useAppStore.getState().overlayOpen).toBe(false);
     });
   });
+
+  it("blurs trigger button after dropdown closes to prevent arrow key reopening", async () => {
+    const user = userEvent.setup();
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/repo");
+    });
+
+    render(<BranchPickerButton />);
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(true);
+    });
+
+    // Press Escape to close
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(false);
+    });
+
+    // Flush requestAnimationFrame used for deferred blur
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+    });
+
+    // Trigger button should not retain focus after close
+    expect(document.activeElement).not.toBe(button);
+  });
 });

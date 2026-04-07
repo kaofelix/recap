@@ -40,7 +40,16 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
   return (
     <>
       <Root
-        onOpenChange={(open) => useAppStore.getState().setOverlayOpen(open)}
+        onOpenChange={(open) => {
+          useAppStore.getState().setOverlayOpen(open);
+          if (!open) {
+            // Blur trigger after Radix restores focus to prevent arrow keys
+            // from reopening the dropdown
+            requestAnimationFrame(() => {
+              (document.activeElement as HTMLElement | null)?.blur?.();
+            });
+          }
+        }}
       >
         <Trigger asChild>
           <button

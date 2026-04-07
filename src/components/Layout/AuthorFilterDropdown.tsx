@@ -167,6 +167,11 @@ export function AuthorFilterDropdown() {
         useAppStore.getState().setOverlayOpen(nextOpen);
         if (!nextOpen) {
           setSearch("");
+          // Blur trigger after Radix restores focus to prevent arrow keys
+          // from reopening the dropdown
+          requestAnimationFrame(() => {
+            (document.activeElement as HTMLElement | null)?.blur?.();
+          });
         }
       }}
       open={open}

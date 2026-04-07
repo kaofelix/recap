@@ -81,6 +81,12 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
         queueMicrotask(() => {
           fetchBranches({ silent: true });
         });
+      } else {
+        // Blur trigger after Radix restores focus to prevent arrow keys
+        // from reopening the dropdown
+        requestAnimationFrame(() => {
+          (document.activeElement as HTMLElement | null)?.blur?.();
+        });
       }
     },
     [fetchBranches]
