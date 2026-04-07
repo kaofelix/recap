@@ -10,6 +10,7 @@ import {
 import { Check, Filter } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type AuthorInfo, listAuthors } from "../../api/commands";
+import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -162,18 +163,14 @@ export function AuthorFilterDropdown() {
 
   return (
     <Root
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        useAppStore.getState().setOverlayOpen(nextOpen);
-        if (!nextOpen) {
-          setSearch("");
-          // Blur trigger after Radix restores focus to prevent arrow keys
-          // from reopening the dropdown
-          requestAnimationFrame(() => {
-            (document.activeElement as HTMLElement | null)?.blur?.();
-          });
-        }
-      }}
+      onOpenChange={useOverlayOpenChange(
+        useCallback((nextOpen: boolean) => {
+          setOpen(nextOpen);
+          if (!nextOpen) {
+            setSearch("");
+          }
+        }, [])
+      )}
       open={open}
     >
       <Trigger asChild>

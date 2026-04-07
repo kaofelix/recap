@@ -17,6 +17,7 @@ import {
 } from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import { useAppStore, useRepos, useSelectedRepo } from "../../store";
 import type { Repository } from "../../types/repository";
@@ -31,6 +32,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
   const selectRepo = useAppStore((state) => state.selectRepo);
   const removeRepo = useAppStore((state) => state.removeRepo);
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+  const handleOpenChange = useOverlayOpenChange();
 
   // Don't render if no repos
   if (repos.length === 0) {
@@ -39,18 +41,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
 
   return (
     <>
-      <Root
-        onOpenChange={(open) => {
-          useAppStore.getState().setOverlayOpen(open);
-          if (!open) {
-            // Blur trigger after Radix restores focus to prevent arrow keys
-            // from reopening the dropdown
-            requestAnimationFrame(() => {
-              (document.activeElement as HTMLElement | null)?.blur?.();
-            });
-          }
-        }}
-      >
+      <Root onOpenChange={handleOpenChange}>
         <Trigger asChild>
           <button
             aria-label="Select repository"

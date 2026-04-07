@@ -8,6 +8,7 @@ import {
 import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { checkoutBranch, listBranches } from "../../api/commands";
+import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -72,24 +73,19 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   }, [selectedRepo, fetchBranches]);
 
   // Refresh branches when dropdown opens (silent — don't disable existing items)
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      setIsOpen(open);
-      useAppStore.getState().setOverlayOpen(open);
-      if (open) {
-        // Defer the refresh so the dropdown is fully interactive before state updates
-        queueMicrotask(() => {
-          fetchBranches({ silent: true });
-        });
-      } else {
-        // Blur trigger after Radix restores focus to prevent arrow keys
-        // from reopening the dropdown
-        requestAnimationFrame(() => {
-          (document.activeElement as HTMLElement | null)?.blur?.();
-        });
-      }
-    },
-    [fetchBranches]
+  const handleOpenChange = useOverlayOpenChange(
+    useCallback(
+      (open: boolean) => {
+        setIsOpen(open);
+        if (open) {
+          // Defer the refresh so the dropdown is fully interactive before state updates
+          queueMicrotask(() => {
+            fetchBranches({ silent: true });
+          });
+        }
+      },
+      [fetchBranches]
+    )
   );
 
   const handleBranchSelect = async (branchName: string) => {
