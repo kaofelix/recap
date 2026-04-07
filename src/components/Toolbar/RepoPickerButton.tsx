@@ -8,19 +8,13 @@ import {
   Root as AlertDialogRoot,
   Title as AlertDialogTitle,
 } from "@radix-ui/react-alert-dialog";
-import {
-  Content,
-  Item,
-  Portal,
-  Root,
-  Trigger,
-} from "@radix-ui/react-dropdown-menu";
+import { Content, Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import { useAppStore, useRepos, useSelectedRepo } from "../../store";
 import type { Repository } from "../../types/repository";
+import { DropdownMenu } from "../DropdownMenu";
 
 export interface RepoPickerButtonProps {
   className?: string;
@@ -32,7 +26,6 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
   const selectRepo = useAppStore((state) => state.selectRepo);
   const removeRepo = useAppStore((state) => state.removeRepo);
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
-  const handleOpenChange = useOverlayOpenChange();
 
   // Don't render if no repos
   if (repos.length === 0) {
@@ -41,7 +34,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
 
   return (
     <>
-      <Root onOpenChange={handleOpenChange}>
+      <DropdownMenu>
         <Trigger asChild>
           <button
             aria-label="Select repository"
@@ -115,7 +108,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
             ))}
           </Content>
         </Portal>
-      </Root>
+      </DropdownMenu>
 
       <AlertDialogRoot
         onOpenChange={(open) => !open && setRepoToDelete(null)}

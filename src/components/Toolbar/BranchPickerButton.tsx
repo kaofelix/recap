@@ -1,14 +1,7 @@
-import {
-  Content,
-  Item,
-  Portal,
-  Root,
-  Trigger,
-} from "@radix-ui/react-dropdown-menu";
+import { Content, Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { checkoutBranch, listBranches } from "../../api/commands";
-import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
@@ -17,6 +10,7 @@ import {
 } from "../../store";
 import { useToastStore } from "../../store/toastStore";
 import type { Branch } from "../../types/branch";
+import { DropdownMenu } from "../DropdownMenu";
 
 export interface BranchPickerButtonProps {
   className?: string;
@@ -73,19 +67,17 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   }, [selectedRepo, fetchBranches]);
 
   // Refresh branches when dropdown opens (silent — don't disable existing items)
-  const handleOpenChange = useOverlayOpenChange(
-    useCallback(
-      (open: boolean) => {
-        setIsOpen(open);
-        if (open) {
-          // Defer the refresh so the dropdown is fully interactive before state updates
-          queueMicrotask(() => {
-            fetchBranches({ silent: true });
-          });
-        }
-      },
-      [fetchBranches]
-    )
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      setIsOpen(open);
+      if (open) {
+        // Defer the refresh so the dropdown is fully interactive before state updates
+        queueMicrotask(() => {
+          fetchBranches({ silent: true });
+        });
+      }
+    },
+    [fetchBranches]
   );
 
   const handleBranchSelect = async (branchName: string) => {
@@ -117,7 +109,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
   const localBranches = branches.filter((b) => !b.is_remote);
 
   return (
-    <Root onOpenChange={handleOpenChange} open={isOpen}>
+    <DropdownMenu onOpenChange={handleOpenChange} open={isOpen}>
       <Trigger asChild>
         <button
           aria-label="Select branch"
@@ -188,6 +180,6 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
           ))}
         </Content>
       </Portal>
-    </Root>
+    </DropdownMenu>
   );
 }

@@ -3,20 +3,19 @@ import {
   Content,
   ItemIndicator,
   Portal,
-  Root,
   Separator,
   Trigger,
 } from "@radix-ui/react-dropdown-menu";
 import { Check, Filter } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type AuthorInfo, listAuthors } from "../../api/commands";
-import { useOverlayOpenChange } from "../../hooks/useOverlayOpenChange";
 import { cn } from "../../lib/utils";
 import {
   useAppStore,
   useAuthorFilter,
   useSelectedRepo,
 } from "../../store/appStore";
+import { DropdownMenu } from "../DropdownMenu";
 
 const RECENT_CONTRIBUTOR_DAYS = 30;
 const RECENT_CONTRIBUTOR_WINDOW_SECONDS =
@@ -162,15 +161,13 @@ export function AuthorFilterDropdown() {
   };
 
   return (
-    <Root
-      onOpenChange={useOverlayOpenChange(
-        useCallback((nextOpen: boolean) => {
-          setOpen(nextOpen);
-          if (!nextOpen) {
-            setSearch("");
-          }
-        }, [])
-      )}
+    <DropdownMenu
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setSearch("");
+        }
+      }}
       open={open}
     >
       <Trigger asChild>
@@ -272,6 +269,6 @@ export function AuthorFilterDropdown() {
           )}
         </Content>
       </Portal>
-    </Root>
+    </DropdownMenu>
   );
 }
