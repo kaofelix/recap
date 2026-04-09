@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-04-09
+
+### Added
+
+- **Native Settings window** — You can now open **Recap → Settings…** (or press **⌘,**) to adjust app preferences in a dedicated macOS settings window.
+- **Theme selector in Settings** — Choose **Light**, **Dark**, or **System** from Settings to apply your preferred appearance across the app.
+
+### Fixed
+
+- **Settings window opening flash** — Opening Settings no longer briefly flashes a white window before the content appears.
+
 ## [0.5.5] - 2026-04-03
 
 ### Fixed
