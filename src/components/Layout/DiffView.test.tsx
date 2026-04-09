@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FocusProvider } from "../../context/FocusContext";
 import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { tauriMocks } from "../../test/setup";
 import { codeFoldMessage, DiffView } from "./DiffView";
 
@@ -34,6 +35,7 @@ describe("DiffView", () => {
     vi.clearAllMocks();
     localStorage.clear();
     themeTesting.resetState();
+    useSettingsStore.setState({ themeMode: "system" });
     document.documentElement.classList.remove("dark");
     useAppStore.setState({
       repos: [],
@@ -237,7 +239,7 @@ describe("DiffView", () => {
   });
 
   it("uses resolved theme to drive diff dark mode instead of DOM class", async () => {
-    themeTesting.setThemeMode("dark");
+    useSettingsStore.setState({ themeMode: "dark" });
     document.documentElement.classList.remove("dark");
 
     mockInvoke.mockResolvedValue({

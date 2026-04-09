@@ -1,6 +1,7 @@
 mod commands;
 mod git;
 pub mod repo_cache;
+mod settings_window;
 
 use tauri::image::Image;
 use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -8,6 +9,7 @@ use tauri::{Emitter, Manager};
 
 const CHECK_FOR_UPDATES_MENU_ID: &str = "check_for_updates";
 const CHECK_FOR_UPDATES_EVENT: &str = "menu://check-for-updates";
+const SETTINGS_MENU_ID: &str = "settings";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,6 +24,10 @@ pub fn run() {
     builder
         .manage(repo_cache::RepoCache::new())
         .setup(|app| {
+            let settings_item = MenuItemBuilder::with_id(SETTINGS_MENU_ID, "Settings…")
+                .accelerator("CmdOrCtrl+,")
+                .build(app)?;
+
             let check_for_updates =
                 MenuItemBuilder::with_id(CHECK_FOR_UPDATES_MENU_ID, "Check for Updates…")
                     .build(app)?;
@@ -31,6 +37,8 @@ pub fn run() {
                     icon: Image::from_bytes(include_bytes!("../icons/icon.png")).ok(),
                     ..Default::default()
                 }))
+                .separator()
+                .item(&settings_item)
                 .separator()
                 .item(&check_for_updates)
                 .separator()
@@ -60,7 +68,9 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app_handle, event| {
-            if event.id().as_ref() == CHECK_FOR_UPDATES_MENU_ID {
+            if event.id().as_ref() == SETTINGS_MENU_ID {
+                settings_window::open_or_focus(app_handle);
+            } else if event.id().as_ref() == CHECK_FOR_UPDATES_MENU_ID {
                 if let Some(window) = app_handle.get_webview_window("main") {
                     let _ = window.emit(CHECK_FOR_UPDATES_EVENT, ());
                 }

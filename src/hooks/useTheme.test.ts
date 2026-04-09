@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useSettingsStore } from "../store/settingsStore";
 import { __testing, useTheme } from "./useTheme";
 
 describe("useTheme", () => {
@@ -11,11 +12,13 @@ describe("useTheme", () => {
   };
 
   beforeEach(() => {
-    // Clear localStorage
     localStorage.clear();
 
-    // Reset internal state
+    // Reset theme engine
     __testing.resetState();
+
+    // Reset settings store
+    useSettingsStore.setState({ themeMode: "system" });
 
     // Mock matchMedia
     originalMatchMedia = window.matchMedia;
@@ -35,7 +38,6 @@ describe("useTheme", () => {
   });
 
   it("should default to system mode", () => {
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.mode).toBe("system");
@@ -43,7 +45,6 @@ describe("useTheme", () => {
 
   it("should resolve system mode to light when system prefers light", () => {
     mockMediaQueryList.matches = false;
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.resolvedTheme).toBe("light");
@@ -52,27 +53,27 @@ describe("useTheme", () => {
 
   it("should resolve system mode to dark when system prefers dark", () => {
     mockMediaQueryList.matches = true;
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.resolvedTheme).toBe("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
-  it("should persist theme choice to localStorage", () => {
-    __testing.initializeTheme();
+  it("should persist theme choice to settings store", () => {
     const { result } = renderHook(() => useTheme());
 
     act(() => {
       result.current.setTheme("dark");
     });
 
-    expect(localStorage.getItem("theme-mode")).toBe("dark");
+    expect(useSettingsStore.getState().themeMode).toBe("dark");
   });
 
-  it("should load theme from localStorage on init", () => {
-    localStorage.setItem("theme-mode", "dark");
-    __testing.initializeTheme();
+  it("should read theme from settings store", () => {
+    act(() => {
+      useSettingsStore.setState({ themeMode: "dark" });
+    });
+
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.mode).toBe("dark");
@@ -80,7 +81,6 @@ describe("useTheme", () => {
   });
 
   it("should apply dark class when theme is dark", () => {
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     act(() => {
@@ -92,7 +92,6 @@ describe("useTheme", () => {
 
   it("should remove dark class when theme is light", () => {
     document.documentElement.classList.add("dark");
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     act(() => {
@@ -103,7 +102,6 @@ describe("useTheme", () => {
   });
 
   it("should toggle between light and dark", () => {
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
 
     // Start with light (system default with mocked light preference)
@@ -125,12 +123,7 @@ describe("useTheme", () => {
   });
 
   it("should handle system preference change when in system mode", () => {
-    __testing.initializeTheme();
     const { result } = renderHook(() => useTheme());
-
-    act(() => {
-      result.current.setTheme("system");
-    });
 
     expect(result.current.mode).toBe("system");
     expect(result.current.resolvedTheme).toBe("light");
@@ -138,7 +131,6 @@ describe("useTheme", () => {
     // Simulate system preference change
     act(() => {
       mockMediaQueryList.matches = true;
-      // Get the change handler that was registered
       const changeHandler = mockMediaQueryList.addEventListener.mock.calls.find(
         (call) => call[0] === "change"
       )?.[1];
@@ -152,11 +144,17 @@ describe("useTheme", () => {
     expect(result.current.resolvedTheme).toBe("dark");
   });
 
-  it("should ignore invalid localStorage values", () => {
-    localStorage.setItem("theme-mode", "invalid");
-    __testing.initializeTheme();
+  it("should react when settings store changes externally", () => {
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.mode).toBe("system");
+
+    // Simulate settings store being updated (e.g. cross-window sync)
+    act(() => {
+      useSettingsStore.setState({ themeMode: "dark" });
+    });
+
+    expect(result.current.mode).toBe("dark");
+    expect(result.current.resolvedTheme).toBe("dark");
   });
 });

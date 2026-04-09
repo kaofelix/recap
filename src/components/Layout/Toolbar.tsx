@@ -4,7 +4,6 @@ import {
   AddRepoButton,
   BranchPickerButton,
   RepoPickerButton,
-  ThemeToggleButton,
   UpdaterStatus,
 } from "../Toolbar";
 
@@ -66,7 +65,6 @@ export function Toolbar({
 
       <div className="ml-auto flex items-center gap-3">
         <UpdaterStatus />
-        <ThemeToggleButton />
       </div>
     </header>
   );

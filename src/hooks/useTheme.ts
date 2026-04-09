@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
+import type { ResolvedTheme, ThemeMode } from "../store/settingsStore";
+import { useSettingsStore } from "../store/settingsStore";
 
-export type ThemeMode = "light" | "dark" | "system";
-export type ResolvedTheme = "light" | "dark";
-
-const STORAGE_KEY = "theme-mode";
+export type { ResolvedTheme, ThemeMode } from "../store/settingsStore";
 
 // Get the system preference
 function getSystemTheme(): ResolvedTheme {
@@ -13,18 +12,6 @@ function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
-}
-
-// Get stored theme from localStorage
-function getStoredTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "system";
-  }
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark" || stored === "system") {
-    return stored;
-  }
-  return "system";
 }
 
 // Resolve the actual theme to apply
@@ -48,81 +35,64 @@ function applyTheme(theme: ResolvedTheme): void {
   }
 }
 
-// Store for managing theme state
-interface ThemeState {
-  mode: ThemeMode;
-  resolved: ResolvedTheme;
+// ─── System theme external store (for useSyncExternalStore) ──────────
+
+const systemThemeListeners = new Set<() => void>();
+
+function subscribeSystemTheme(callback: () => void): () => void {
+  systemThemeListeners.add(callback);
+  return () => systemThemeListeners.delete(callback);
 }
 
-let currentState: ThemeState = {
-  mode: "system",
-  resolved: "light",
-};
-
-const listeners = new Set<() => void>();
-
-function subscribe(callback: () => void): () => void {
-  listeners.add(callback);
-  return () => listeners.delete(callback);
+function getSystemThemeSnapshot(): ResolvedTheme {
+  return getSystemTheme();
 }
 
-function getSnapshot(): ThemeState {
-  return currentState;
+function getServerSnapshot(): ResolvedTheme {
+  return "light";
 }
 
-function getServerSnapshot(): ThemeState {
-  return { mode: "system", resolved: "light" };
-}
+// ─── Theme engine setup ─────────────────────────────────────────────
 
-function emitChange(): void {
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function setThemeMode(mode: ThemeMode): void {
-  const resolved = resolveTheme(mode);
-  localStorage.setItem(STORAGE_KEY, mode);
-  applyTheme(resolved);
-  currentState = { mode, resolved };
-  emitChange();
-}
-
-// Initialize theme on module load
-function initializeTheme(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const mode = getStoredTheme();
-  const resolved = resolveTheme(mode);
-  applyTheme(resolved);
-  currentState = { mode, resolved };
-
-  // Listen for system preference changes
-  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  const handleChange = (): void => {
-    if (currentState.mode === "system") {
-      const newResolved = getSystemTheme();
-      applyTheme(newResolved);
-      currentState = { ...currentState, resolved: newResolved };
-      emitChange();
-    }
-  };
-  mediaQuery.addEventListener("change", handleChange);
-}
-
-// Track if initialized
 let initialized = false;
 
-// Initialize on first use (not module load to support SSR/testing)
-function ensureInitialized(): void {
+/**
+ * Set up theme application. Call once from each window's entry point
+ * (main.tsx, settings-main.tsx) to ensure the theme is applied immediately
+ * and stays in sync with settings changes and system preference changes.
+ */
+export function setupTheme(): void {
   if (initialized || typeof window === "undefined") {
     return;
   }
   initialized = true;
-  initializeTheme();
+
+  // Apply initial theme immediately (before React renders, avoids flash)
+  const initialMode = useSettingsStore.getState().themeMode;
+  applyTheme(resolveTheme(initialMode));
+
+  // Re-apply whenever settings change (local or cross-window sync)
+  useSettingsStore.subscribe((state, prevState) => {
+    if (state.themeMode !== prevState.themeMode) {
+      applyTheme(resolveTheme(state.themeMode));
+    }
+  });
+
+  // Listen for system preference changes
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaQuery.addEventListener("change", () => {
+    // Notify React subscribers so resolvedTheme re-derives
+    for (const listener of systemThemeListeners) {
+      listener();
+    }
+    // Apply DOM update if in system mode
+    if (useSettingsStore.getState().themeMode === "system") {
+      applyTheme(getSystemTheme());
+    }
+  });
 }
+
+// ─── React hook ─────────────────────────────────────────────────────
 
 export interface UseThemeReturn {
   /** Current theme mode setting (light, dark, or system) */
@@ -136,48 +106,38 @@ export interface UseThemeReturn {
 }
 
 export function useTheme(): UseThemeReturn {
-  ensureInitialized();
-  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  setupTheme();
 
-  const setTheme = useCallback((mode: ThemeMode) => {
-    setThemeMode(mode);
+  const mode = useSettingsStore((s) => s.themeMode);
+
+  const systemTheme = useSyncExternalStore(
+    subscribeSystemTheme,
+    getSystemThemeSnapshot,
+    getServerSnapshot
+  );
+
+  const resolvedTheme: ResolvedTheme = mode === "system" ? systemTheme : mode;
+
+  const setTheme = useCallback((newMode: ThemeMode) => {
+    useSettingsStore.getState().setThemeMode(newMode);
+    applyTheme(resolveTheme(newMode));
   }, []);
 
   const toggleTheme = useCallback(() => {
-    const current = currentState.resolved;
-    setThemeMode(current === "dark" ? "light" : "dark");
+    const currentResolved = resolveTheme(useSettingsStore.getState().themeMode);
+    const newMode: ThemeMode = currentResolved === "dark" ? "light" : "dark";
+    useSettingsStore.getState().setThemeMode(newMode);
+    applyTheme(newMode);
   }, []);
 
-  // Re-initialize on mount to ensure SSR hydration works
-  useEffect(() => {
-    const mode = getStoredTheme();
-    const resolved = resolveTheme(mode);
-    if (currentState.mode !== mode || currentState.resolved !== resolved) {
-      applyTheme(resolved);
-      currentState = { mode, resolved };
-      emitChange();
-    }
-  }, []);
-
-  return {
-    mode: state.mode,
-    resolvedTheme: state.resolved,
-    setTheme,
-    toggleTheme,
-  };
+  return { mode, resolvedTheme, setTheme, toggleTheme };
 }
 
-// Re-export for testing
+// ─── Testing helpers ────────────────────────────────────────────────
+
 export const __testing = {
-  initializeTheme,
-  getStoredTheme,
-  getSystemTheme,
-  resolveTheme,
-  applyTheme,
-  setThemeMode,
   resetState: () => {
-    currentState = { mode: "system", resolved: "light" };
-    listeners.clear();
     initialized = false;
+    systemThemeListeners.clear();
   },
 };
