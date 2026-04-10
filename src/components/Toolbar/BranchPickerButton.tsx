@@ -1,5 +1,4 @@
 import {
-  Content,
   Item,
   Portal,
   Separator,
@@ -35,7 +34,7 @@ import {
 import { useToastStore } from "../../store/toastStore";
 import type { Branch } from "../../types/branch";
 import type { WorktreeInfo } from "../../types/worktree";
-import { DropdownMenu } from "../DropdownMenu";
+import { DropdownMenu, DropdownMenuContent } from "../DropdownMenu";
 
 export interface BranchPickerButtonProps {
   className?: string;
@@ -390,7 +389,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
       </TooltipProvider>
 
       <Portal>
-        <Content
+        <DropdownMenuContent
           align="start"
           className={cn(
             "max-h-[320px] min-w-[280px] overflow-y-auto rounded-md py-1 shadow-lg",
@@ -476,7 +475,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
               ))}
             </>
           )}
-        </Content>
+        </DropdownMenuContent>
       </Portal>
     </DropdownMenu>
   );

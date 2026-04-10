@@ -8,13 +8,13 @@ import {
   Root as AlertDialogRoot,
   Title as AlertDialogTitle,
 } from "@radix-ui/react-alert-dialog";
-import { Content, Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
+import { Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { useAppStore, useRepos, useSelectedRepo } from "../../store";
 import type { Repository } from "../../types/repository";
-import { DropdownMenu } from "../DropdownMenu";
+import { DropdownMenu, DropdownMenuContent } from "../DropdownMenu";
 
 export interface RepoPickerButtonProps {
   className?: string;
@@ -54,7 +54,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
         </Trigger>
 
         <Portal>
-          <Content
+          <DropdownMenuContent
             align="start"
             className={cn(
               "min-w-[180px] rounded-md py-1 shadow-lg",
@@ -106,7 +106,7 @@ export function RepoPickerButton({ className }: RepoPickerButtonProps) {
                 </button>
               </Item>
             ))}
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
 

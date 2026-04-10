@@ -1,6 +1,5 @@
 import {
   CheckboxItem,
-  Content,
   ItemIndicator,
   Portal,
   Separator,
@@ -15,7 +14,7 @@ import {
   useAuthorFilter,
   useSelectedRepo,
 } from "../../store/appStore";
-import { DropdownMenu } from "../DropdownMenu";
+import { DropdownMenu, DropdownMenuContent } from "../DropdownMenu";
 
 const RECENT_CONTRIBUTOR_DAYS = 30;
 const RECENT_CONTRIBUTOR_WINDOW_SECONDS =
@@ -193,7 +192,7 @@ export function AuthorFilterDropdown() {
       </Trigger>
 
       <Portal>
-        <Content
+        <DropdownMenuContent
           align="end"
           className={cn(
             "max-h-[300px] min-w-[220px] overflow-y-auto rounded-md py-1 shadow-lg",
@@ -267,7 +266,7 @@ export function AuthorFilterDropdown() {
               {olderAuthors.map(renderAuthor)}
             </>
           )}
-        </Content>
+        </DropdownMenuContent>
       </Portal>
     </DropdownMenu>
   );

@@ -1,9 +1,15 @@
-import { Content, Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { Item, Portal, Trigger } from "@radix-ui/react-dropdown-menu";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "../store/appStore";
-import { DropdownMenu } from "./DropdownMenu";
+import { DropdownMenu, DropdownMenuContent } from "./DropdownMenu";
 
 describe("DropdownMenu", () => {
   beforeEach(() => {
@@ -19,9 +25,9 @@ describe("DropdownMenu", () => {
           <button type="button">Open</button>
         </Trigger>
         <Portal>
-          <Content>
+          <DropdownMenuContent>
             <Item onSelect={() => undefined}>Item</Item>
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
     );
@@ -42,9 +48,9 @@ describe("DropdownMenu", () => {
           <button type="button">Open</button>
         </Trigger>
         <Portal>
-          <Content>
+          <DropdownMenuContent>
             <Item onSelect={() => undefined}>Item</Item>
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
     );
@@ -70,9 +76,9 @@ describe("DropdownMenu", () => {
           <button type="button">Open</button>
         </Trigger>
         <Portal>
-          <Content>
+          <DropdownMenuContent>
             <Item onSelect={() => undefined}>Item</Item>
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
     );
@@ -88,7 +94,48 @@ describe("DropdownMenu", () => {
       expect(useAppStore.getState().overlayOpen).toBe(false);
     });
 
-    // Flush requestAnimationFrame
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+    });
+
+    expect(document.activeElement).not.toBe(button);
+  });
+
+  it("blurs the trigger when the menu is dismissed by clicking outside", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <DropdownMenu>
+          <Trigger asChild>
+            <button type="button">Open</button>
+          </Trigger>
+          <Portal>
+            <DropdownMenuContent>
+              <Item onSelect={() => undefined}>Item</Item>
+            </DropdownMenuContent>
+          </Portal>
+        </DropdownMenu>
+        <div data-testid="outside">Outside</div>
+      </>
+    );
+
+    const button = screen.getByRole("button", { name: "Open" });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(true);
+    });
+
+    fireEvent.pointerDown(document.body);
+    fireEvent.mouseDown(document.body);
+    fireEvent.mouseUp(document.body);
+    fireEvent.click(document.body);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().overlayOpen).toBe(false);
+    });
+
     await act(async () => {
       await new Promise((r) => requestAnimationFrame(r));
     });
@@ -110,9 +157,9 @@ describe("DropdownMenu", () => {
           <button type="button">Open</button>
         </Trigger>
         <Portal>
-          <Content>
+          <DropdownMenuContent>
             <Item onSelect={() => undefined}>Item</Item>
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
     );
@@ -135,14 +182,13 @@ describe("DropdownMenu", () => {
           <button type="button">Open</button>
         </Trigger>
         <Portal>
-          <Content>
+          <DropdownMenuContent>
             <Item onSelect={() => undefined}>Item</Item>
-          </Content>
+          </DropdownMenuContent>
         </Portal>
       </DropdownMenu>
     );
 
-    // Should render without errors in controlled mode
     expect(screen.getByRole("button", { name: "Open" })).toBeInTheDocument();
   });
 });
