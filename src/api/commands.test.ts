@@ -22,6 +22,7 @@ import {
   listAuthors,
   listBranches,
   listCommits,
+  listWorktrees,
   reportFrontendError,
   rewordCommit,
   stageAll,
@@ -412,7 +413,14 @@ describe("API commands", () => {
 
   describe("validateRepo", () => {
     it("calls invoke with correct args", async () => {
-      const info = { path: "/repo", name: "repo", branch: "main" };
+      const info = {
+        path: "/repo",
+        name: "repo",
+        branch: "main",
+        canonical_path: "/repo",
+        selected_worktree_path: "/repo",
+        is_linked_worktree: false,
+      };
       mockInvoke.mockResolvedValue(info);
 
       const result = await validateRepo("/repo");
@@ -421,6 +429,18 @@ describe("API commands", () => {
         path: "/repo",
       });
       expect(result).toBe(info);
+    });
+  });
+
+  describe("listWorktrees", () => {
+    it("calls invoke with correct args", async () => {
+      mockInvoke.mockResolvedValue([]);
+
+      await listWorktrees("/repo");
+
+      expect(mockInvoke).toHaveBeenCalledWith("list_worktrees", {
+        repoPath: "/repo",
+      });
     });
   });
 

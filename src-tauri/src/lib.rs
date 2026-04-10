@@ -91,6 +91,7 @@ pub fn run() {
             commands::git::get_commit_range_file_contents,
             commands::git::get_current_branch,
             commands::git::list_branches,
+            commands::git::list_worktrees,
             commands::git::checkout_branch,
             commands::git::validate_repo,
             commands::git::get_working_changes,

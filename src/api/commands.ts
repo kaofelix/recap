@@ -10,6 +10,7 @@ import type { Branch } from "../types/branch";
 import type { Commit } from "../types/commit";
 import type { FileContents } from "../types/diff";
 import type { ChangedFile, WorkingFile } from "../types/file";
+import type { WorktreeInfo } from "../types/worktree";
 
 // ============================================================================
 // Types used by API layer (not shared elsewhere)
@@ -24,6 +25,9 @@ export interface RepoInfo {
   path: string;
   name: string;
   branch: string;
+  canonical_path: string;
+  selected_worktree_path: string;
+  is_linked_worktree: boolean;
 }
 
 export interface AuthorInfo {
@@ -211,6 +215,10 @@ export async function getAheadBehind(repoPath: string): Promise<AheadBehind> {
 
 export async function listBranches(repoPath: string): Promise<Branch[]> {
   return invoke<Branch[]>("list_branches", { repoPath });
+}
+
+export async function listWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
+  return invoke<WorktreeInfo[]>("list_worktrees", { repoPath });
 }
 
 export async function checkoutBranch(

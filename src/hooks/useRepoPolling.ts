@@ -1,3 +1,4 @@
+import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
 import {
   getAheadBehind,
@@ -13,6 +14,17 @@ import { useAppVisibility } from "./useAppVisibility";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_INTERVAL_BACKGROUND_MS = 30_000;
+
+function isLatestRequest(
+  latestRepoPathRef: React.MutableRefObject<string | null>,
+  requestIdRef: React.MutableRefObject<number>,
+  repoPath: string,
+  requestId: number
+): boolean {
+  return (
+    latestRepoPathRef.current === repoPath && requestIdRef.current === requestId
+  );
+}
 
 /**
  * Keep file selection aligned with available changes.
@@ -103,11 +115,23 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
   // Track if this is the initial load (for loading states)
   const isInitialCommitsLoad = useRef(true);
   const isInitialChangesLoad = useRef(true);
+  const latestRepoPathRef = useRef<string | null>(selectedRepo?.path ?? null);
+  const commitsRequestIdRef = useRef(0);
+  const changesRequestIdRef = useRef(0);
 
+  useEffect(() => {
+    latestRepoPathRef.current = selectedRepo?.path ?? null;
+  }, [selectedRepo]);
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: polling coordinates multiple async requests with stale-request guards.
   const fetchCommits = useCallback(async () => {
     if (!selectedRepo) {
       return;
     }
+
+    const repoPath = selectedRepo.path;
+    const requestId = commitsRequestIdRef.current + 1;
+    commitsRequestIdRef.current = requestId;
 
     const isInitial = isInitialCommitsLoad.current;
     if (isInitial) {
@@ -116,28 +140,76 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     }
 
     try {
-      const result = await listCommits(selectedRepo.path, {
+      const result = await listCommits(repoPath, {
         limit: commitLimit,
         authorEmails: authorFilter.length > 0 ? authorFilter : undefined,
       });
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setCommits(result);
       setCommitsError(null);
       setHasMoreCommits(result.length >= commitLimit);
     } catch (err) {
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setCommitsError(err instanceof Error ? err.message : String(err));
       setCommits([]);
     } finally {
-      if (isInitial) {
+      if (
+        isInitial &&
+        isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
         setCommitsLoading(false);
       }
     }
 
     // Fetch ahead/behind in parallel (non-blocking — errors just clear the count)
     try {
-      const ab = await getAheadBehind(selectedRepo.path);
+      const ab = await getAheadBehind(repoPath);
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setUnpushedCount(ab.ahead);
       setBehindCount(ab.behind);
     } catch {
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       // No upstream or detached HEAD — clear the indicator
       setUnpushedCount(null);
       setBehindCount(null);
@@ -145,9 +217,29 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
 
     // Fetch current branch name (non-blocking — errors clear it)
     try {
-      const branchName = await getCurrentBranch(selectedRepo.path);
+      const branchName = await getCurrentBranch(repoPath);
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setCurrentBranchName(branchName);
     } catch {
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          commitsRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setCurrentBranchName(null);
     }
   }, [
@@ -168,6 +260,10 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       return;
     }
 
+    const repoPath = selectedRepo.path;
+    const requestId = changesRequestIdRef.current + 1;
+    changesRequestIdRef.current = requestId;
+
     const isInitial = isInitialChangesLoad.current;
     if (isInitial) {
       setChangesLoading(true);
@@ -175,7 +271,17 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
     }
 
     try {
-      const result = await getWorkingChanges(selectedRepo.path);
+      const result = await getWorkingChanges(repoPath);
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          changesRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setWorkingChanges(result);
       if (viewMode === "changes") {
         reconcileSelection(
@@ -206,10 +312,28 @@ export function useRepoPolling(selectedRepo: Repository | null): void {
       );
       setWorkingChangesFingerprint(fingerprint);
     } catch (err) {
+      if (
+        !isLatestRequest(
+          latestRepoPathRef,
+          changesRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
+        return;
+      }
       setChangesError(err instanceof Error ? err.message : String(err));
       setWorkingChanges([]);
     } finally {
-      if (isInitial) {
+      if (
+        isInitial &&
+        isLatestRequest(
+          latestRepoPathRef,
+          changesRequestIdRef,
+          repoPath,
+          requestId
+        )
+      ) {
         setChangesLoading(false);
       }
     }

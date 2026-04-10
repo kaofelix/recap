@@ -18,6 +18,12 @@ export interface PollingState {
   changesError: string | null;
 }
 
+export interface RepoInput {
+  path: string;
+  canonicalPath?: string;
+  name?: string;
+}
+
 export interface AppState {
   repos: Repository[];
   selectedRepoId: string | null;
@@ -62,9 +68,10 @@ export interface AppState {
   /** Whether word wrap is enabled in the diff viewer */
   wordWrap: boolean;
 
-  addRepo: (path: string) => void;
+  addRepo: (repo: string | RepoInput) => void;
   removeRepo: (id: string) => void;
   selectRepo: (id: string | null) => void;
+  selectRepoWorktree: (repoId: string, path: string) => void;
   selectCommit: (id: string | null) => void;
   selectCommitRange: (ids: string[]) => void;
   toggleCommitSelection: (id: string) => void;
@@ -117,6 +124,52 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function getRepoCanonicalPath(repo: Repository): string {
+  return repo.canonicalPath ?? repo.path;
+}
+
+function normalizeRepoInput(input: string | RepoInput): Required<RepoInput> {
+  if (typeof input === "string") {
+    return {
+      path: input,
+      canonicalPath: input,
+      name: extractRepoName(input),
+    };
+  }
+
+  const canonicalPath = input.canonicalPath ?? input.path;
+  return {
+    path: input.path,
+    canonicalPath,
+    name: input.name ?? extractRepoName(canonicalPath),
+  };
+}
+
+function getRepoScopedResetState(): Partial<AppState> {
+  return {
+    selectedCommitIds: [],
+    selectedFilePath: null,
+    selectedChangeId: null,
+    changedFiles: [],
+    isLoadingCommitFiles: false,
+    commitFilesError: null,
+    workingChangesFingerprint: "",
+    workingChangesPollRequest: 0,
+    commits: [],
+    isLoadingCommits: false,
+    commitsError: null,
+    workingChanges: [],
+    isLoadingChanges: false,
+    changesError: null,
+    unpushedCount: null,
+    behindCount: null,
+    currentBranchName: null,
+    authorFilter: [],
+    commitLimit: 50,
+    hasMoreCommits: true,
+  };
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -154,23 +207,51 @@ export const useAppStore = create<AppState>()(
       diffDisplayMode: "split" as DiffDisplayMode,
       wordWrap: true,
 
-      addRepo: (path: string) => {
-        const { repos } = get();
+      addRepo: (input: string | RepoInput) => {
+        const { repos, selectedRepoId } = get();
+        const repoInput = normalizeRepoInput(input);
+        const existingRepo = repos.find(
+          (repo) => getRepoCanonicalPath(repo) === repoInput.canonicalPath
+        );
 
-        // Don't add duplicates
-        if (repos.some((r) => r.path === path)) {
+        if (existingRepo) {
+          const shouldReset =
+            selectedRepoId !== existingRepo.id ||
+            existingRepo.path !== repoInput.path;
+
+          const nextRepos = repos.map((repo) =>
+            repo.id === existingRepo.id
+              ? {
+                  ...repo,
+                  path: repoInput.path,
+                  canonicalPath: repoInput.canonicalPath,
+                  name: repoInput.name,
+                }
+              : repo
+          );
+
+          set({
+            repos: nextRepos,
+            selectedRepoId: existingRepo.id,
+            ...(shouldReset ? getRepoScopedResetState() : {}),
+          });
           return;
         }
 
         const newRepo: Repository = {
           id: generateId(),
-          path,
-          name: extractRepoName(path),
+          path: repoInput.path,
+          canonicalPath: repoInput.canonicalPath,
+          name: repoInput.name,
           addedAt: Date.now(),
         };
 
         // Auto-select the newly added repo
-        set({ repos: [...repos, newRepo], selectedRepoId: newRepo.id });
+        set({
+          repos: [...repos, newRepo],
+          selectedRepoId: newRepo.id,
+          ...(selectedRepoId !== newRepo.id ? getRepoScopedResetState() : {}),
+        });
       },
 
       removeRepo: (id: string) => {
@@ -186,15 +267,9 @@ export const useAppStore = create<AppState>()(
         set({
           repos: newRepos,
           selectedRepoId: newSelectedId,
-          // Clear commit/file selection when repo changes
-          ...(newSelectedId !== selectedRepoId && {
-            selectedCommitIds: [],
-            selectedFilePath: null,
-            selectedChangeId: null,
-            changedFiles: [],
-            isLoadingCommitFiles: false,
-            commitFilesError: null,
-          }),
+          ...(newSelectedId !== selectedRepoId
+            ? getRepoScopedResetState()
+            : {}),
         });
       },
 
@@ -203,20 +278,30 @@ export const useAppStore = create<AppState>()(
 
         // Only select if repo exists or if clearing selection
         if (id === null || repos.some((r) => r.id === id)) {
-          // Clear commit and file selection when repo changes
           set({
             selectedRepoId: id,
-            selectedCommitIds: [],
-            selectedFilePath: null,
-            selectedChangeId: null,
-            changedFiles: [],
-            isLoadingCommitFiles: false,
-            commitFilesError: null,
-            authorFilter: [],
-            commitLimit: 50,
-            hasMoreCommits: true,
+            ...getRepoScopedResetState(),
           });
         }
+      },
+
+      selectRepoWorktree: (repoId: string, path: string) => {
+        const { repos, selectedRepoId } = get();
+        const repo = repos.find((candidate) => candidate.id === repoId);
+        if (!repo) {
+          return;
+        }
+
+        const shouldReset = selectedRepoId !== repoId || repo.path !== path;
+        const nextRepos = repos.map((candidate) =>
+          candidate.id === repoId ? { ...candidate, path } : candidate
+        );
+
+        set({
+          repos: nextRepos,
+          selectedRepoId: repoId,
+          ...(shouldReset ? getRepoScopedResetState() : {}),
+        });
       },
 
       selectCommit: (id: string | null) => {
@@ -395,7 +480,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "recap-storage",
-      version: 3,
+      version: 4,
       partialize: (state) => ({
         repos: state.repos,
         selectedRepoId: state.selectedRepoId,
@@ -426,12 +511,30 @@ export const useAppStore = create<AppState>()(
             wordWrap: true,
           };
         }
-        // v2 → v3: add diffDisplayMode and wordWrap preferences
-        return {
+        const withDiffPreferences = {
           ...persistedState,
           diffDisplayMode: persistedState.diffDisplayMode ?? "split",
           wordWrap: persistedState.wordWrap ?? true,
         };
+
+        if (version < 4) {
+          const repos = Array.isArray(withDiffPreferences.repos)
+            ? withDiffPreferences.repos.map((repo) => {
+                const typedRepo = repo as Repository;
+                return {
+                  ...typedRepo,
+                  canonicalPath: typedRepo.canonicalPath ?? typedRepo.path,
+                };
+              })
+            : [];
+
+          return {
+            ...withDiffPreferences,
+            repos,
+          };
+        }
+
+        return withDiffPreferences;
       },
       onRehydrateStorage: () => {
         return (state) => {

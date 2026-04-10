@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FocusProvider } from "../../context/FocusContext";
 import { useAppStore } from "../../store/appStore";
@@ -777,6 +778,186 @@ describe("FileList", () => {
 
     await waitFor(() => {
       expect(useAppStore.getState().changedFiles).toEqual([]);
+    });
+  });
+
+  it("refetches commit files from the updated worktree path after canonical repo upsert", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: "/test/repo-main",
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+      selectedCommitIds: ["commit1"],
+      viewMode: "history",
+    });
+
+    render(<FileList />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_commit_files", {
+        repoPath: "/test/repo-main",
+        commitId: "commit1",
+      });
+    });
+
+    await act(async () => {
+      useAppStore.getState().addRepo({
+        path: "/test/repo-feature",
+        canonicalPath: "/test/repo",
+        name: "repo",
+      });
+      useAppStore.getState().selectCommit("commit1");
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_commit_files", {
+        repoPath: "/test/repo-feature",
+        commitId: "commit1",
+      });
+    });
+  });
+
+  it("uses the active worktree path for stage all after canonical repo upsert", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: "/test/repo-main",
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+      viewMode: "changes",
+      workingChanges: [
+        {
+          path: "src/file.ts",
+          staged_status: null,
+          unstaged_status: "Modified",
+          staged_additions: 0,
+          staged_deletions: 0,
+          unstaged_additions: 1,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "unstaged",
+          mtime_ms: null,
+        },
+      ],
+    });
+
+    render(<FileList />);
+
+    await act(async () => {
+      useAppStore.getState().addRepo({
+        path: "/test/repo-feature",
+        canonicalPath: "/test/repo",
+        name: "repo",
+      });
+      useAppStore.setState({
+        workingChanges: [
+          {
+            path: "src/file.ts",
+            staged_status: null,
+            unstaged_status: "Modified",
+            staged_additions: 0,
+            staged_deletions: 0,
+            unstaged_additions: 1,
+            unstaged_deletions: 0,
+            old_path: null,
+            section: "unstaged",
+            mtime_ms: null,
+          },
+        ],
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: "Stage All" }));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("stage_all", {
+        repoPath: "/test/repo-feature",
+      });
+    });
+  });
+
+  it("uses the active worktree path for commit creation after switching worktrees", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: "/test/repo-main",
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+      viewMode: "changes",
+      workingChanges: [
+        {
+          path: "src/file.ts",
+          staged_status: "Modified",
+          unstaged_status: null,
+          staged_additions: 1,
+          staged_deletions: 0,
+          unstaged_additions: 0,
+          unstaged_deletions: 0,
+          old_path: null,
+          section: "staged",
+          mtime_ms: null,
+        },
+      ],
+    });
+
+    render(<FileList />);
+
+    await act(async () => {
+      useAppStore.getState().selectRepoWorktree("1", "/test/repo-feature");
+      useAppStore.setState({
+        workingChanges: [
+          {
+            path: "src/file.ts",
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 1,
+            staged_deletions: 0,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
+            old_path: null,
+            section: "staged",
+            mtime_ms: null,
+          },
+        ],
+      });
+    });
+
+    await user.click(screen.getByTestId("commit-form-toggle"));
+    await user.type(
+      screen.getByPlaceholderText("Commit summary"),
+      "feat: worktree"
+    );
+    await user.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("create_commit", {
+        repoPath: "/test/repo-feature",
+        message: "feat: worktree",
+      });
     });
   });
 });

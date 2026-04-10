@@ -104,7 +104,7 @@ export function Sidebar({ className }: SidebarProps) {
   const commitIds = commits.map((commit) => commit.id);
 
   useEffect(() => {
-    if (viewMode !== "history" || isLoadingCommits || commitsError) {
+    if (viewMode !== "history" || commitsError) {
       return;
     }
     if (commits.length === 0) {
@@ -121,14 +121,7 @@ export function Sidebar({ className }: SidebarProps) {
       selectCommit(commits[0].id);
       commitSelectionAnchorRef.current = commits[0].id;
     }
-  }, [
-    commits,
-    selectedCommitIds,
-    selectCommit,
-    viewMode,
-    isLoadingCommits,
-    commitsError,
-  ]);
+  }, [commits, selectedCommitIds, selectCommit, viewMode, commitsError]);
 
   useEffect(() => {
     if (!(viewMode === "changes" && workingChanges.length === 0)) {

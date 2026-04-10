@@ -38,8 +38,12 @@ export function AddRepoButton({ className }: AddRepoButtonProps) {
       // Validate with backend
       const repoInfo = await validateRepo(path);
 
-      // Add to store (auto-selects the new repo)
-      addRepo(repoInfo.path);
+      // Add to store (auto-selects the repo and preserves worktree context)
+      addRepo({
+        path: repoInfo.selected_worktree_path,
+        canonicalPath: repoInfo.canonical_path,
+        name: repoInfo.name,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       addToast({ message });

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, Repository};
@@ -131,12 +133,31 @@ pub struct FileContents {
 /// Information about a repository
 #[derive(Debug, Clone, Serialize)]
 pub struct RepoInfo {
-    /// Path to the repository
+    /// Path originally validated by the user (selected worktree path)
     pub path: String,
-    /// Name of the repository (directory name)
+    /// Name of the repository (canonical/main worktree directory name)
     pub name: String,
-    /// Current branch name
+    /// Current branch name for the selected worktree
     pub branch: String,
+    /// Canonical repository path (main worktree path)
+    pub canonical_path: String,
+    /// Selected worktree path
+    pub selected_worktree_path: String,
+    /// Whether the selected path is a linked worktree
+    pub is_linked_worktree: bool,
+}
+
+/// Represents a worktree belonging to a repository
+#[derive(Debug, Clone, Serialize)]
+pub struct WorktreeInfo {
+    /// Display name for the worktree
+    pub name: String,
+    /// Absolute path to the worktree root
+    pub path: String,
+    /// Current branch checked out in the worktree
+    pub branch: String,
+    /// Whether this is the main worktree
+    pub is_main: bool,
 }
 
 /// Represents a git branch
@@ -150,6 +171,8 @@ pub struct Branch {
     pub is_remote: bool,
     /// SHA of the tip commit
     pub commit_id: String,
+    /// Path to the worktree where this branch is currently checked out, if any
+    pub checked_out_worktree_path: Option<String>,
 }
 
 /// Represents a git commit with essential metadata
@@ -926,6 +949,106 @@ pub fn get_current_branch(repo: &Repository) -> Result<String, String> {
     }
 }
 
+fn path_to_string(path: &Path) -> String {
+    let mut value = path.to_string_lossy().to_string();
+
+    while value.len() > 1 && value.ends_with(std::path::MAIN_SEPARATOR) {
+        value.pop();
+    }
+
+    value
+}
+
+fn repo_workdir(repo: &Repository) -> Result<&Path, String> {
+    repo.workdir()
+        .ok_or_else(|| "Repository has no working directory (bare repo)".to_string())
+}
+
+fn common_git_dir(repo: &Repository) -> Result<PathBuf, String> {
+    if repo.is_worktree() {
+        repo.path()
+            .parent()
+            .and_then(|path| path.parent())
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "Failed to resolve common git directory for worktree".to_string())
+    } else {
+        Ok(repo.path().to_path_buf())
+    }
+}
+
+fn canonical_repo_path(repo: &Repository) -> Result<String, String> {
+    common_git_dir(repo)?
+        .parent()
+        .map(path_to_string)
+        .ok_or_else(|| "Failed to resolve canonical repository path".to_string())
+}
+
+fn main_repository(repo: &Repository) -> Result<Repository, String> {
+    let canonical_path = canonical_repo_path(repo)?;
+    Repository::open(&canonical_path)
+        .map_err(|e| format!("Failed to open canonical repository: {}", e))
+}
+
+fn worktree_display_name(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
+    let main_repo = main_repository(repo)?;
+    let main_workdir = repo_workdir(&main_repo)?;
+
+    let mut worktrees = vec![WorktreeInfo {
+        name: worktree_display_name(main_workdir),
+        path: path_to_string(main_workdir),
+        branch: get_current_branch(&main_repo)?,
+        is_main: true,
+    }];
+
+    let linked_worktrees = main_repo
+        .worktrees()
+        .map_err(|e| format!("Failed to list worktrees: {}", e))?;
+
+    for worktree_name in linked_worktrees.iter() {
+        let worktree_name =
+            worktree_name.ok_or_else(|| "Worktree name is not valid UTF-8".to_string())?;
+        let worktree = main_repo
+            .find_worktree(worktree_name)
+            .map_err(|e| format!("Failed to open worktree '{}': {}", worktree_name, e))?;
+
+        let worktree_path = worktree.path().to_path_buf();
+        let worktree_repo = Repository::open(&worktree_path).map_err(|e| {
+            format!(
+                "Failed to open worktree repository '{}': {}",
+                worktree_name, e
+            )
+        })?;
+
+        let worktree_display = worktree
+            .name()
+            .map(str::to_string)
+            .unwrap_or_else(|| worktree_display_name(&worktree_path));
+
+        worktrees.push(WorktreeInfo {
+            name: worktree_display,
+            path: path_to_string(&worktree_path),
+            branch: get_current_branch(&worktree_repo)?,
+            is_main: false,
+        });
+    }
+
+    worktrees.sort_by(|a, b| {
+        if a.is_main != b.is_main {
+            return b.is_main.cmp(&a.is_main);
+        }
+        a.name.cmp(&b.name)
+    });
+
+    Ok(worktrees)
+}
+
 /// Lists all branches in the repository
 ///
 /// # Arguments
@@ -936,6 +1059,10 @@ pub fn get_current_branch(repo: &Repository) -> Result<String, String> {
 pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
     // Get current branch name for comparison
     let current_branch = get_current_branch(repo).ok();
+    let checked_out_worktrees: HashMap<_, _> = list_worktrees(repo)?
+        .into_iter()
+        .map(|worktree| (worktree.branch, worktree.path))
+        .collect();
 
     let mut branches = Vec::new();
 
@@ -964,6 +1091,7 @@ pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
             .unwrap_or_default();
 
         branches.push(Branch {
+            checked_out_worktree_path: checked_out_worktrees.get(&name).cloned(),
             name,
             is_current,
             is_remote: false,
@@ -994,6 +1122,7 @@ pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
             .unwrap_or_default();
 
         branches.push(Branch {
+            checked_out_worktree_path: None,
             name,
             is_current: false, // Remote branches can't be current
             is_remote: true,
@@ -1082,27 +1211,21 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Strin
 /// # Returns
 /// A RepoInfo struct or an error message
 pub fn validate_repo(repo: &Repository) -> Result<RepoInfo, String> {
-    // Get repository root path
-    let repo_path = repo
-        .workdir()
-        .ok_or_else(|| "Repository has no working directory (bare repo)".to_string())?
-        .to_string_lossy()
-        .to_string();
-
-    // Get directory name
-    let name = std::path::Path::new(&repo_path)
+    let selected_worktree_path = path_to_string(repo_workdir(repo)?);
+    let canonical_path = canonical_repo_path(repo)?;
+    let name = Path::new(&canonical_path)
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
 
-    // Get current branch
-    let branch = get_current_branch(repo)?;
-
     Ok(RepoInfo {
-        path: repo_path,
+        path: selected_worktree_path.clone(),
         name,
-        branch,
+        branch: get_current_branch(repo)?,
+        canonical_path,
+        selected_worktree_path,
+        is_linked_worktree: repo.is_worktree(),
     })
 }
 
@@ -2449,8 +2572,24 @@ pub fn get_remote_url(repo: &Repository) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::process::Command;
     use tempfile::TempDir;
+
+    fn run_git(args: &[&str], current_dir: &Path) {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(current_dir)
+            .output()
+            .expect("Failed to run git command");
+
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
     fn create_test_repo() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
@@ -2503,6 +2642,140 @@ mod tests {
             .expect("Failed to create commit");
 
         temp_dir
+    }
+
+    struct WorktreeFixture {
+        _main_dir: TempDir,
+        _linked_parent_dir: TempDir,
+        main_path: String,
+        linked_path: String,
+        main_branch: String,
+        linked_branch: String,
+    }
+
+    fn create_test_repo_with_linked_worktree() -> WorktreeFixture {
+        let main_dir = create_test_repo();
+        let main_path = main_dir.path();
+
+        run_git(&["branch", "feature"], main_path);
+
+        let linked_parent_dir = TempDir::new().expect("Failed to create temp directory");
+        let linked_path = linked_parent_dir.path().join("feature-worktree");
+        let linked_path_str = linked_path.to_string_lossy().to_string();
+        run_git(&["worktree", "add", &linked_path_str, "feature"], main_path);
+
+        let repo = Repository::open(main_path).expect("Should open main repo");
+        let main_branch = get_current_branch(&repo).expect("Should get main branch");
+
+        WorktreeFixture {
+            _main_dir: main_dir,
+            _linked_parent_dir: linked_parent_dir,
+            main_path: path_to_string(repo.workdir().unwrap()),
+            linked_path: path_to_string(
+                Repository::open(&linked_path)
+                    .expect("Should open linked worktree")
+                    .workdir()
+                    .unwrap(),
+            ),
+            main_branch,
+            linked_branch: "feature".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_list_worktrees_includes_main_and_linked_worktrees() {
+        let fixture = create_test_repo_with_linked_worktree();
+        let repo = Repository::open(&fixture.main_path).unwrap();
+
+        let worktrees = list_worktrees(&repo).expect("Should return worktrees");
+
+        assert_eq!(worktrees.len(), 2);
+
+        let main_worktree = worktrees
+            .iter()
+            .find(|worktree| worktree.is_main)
+            .expect("Should include main worktree");
+        assert_eq!(main_worktree.path, fixture.main_path);
+        assert_eq!(main_worktree.branch, fixture.main_branch);
+        assert!(!main_worktree.name.is_empty());
+
+        let linked_worktree = worktrees
+            .iter()
+            .find(|worktree| !worktree.is_main)
+            .expect("Should include linked worktree");
+        assert_eq!(linked_worktree.path, fixture.linked_path);
+        assert_eq!(linked_worktree.branch, fixture.linked_branch);
+        assert!(!linked_worktree.name.is_empty());
+    }
+
+    #[test]
+    fn test_list_worktrees_from_linked_worktree_returns_full_set() {
+        let fixture = create_test_repo_with_linked_worktree();
+        let repo = Repository::open(&fixture.linked_path).unwrap();
+
+        let worktrees = list_worktrees(&repo).expect("Should return worktrees");
+
+        assert_eq!(worktrees.len(), 2);
+        assert!(worktrees.iter().any(|worktree| worktree.is_main));
+        assert!(worktrees
+            .iter()
+            .any(|worktree| worktree.path == fixture.linked_path));
+    }
+
+    #[test]
+    fn test_list_branches_reports_checked_out_worktree_paths() {
+        let fixture = create_test_repo_with_linked_worktree();
+        let repo = Repository::open(&fixture.main_path).unwrap();
+
+        let branches = list_branches(&repo).expect("Should return branches");
+
+        let main_branch = branches
+            .iter()
+            .find(|branch| branch.name == fixture.main_branch)
+            .expect("Should include main branch");
+        assert!(main_branch.is_current);
+        assert_eq!(
+            main_branch.checked_out_worktree_path,
+            Some(fixture.main_path.clone())
+        );
+
+        let linked_branch = branches
+            .iter()
+            .find(|branch| branch.name == fixture.linked_branch)
+            .expect("Should include linked branch");
+        assert!(!linked_branch.is_current);
+        assert_eq!(
+            linked_branch.checked_out_worktree_path,
+            Some(fixture.linked_path.clone())
+        );
+    }
+
+    #[test]
+    fn test_validate_repo_returns_canonical_repo_info_for_linked_worktree() {
+        let fixture = create_test_repo_with_linked_worktree();
+        let repo = Repository::open(&fixture.linked_path).unwrap();
+
+        let info = validate_repo(&repo).expect("Should return repo info");
+
+        assert_eq!(info.path, fixture.linked_path);
+        assert_eq!(info.selected_worktree_path, fixture.linked_path);
+        assert_eq!(info.canonical_path, fixture.main_path);
+        assert!(info.is_linked_worktree);
+        assert_eq!(info.branch, fixture.linked_branch);
+    }
+
+    #[test]
+    fn test_validate_repo_returns_main_repo_info_for_main_worktree() {
+        let fixture = create_test_repo_with_linked_worktree();
+        let repo = Repository::open(&fixture.main_path).unwrap();
+
+        let info = validate_repo(&repo).expect("Should return repo info");
+
+        assert_eq!(info.path, fixture.main_path);
+        assert_eq!(info.selected_worktree_path, fixture.main_path);
+        assert_eq!(info.canonical_path, fixture.main_path);
+        assert!(!info.is_linked_worktree);
+        assert_eq!(info.branch, fixture.main_branch);
     }
 
     #[test]

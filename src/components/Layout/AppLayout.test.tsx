@@ -39,7 +39,7 @@ describe("AppLayout", () => {
     renderAppLayout();
 
     expect(screen.getByText("Repository:")).toBeInTheDocument();
-    expect(screen.getByText("Branch:")).toBeInTheDocument();
+    expect(screen.queryByText("Branch:")).not.toBeInTheDocument();
   });
 
   it("places commit list toggle button to the left of repository label", () => {

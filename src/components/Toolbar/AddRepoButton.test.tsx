@@ -75,6 +75,9 @@ describe("AddRepoButton", () => {
       path: mockPath,
       name: "my-repo",
       branch: "main",
+      canonical_path: mockPath,
+      selected_worktree_path: mockPath,
+      is_linked_worktree: false,
     };
 
     tauriMocks.dialogOpen.mockResolvedValue(mockPath);
@@ -96,6 +99,7 @@ describe("AddRepoButton", () => {
     const repos = useAppStore.getState().repos;
     expect(repos).toHaveLength(1);
     expect(repos[0].path).toBe(mockPath);
+    expect(repos[0].canonicalPath).toBe(mockPath);
   });
 
   it("should select the newly added repo", async () => {
@@ -104,6 +108,9 @@ describe("AddRepoButton", () => {
       path: mockPath,
       name: "my-repo",
       branch: "main",
+      canonical_path: mockPath,
+      selected_worktree_path: mockPath,
+      is_linked_worktree: false,
     };
 
     tauriMocks.dialogOpen.mockResolvedValue(mockPath);
@@ -214,6 +221,9 @@ describe("AddRepoButton", () => {
       path: mockPath,
       name: "my-repo",
       branch: "main",
+      canonical_path: mockPath,
+      selected_worktree_path: mockPath,
+      is_linked_worktree: false,
     };
 
     // Dialog can return array
@@ -240,12 +250,47 @@ describe("AddRepoButton", () => {
     expect(screen.getByRole("button")).toHaveClass("custom-class");
   });
 
+  it("should add a linked worktree without losing canonical repo identity", async () => {
+    const mockPath = "/path/to/my-repo-worktree";
+    const mockRepoInfo = {
+      path: mockPath,
+      name: "my-repo",
+      branch: "feature/worktree",
+      canonical_path: "/path/to/my-repo",
+      selected_worktree_path: mockPath,
+      is_linked_worktree: true,
+    };
+
+    tauriMocks.dialogOpen.mockResolvedValue(mockPath);
+    tauriMocks.invoke.mockResolvedValue(mockRepoInfo);
+
+    render(<AddRepoButton />);
+
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
+    await act(async () => {
+      button.click();
+    });
+
+    await waitFor(() => {
+      expect(useAppStore.getState().repos).toHaveLength(1);
+    });
+
+    expect(useAppStore.getState().repos[0]).toMatchObject({
+      path: "/path/to/my-repo-worktree",
+      canonicalPath: "/path/to/my-repo",
+      name: "my-repo",
+    });
+  });
+
   it("should not add duplicate repos", async () => {
     const mockPath = "/path/to/my-repo";
     const mockRepoInfo = {
       path: mockPath,
       name: "my-repo",
       branch: "main",
+      canonical_path: mockPath,
+      selected_worktree_path: mockPath,
+      is_linked_worktree: false,
     };
 
     tauriMocks.dialogOpen.mockResolvedValue(mockPath);
@@ -272,5 +317,54 @@ describe("AddRepoButton", () => {
     await waitFor(() => {
       expect(useAppStore.getState().repos).toHaveLength(1);
     });
+  });
+
+  it("should reuse the existing repo entry when adding a second worktree from the same repo", async () => {
+    tauriMocks.dialogOpen
+      .mockResolvedValueOnce("/path/to/my-repo")
+      .mockResolvedValueOnce("/path/to/my-repo-feature");
+    tauriMocks.invoke
+      .mockResolvedValueOnce({
+        path: "/path/to/my-repo",
+        name: "my-repo",
+        branch: "main",
+        canonical_path: "/path/to/my-repo",
+        selected_worktree_path: "/path/to/my-repo",
+        is_linked_worktree: false,
+      })
+      .mockResolvedValueOnce({
+        path: "/path/to/my-repo-feature",
+        name: "my-repo",
+        branch: "feature/worktree",
+        canonical_path: "/path/to/my-repo",
+        selected_worktree_path: "/path/to/my-repo-feature",
+        is_linked_worktree: true,
+      });
+
+    render(<AddRepoButton />);
+
+    const button = screen.getByRole("button", { name: ADD_REPO_BUTTON });
+
+    await act(async () => {
+      button.click();
+    });
+
+    const firstRepoId = useAppStore.getState().repos[0]?.id;
+
+    await act(async () => {
+      button.click();
+    });
+
+    await waitFor(() => {
+      expect(useAppStore.getState().repos).toHaveLength(1);
+    });
+
+    expect(useAppStore.getState().repos[0]).toMatchObject({
+      id: firstRepoId,
+      path: "/path/to/my-repo-feature",
+      canonicalPath: "/path/to/my-repo",
+      name: "my-repo",
+    });
+    expect(useAppStore.getState().selectedRepoId).toBe(firstRepoId);
   });
 });

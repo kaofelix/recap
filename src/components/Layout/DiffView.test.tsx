@@ -208,6 +208,74 @@ describe("DiffView", () => {
     });
   });
 
+  it("refetches changes-mode diff content from the updated worktree path after canonical repo upsert", async () => {
+    mockInvoke.mockResolvedValue({
+      old_content: "before",
+      new_content: "after",
+      is_binary: false,
+    });
+
+    const workingChange = {
+      path: "src/file.ts",
+      staged_status: null,
+      unstaged_status: "Modified",
+      staged_additions: 0,
+      staged_deletions: 0,
+      unstaged_additions: 1,
+      unstaged_deletions: 0,
+      old_path: null,
+      section: "unstaged" as const,
+      mtime_ms: null,
+    };
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: "/test/repo-main",
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+      viewMode: "changes",
+      workingChanges: [workingChange],
+      changedFiles: [workingChange],
+      selectedFilePath: "src/file.ts",
+      selectedChangeId: "src/file.ts#unstaged",
+    });
+
+    render(<DiffView />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_unstaged_file_contents", {
+        repoPath: "/test/repo-main",
+        filePath: "src/file.ts",
+      });
+    });
+
+    await act(async () => {
+      useAppStore.getState().addRepo({
+        path: "/test/repo-feature",
+        canonicalPath: "/test/repo",
+        name: "repo",
+      });
+      useAppStore.setState({
+        workingChanges: [workingChange],
+        changedFiles: [workingChange],
+      });
+      useAppStore.getState().selectChange("src/file.ts#unstaged");
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_unstaged_file_contents", {
+        repoPath: "/test/repo-feature",
+        filePath: "src/file.ts",
+      });
+    });
+  });
+
   it("provides explicit gutter hover colors for both light and dark diff themes", async () => {
     mockInvoke.mockResolvedValue({
       old_content: "line one",

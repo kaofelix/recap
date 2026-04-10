@@ -14,24 +14,45 @@ function createMockBranches() {
       is_current: true,
       is_remote: false,
       commit_id: "abc1234567890",
+      checked_out_worktree_path: "/path/to/my-repo",
     },
     {
       name: "feature-a",
       is_current: false,
       is_remote: false,
       commit_id: "def4567890123",
+      checked_out_worktree_path: null,
     },
     {
       name: "feature-b",
       is_current: false,
       is_remote: false,
       commit_id: "ghi7890123456",
+      checked_out_worktree_path: "/path/to/my-repo-feature",
     },
     {
       name: "origin/main",
       is_current: false,
       is_remote: true,
       commit_id: "abc1234567890",
+      checked_out_worktree_path: null,
+    },
+  ];
+}
+
+function createMockWorktrees() {
+  return [
+    {
+      name: "main-worktree",
+      path: "/path/to/my-repo",
+      branch: "main",
+      is_main: true,
+    },
+    {
+      name: "feature-worktree",
+      path: "/path/to/my-repo-feature",
+      branch: "feature-b",
+      is_main: false,
     },
   ];
 }
@@ -47,10 +68,13 @@ describe("BranchPickerButton", () => {
     // Reset mocks
     vi.clearAllMocks();
 
-    // Default mock implementation for list_branches
+    // Default mock implementation for branch/worktree commands
     tauriMocks.invoke.mockImplementation((cmd: string) => {
       if (cmd === "list_branches") {
         return Promise.resolve(createMockBranches());
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve(createMockWorktrees());
       }
       if (cmd === "checkout_branch") {
         return Promise.resolve();
@@ -79,7 +103,7 @@ describe("BranchPickerButton", () => {
     });
   });
 
-  it("should display the current branch name", async () => {
+  it("should display the current branch for the primary worktree and show its full path in a tooltip", async () => {
     act(() => {
       useAppStore.getState().addRepo("/path/to/my-repo");
     });
@@ -89,6 +113,9 @@ describe("BranchPickerButton", () => {
     await waitFor(() => {
       expect(screen.getByText("main")).toBeInTheDocument();
     });
+
+    expect(screen.queryByText("main-worktree")).not.toBeInTheDocument();
+    expect(screen.getByRole("tooltip")).toHaveTextContent("/path/to/my-repo");
   });
 
   it("should fetch branches when repo changes", async () => {
@@ -105,7 +132,7 @@ describe("BranchPickerButton", () => {
     });
   });
 
-  it("should open dropdown with branch list when clicked", async () => {
+  it("should show primary-worktree branches under Branches and only linked worktrees under Worktrees", async () => {
     const user = userEvent.setup();
 
     act(() => {
@@ -121,21 +148,31 @@ describe("BranchPickerButton", () => {
     const button = screen.getByRole("button", { name: /select branch/i });
     await user.click(button);
 
-    // Should show local branches only (not remote)
-    expect(screen.getByRole("menuitem", { name: /main/i })).toBeInTheDocument();
+    expect(screen.getByText("Worktrees")).toBeInTheDocument();
+    expect(screen.getByText("Branches")).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("menuitem", { name: /^main$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /feature-worktree/i })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: /feature-a/i })
     ).toBeInTheDocument();
+
     expect(
-      screen.getByRole("menuitem", { name: /feature-b/i })
-    ).toBeInTheDocument();
-    // Remote branches should not be shown
+      screen.queryByRole("menuitem", { name: /main-worktree/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /feature-b/i })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: /origin\/main/i })
     ).not.toBeInTheDocument();
   });
 
-  it("should show checkmark on current branch", async () => {
+  it("should show the checkmark on the current branch when viewing the primary worktree", async () => {
     const user = userEvent.setup();
 
     act(() => {
@@ -151,13 +188,74 @@ describe("BranchPickerButton", () => {
     const button = screen.getByRole("button", { name: /select branch/i });
     await user.click(button);
 
-    const mainItem = screen.getByRole("menuitem", { name: /main/i });
+    const branchItem = screen.getByRole("menuitem", { name: /^main$/i });
     // eslint-disable-next-line testing-library/no-node-access
-    const checkmark = mainItem.querySelector("svg");
+    const checkmark = branchItem.querySelector("svg");
     expect(checkmark).toBeInTheDocument();
   });
 
-  it("should show commit hash for each branch", async () => {
+  it("should show the linked worktree name when viewing a linked worktree", async () => {
+    tauriMocks.invoke.mockImplementation(
+      (cmd: string, args?: { repoPath?: string }) => {
+        if (cmd === "list_branches") {
+          if (args?.repoPath === "/path/to/my-repo-feature") {
+            return Promise.resolve([
+              {
+                name: "main",
+                is_current: false,
+                is_remote: false,
+                commit_id: "abc1234567890",
+                checked_out_worktree_path: "/path/to/my-repo",
+              },
+              {
+                name: "feature-a",
+                is_current: false,
+                is_remote: false,
+                commit_id: "def4567890123",
+                checked_out_worktree_path: null,
+              },
+              {
+                name: "feature-b",
+                is_current: true,
+                is_remote: false,
+                commit_id: "ghi7890123456",
+                checked_out_worktree_path: "/path/to/my-repo-feature",
+              },
+            ]);
+          }
+          return Promise.resolve(createMockBranches());
+        }
+        if (cmd === "list_worktrees") {
+          return Promise.resolve(createMockWorktrees());
+        }
+        if (cmd === "checkout_branch") {
+          return Promise.resolve();
+        }
+        return Promise.reject(new Error(`Unknown command: ${cmd}`));
+      }
+    );
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/my-repo-feature",
+        canonicalPath: "/path/to/my-repo",
+        name: "my-repo",
+      });
+    });
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("feature-worktree")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/^feature-b$/)).not.toBeInTheDocument();
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "/path/to/my-repo-feature"
+    );
+  });
+
+  it("should show linked worktree paths in the worktrees section", async () => {
     const user = userEvent.setup();
 
     act(() => {
@@ -173,9 +271,73 @@ describe("BranchPickerButton", () => {
     const button = screen.getByRole("button", { name: /select branch/i });
     await user.click(button);
 
-    // Should show first 7 chars of commit hash
-    expect(screen.getByText("abc1234")).toBeInTheDocument();
-    expect(screen.getByText("def4567")).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", {
+        name: /feature-worktree.*\/path\/to\/my-repo-feature/i,
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", {
+        name: /main-worktree.*\/path\/to\/my-repo/i,
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("should abbreviate home-directory paths in the tooltip and worktree rows", async () => {
+    const user = userEvent.setup();
+
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return Promise.resolve([
+          {
+            name: "main",
+            is_current: true,
+            is_remote: false,
+            commit_id: "abc1234567890",
+            checked_out_worktree_path: "/Users/kaofelix/Code/doto",
+          },
+        ]);
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve([
+          {
+            name: "main-worktree",
+            path: "/Users/kaofelix/Code/doto",
+            branch: "main",
+            is_main: true,
+          },
+          {
+            name: "feat1",
+            path: "/Users/kaofelix/Code/doto--feat1",
+            branch: "feat1",
+            is_main: false,
+          },
+        ]);
+      }
+      if (cmd === "checkout_branch") {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo("/Users/kaofelix/Code/doto");
+    });
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("main")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("~/Code/doto");
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    expect(
+      screen.getByRole("menuitem", { name: /feat1.*~\/Code\/doto--feat1/i })
+    ).toBeInTheDocument();
   });
 
   it("should switch branch when clicking a different one", async () => {
@@ -234,12 +396,214 @@ describe("BranchPickerButton", () => {
     });
   });
 
+  it("should switch active worktree when clicking a worktree item", async () => {
+    const user = userEvent.setup();
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/my-repo",
+        canonicalPath: "/path/to/my-repo",
+        name: "my-repo",
+      });
+      useAppStore.getState().selectCommit("some-commit-id");
+    });
+
+    const repoId = useAppStore.getState().selectedRepoId;
+    expect(repoId).not.toBeNull();
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("main")).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    const featureWorktreeItem = screen.getByRole("menuitem", {
+      name: /feature-worktree/i,
+    });
+    await user.click(featureWorktreeItem);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().selectedRepoId).toBe(repoId);
+      expect(useAppStore.getState().repos[0]?.path).toBe(
+        "/path/to/my-repo-feature"
+      );
+    });
+
+    expect(
+      tauriMocks.invoke.mock.calls.some(([cmd]) => cmd === "checkout_branch")
+    ).toBe(false);
+    expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBeNull();
+  });
+
+  it("should switch to the primary worktree instead of checking out its branch from a linked worktree", async () => {
+    const user = userEvent.setup();
+
+    tauriMocks.invoke.mockImplementation(
+      (cmd: string, args?: { repoPath?: string }) => {
+        if (cmd === "list_branches") {
+          if (args?.repoPath === "/path/to/my-repo-feature") {
+            return Promise.resolve([
+              {
+                name: "main",
+                is_current: false,
+                is_remote: false,
+                commit_id: "abc1234567890",
+                checked_out_worktree_path: "/path/to/my-repo",
+              },
+              {
+                name: "feature-a",
+                is_current: false,
+                is_remote: false,
+                commit_id: "def4567890123",
+                checked_out_worktree_path: null,
+              },
+              {
+                name: "feature-b",
+                is_current: true,
+                is_remote: false,
+                commit_id: "ghi7890123456",
+                checked_out_worktree_path: "/path/to/my-repo-feature",
+              },
+            ]);
+          }
+          return Promise.resolve(createMockBranches());
+        }
+        if (cmd === "list_worktrees") {
+          return Promise.resolve(createMockWorktrees());
+        }
+        if (cmd === "checkout_branch") {
+          return Promise.resolve();
+        }
+        return Promise.reject(new Error(`Unknown command: ${cmd}`));
+      }
+    );
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/my-repo-feature",
+        canonicalPath: "/path/to/my-repo",
+        name: "my-repo",
+      });
+      useAppStore.getState().selectCommit("some-commit-id");
+    });
+
+    const repoId = useAppStore.getState().selectedRepoId;
+    expect(repoId).not.toBeNull();
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("feature-worktree")).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    const mainItem = screen.getByRole("menuitem", { name: /^main$/i });
+    await user.click(mainItem);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().selectedRepoId).toBe(repoId);
+      expect(useAppStore.getState().repos[0]?.path).toBe("/path/to/my-repo");
+    });
+
+    expect(
+      tauriMocks.invoke.mock.calls.some(([cmd]) => cmd === "checkout_branch")
+    ).toBe(false);
+    expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBeNull();
+  });
+
+  it("should switch to the primary worktree and then check out an unowned branch from a linked worktree", async () => {
+    const user = userEvent.setup();
+
+    tauriMocks.invoke.mockImplementation(
+      (cmd: string, args?: { repoPath?: string }) => {
+        if (cmd === "list_branches") {
+          if (args?.repoPath === "/path/to/my-repo-feature") {
+            return Promise.resolve([
+              {
+                name: "main",
+                is_current: false,
+                is_remote: false,
+                commit_id: "abc1234567890",
+                checked_out_worktree_path: "/path/to/my-repo",
+              },
+              {
+                name: "feature-a",
+                is_current: false,
+                is_remote: false,
+                commit_id: "def4567890123",
+                checked_out_worktree_path: null,
+              },
+              {
+                name: "feature-b",
+                is_current: true,
+                is_remote: false,
+                commit_id: "ghi7890123456",
+                checked_out_worktree_path: "/path/to/my-repo-feature",
+              },
+            ]);
+          }
+          return Promise.resolve(createMockBranches());
+        }
+        if (cmd === "list_worktrees") {
+          return Promise.resolve(createMockWorktrees());
+        }
+        if (cmd === "checkout_branch") {
+          return Promise.resolve();
+        }
+        return Promise.reject(new Error(`Unknown command: ${cmd}`));
+      }
+    );
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/my-repo-feature",
+        canonicalPath: "/path/to/my-repo",
+        name: "my-repo",
+      });
+      useAppStore.getState().selectCommit("some-commit-id");
+    });
+
+    const repoId = useAppStore.getState().selectedRepoId;
+    expect(repoId).not.toBeNull();
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText("feature-worktree")).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    const featureAItem = screen.getByRole("menuitem", { name: /feature-a/i });
+    await user.click(featureAItem);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().selectedRepoId).toBe(repoId);
+      expect(useAppStore.getState().repos[0]?.path).toBe("/path/to/my-repo");
+      expect(tauriMocks.invoke).toHaveBeenCalledWith("checkout_branch", {
+        repoPath: "/path/to/my-repo",
+        branchName: "feature-a",
+      });
+    });
+
+    expect(useAppStore.getState().selectedCommitIds[0] ?? null).toBeNull();
+  });
+
   it("should show a toast when checkout fails", async () => {
     const user = userEvent.setup();
 
     tauriMocks.invoke.mockImplementation((cmd: string) => {
       if (cmd === "list_branches") {
         return Promise.resolve(createMockBranches());
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve(createMockWorktrees());
       }
       if (cmd === "checkout_branch") {
         return Promise.reject(
@@ -280,7 +644,7 @@ describe("BranchPickerButton", () => {
   it("should show loading state while fetching branches", async () => {
     // Make list_branches hang
     tauriMocks.invoke.mockImplementation((cmd: string) => {
-      if (cmd === "list_branches") {
+      if (cmd === "list_branches" || cmd === "list_worktrees") {
         // Never resolves - simulates hanging request
         return new Promise(() => undefined);
       }
@@ -334,43 +698,9 @@ describe("BranchPickerButton", () => {
     });
   });
 
-  it("should display branch name from store when available", async () => {
-    act(() => {
-      useAppStore.getState().addRepo("/path/to/my-repo");
-      useAppStore.getState().setCurrentBranchName("develop");
-    });
-
-    // list_branches returns different current (simulate external branch change detected by polling)
+  it("should show the raw worktree directory name until worktree metadata loads", async () => {
     tauriMocks.invoke.mockImplementation((cmd: string) => {
-      if (cmd === "list_branches") {
-        return Promise.resolve([
-          {
-            name: "develop",
-            is_current: true,
-            is_remote: false,
-            commit_id: "aaa1111111111",
-          },
-        ]);
-      }
-      return Promise.reject(new Error(`Unknown command: ${cmd}`));
-    });
-
-    render(<BranchPickerButton />);
-
-    // Should show store's currentBranchName immediately (before fetch completes)
-    expect(screen.getByText("develop")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(tauriMocks.invoke).toHaveBeenCalledWith("list_branches", {
-        repoPath: "/path/to/my-repo",
-      });
-    });
-  });
-
-  it("should show store branch name even before branches are fetched", async () => {
-    // Make list_branches hang forever
-    tauriMocks.invoke.mockImplementation((cmd: string) => {
-      if (cmd === "list_branches") {
+      if (cmd === "list_branches" || cmd === "list_worktrees") {
         return new Promise(() => undefined);
       }
       return Promise.reject(new Error(`Unknown command: ${cmd}`));
@@ -378,13 +708,11 @@ describe("BranchPickerButton", () => {
 
     act(() => {
       useAppStore.getState().addRepo("/path/to/my-repo");
-      useAppStore.getState().setCurrentBranchName("my-feature");
     });
 
     render(<BranchPickerButton />);
 
-    // Should show the store name even though list_branches hasn't resolved
-    expect(screen.getByText("my-feature")).toBeInTheDocument();
+    expect(screen.getByText("my-repo")).toBeInTheDocument();
   });
 
   it("should refresh branches when dropdown is opened", async () => {
@@ -433,6 +761,7 @@ describe("BranchPickerButton", () => {
               is_current: true,
               is_remote: false,
               commit_id: "abc1234567890",
+              checked_out_worktree_path: "/path/to/my-repo",
             },
           ]);
         }
@@ -443,14 +772,19 @@ describe("BranchPickerButton", () => {
             is_current: true,
             is_remote: false,
             commit_id: "abc1234567890",
+            checked_out_worktree_path: "/path/to/my-repo",
           },
           {
             name: "new-feature",
             is_current: false,
             is_remote: false,
             commit_id: "xyz9876543210",
+            checked_out_worktree_path: null,
           },
         ]);
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve(createMockWorktrees());
       }
       if (cmd === "checkout_branch") {
         return Promise.resolve();

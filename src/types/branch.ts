@@ -3,4 +3,5 @@ export interface Branch {
   is_current: boolean;
   is_remote: boolean;
   commit_id: string;
+  checked_out_worktree_path?: string | null;
 }

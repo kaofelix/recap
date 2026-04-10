@@ -59,7 +59,6 @@ export function Toolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="font-medium text-sm text-text-secondary">Branch:</span>
         <BranchPickerButton />
       </div>
 

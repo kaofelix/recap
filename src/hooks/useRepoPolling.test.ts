@@ -13,6 +13,22 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.unmock("./useRepoPolling");
 vi.unmock("./useAppVisibility");
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushAsyncWork(iterations = 8) {
+  for (let index = 0; index < iterations; index += 1) {
+    await Promise.resolve();
+  }
+}
+
 describe("useRepoPolling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -436,6 +452,215 @@ describe("useRepoPolling", () => {
       repoPath: "/test/repo",
       limit: 50,
       authorEmails: ["alice@example.com", "bob@example.com"],
+    });
+  });
+
+  it("does not let stale polling responses overwrite data after switching active worktrees", async () => {
+    const initialPath = "/test/repo-main";
+    const nextPath = "/test/repo-feature";
+    const initialCommits =
+      createDeferred<
+        Array<{
+          id: string;
+          message: string;
+          author: string;
+          email: string;
+          timestamp: number;
+        }>
+      >();
+
+    const featureCommits = [
+      {
+        id: "feature-commit",
+        message: "feature commit",
+        author: "Feature",
+        email: "feature@example.com",
+        timestamp: 2,
+      },
+    ];
+    const mainCommits = [
+      {
+        id: "main-commit",
+        message: "main commit",
+        author: "Main",
+        email: "main@example.com",
+        timestamp: 1,
+      },
+    ];
+    const featureChanges = [
+      {
+        path: "src/feature.ts",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 1,
+        staged_deletions: 0,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged",
+        mtime_ms: null,
+      },
+    ];
+    const mainChanges = [
+      {
+        path: "src/main.ts",
+        staged_status: "Modified",
+        unstaged_status: null,
+        staged_additions: 1,
+        staged_deletions: 0,
+        unstaged_additions: 0,
+        unstaged_deletions: 0,
+        old_path: null,
+        section: "staged",
+        mtime_ms: null,
+      },
+    ];
+
+    mockInvoke.mockImplementation(
+      (command: string, args?: { repoPath?: string }) => {
+        const repoPath = args?.repoPath;
+
+        if (command === "list_commits") {
+          if (repoPath === initialPath) {
+            return initialCommits.promise;
+          }
+          if (repoPath === nextPath) {
+            return Promise.resolve(featureCommits);
+          }
+        }
+
+        if (command === "get_ahead_behind") {
+          if (repoPath === initialPath) {
+            return Promise.resolve({ ahead: 1, behind: 0 });
+          }
+          if (repoPath === nextPath) {
+            return Promise.resolve({ ahead: 0, behind: 2 });
+          }
+        }
+
+        if (command === "get_current_branch") {
+          if (repoPath === initialPath) {
+            return Promise.resolve("main");
+          }
+          if (repoPath === nextPath) {
+            return Promise.resolve("feature");
+          }
+        }
+
+        if (command === "get_working_changes_ex") {
+          if (repoPath === initialPath) {
+            return Promise.resolve(mainChanges);
+          }
+          if (repoPath === nextPath) {
+            return Promise.resolve(featureChanges);
+          }
+        }
+
+        return Promise.resolve([]);
+      }
+    );
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: initialPath,
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+    const { useSelectedRepo } = await import("../store/appStore");
+
+    renderHook(() => {
+      const selectedRepo = useSelectedRepo();
+      useRepoPolling(selectedRepo);
+      return selectedRepo;
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      useAppStore.getState().selectRepoWorktree("1", nextPath);
+    });
+
+    await act(async () => {
+      await flushAsyncWork();
+    });
+
+    expect(useAppStore.getState().commits).toEqual(featureCommits);
+    expect(useAppStore.getState().workingChanges).toEqual(featureChanges);
+    expect(useAppStore.getState().currentBranchName).toBe("feature");
+    expect(useAppStore.getState().unpushedCount).toBe(0);
+    expect(useAppStore.getState().behindCount).toBe(2);
+
+    await act(async () => {
+      initialCommits.resolve(mainCommits);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useAppStore.getState().commits).toEqual(featureCommits);
+    expect(useAppStore.getState().workingChanges).toEqual(featureChanges);
+    expect(useAppStore.getState().currentBranchName).toBe("feature");
+    expect(useAppStore.getState().unpushedCount).toBe(0);
+    expect(useAppStore.getState().behindCount).toBe(2);
+  });
+
+  it("re-polls using the updated worktree path when the selected repo is re-added via canonical upsert", async () => {
+    mockInvoke.mockResolvedValue([]);
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: "1",
+          path: "/test/repo-main",
+          canonicalPath: "/test/repo",
+          name: "repo",
+          addedAt: Date.now(),
+        },
+      ],
+      selectedRepoId: "1",
+    });
+
+    const { useRepoPolling } = await import("./useRepoPolling");
+    const { useSelectedRepo } = await import("../store/appStore");
+
+    renderHook(() => {
+      const selectedRepo = useSelectedRepo();
+      useRepoPolling(selectedRepo);
+      return selectedRepo;
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      useAppStore.getState().addRepo({
+        path: "/test/repo-feature",
+        canonicalPath: "/test/repo",
+        name: "repo",
+      });
+    });
+
+    await act(async () => {
+      await flushAsyncWork();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_commits", {
+      repoPath: "/test/repo-feature",
+      limit: 50,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("get_working_changes_ex", {
+      repoPath: "/test/repo-feature",
     });
   });
 

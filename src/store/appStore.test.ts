@@ -43,6 +43,24 @@ describe("appStore", () => {
 
       expect(result.current.repos).toHaveLength(1);
       expect(result.current.repos[0].path).toBe("/path/to/my-repo");
+      expect(result.current.repos[0].canonicalPath).toBe("/path/to/my-repo");
+      expect(result.current.repos[0].name).toBe("my-repo");
+    });
+
+    it("should store canonical repo identity separately from active worktree path", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo({
+          path: "/path/to/my-repo-worktree",
+          canonicalPath: "/path/to/my-repo",
+          name: "my-repo",
+        });
+      });
+
+      expect(result.current.repos).toHaveLength(1);
+      expect(result.current.repos[0].path).toBe("/path/to/my-repo-worktree");
+      expect(result.current.repos[0].canonicalPath).toBe("/path/to/my-repo");
       expect(result.current.repos[0].name).toBe("my-repo");
     });
 
@@ -85,6 +103,34 @@ describe("appStore", () => {
       });
 
       expect(result.current.repos).toHaveLength(1);
+    });
+
+    it("should reuse an existing repo entry when adding another worktree for the same canonical repo", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo({
+          path: "/path/to/repo",
+          canonicalPath: "/path/to/repo",
+          name: "repo",
+        });
+      });
+
+      const existingRepoId = result.current.repos[0].id;
+
+      act(() => {
+        result.current.addRepo({
+          path: "/path/to/repo-feature",
+          canonicalPath: "/path/to/repo",
+          name: "repo",
+        });
+      });
+
+      expect(result.current.repos).toHaveLength(1);
+      expect(result.current.repos[0].id).toBe(existingRepoId);
+      expect(result.current.repos[0].path).toBe("/path/to/repo-feature");
+      expect(result.current.repos[0].canonicalPath).toBe("/path/to/repo");
+      expect(result.current.selectedRepoId).toBe(existingRepoId);
     });
 
     it("should generate unique IDs", () => {
@@ -236,6 +282,43 @@ describe("appStore", () => {
       expect(result.current.selectedRepoId).toBe(repoId);
     });
 
+    it("should preserve each repo's active worktree path when switching repos", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo({
+          path: "/repos/repo-one-main",
+          canonicalPath: "/repos/repo-one",
+          name: "repo-one",
+        });
+        result.current.addRepo({
+          path: "/repos/repo-two-main",
+          canonicalPath: "/repos/repo-two",
+          name: "repo-two",
+        });
+      });
+
+      const [repoOne, repoTwo] = result.current.repos;
+
+      act(() => {
+        result.current.selectRepoWorktree(
+          repoOne.id,
+          "/repos/repo-one-feature"
+        );
+        result.current.selectRepo(repoTwo.id);
+        result.current.selectRepo(repoOne.id);
+      });
+
+      expect(result.current.selectedRepoId).toBe(repoOne.id);
+      expect(
+        result.current.repos.find((repo) => repo.id === repoOne.id)?.path
+      ).toBe("/repos/repo-one-feature");
+      expect(
+        result.current.repos.find((repo) => repo.id === repoOne.id)
+          ?.canonicalPath
+      ).toBe("/repos/repo-one");
+    });
+
     it("should clear selection when passed null", () => {
       const { result } = renderHook(() => useAppStore());
 
@@ -262,6 +345,76 @@ describe("appStore", () => {
       });
 
       expect(result.current.selectedRepoId).toBeNull();
+    });
+  });
+
+  describe("selectRepoWorktree", () => {
+    it("should update the active worktree path without changing repo identity", () => {
+      const { result } = renderHook(() => useAppStore());
+
+      act(() => {
+        result.current.addRepo({
+          path: "/repos/repo-main",
+          canonicalPath: "/repos/repo",
+          name: "repo",
+        });
+      });
+
+      const repoId = result.current.repos[0].id;
+
+      act(() => {
+        result.current.selectCommit("abc123");
+        result.current.selectFile("src/App.tsx");
+        result.current.setChangedFiles([
+          {
+            path: "src/App.tsx",
+            status: "Modified",
+            additions: 1,
+            deletions: 0,
+            old_path: null,
+          },
+        ]);
+        result.current.setCommits([
+          {
+            id: "abc123",
+            author: "Test",
+            email: "test@example.com",
+            timestamp: 1_704_067_200,
+            message: "Test commit",
+            is_pushed: false,
+          },
+        ]);
+        result.current.setWorkingChanges([
+          {
+            path: "src/App.tsx",
+            staged_status: "Modified",
+            unstaged_status: null,
+            staged_additions: 1,
+            staged_deletions: 0,
+            unstaged_additions: 0,
+            unstaged_deletions: 0,
+            old_path: null,
+            section: "staged",
+          },
+        ]);
+        result.current.toggleAuthorFilter("alice@example.com");
+      });
+
+      act(() => {
+        result.current.selectRepoWorktree(repoId, "/repos/repo-feature");
+      });
+
+      expect(result.current.selectedRepoId).toBe(repoId);
+      expect(result.current.repos[0].path).toBe("/repos/repo-feature");
+      expect(result.current.repos[0].canonicalPath).toBe("/repos/repo");
+      expect(result.current.selectedCommitIds).toEqual([]);
+      expect(result.current.selectedFilePath).toBeNull();
+      expect(result.current.changedFiles).toEqual([]);
+      expect(result.current.commits).toEqual([]);
+      expect(result.current.workingChanges).toEqual([]);
+      expect(result.current.authorFilter).toEqual([]);
+      expect(result.current.commitLimit).toBe(50);
+      expect(result.current.hasMoreCommits).toBe(true);
     });
   });
 
@@ -1232,7 +1385,11 @@ describe("appStore", () => {
 
     it("should persist repos, selectedRepoId, viewMode, authorFilter, diffDisplayMode, and wordWrap", () => {
       act(() => {
-        useAppStore.getState().addRepo("/path/to/repo");
+        useAppStore.getState().addRepo({
+          path: "/path/to/repo-worktree",
+          canonicalPath: "/path/to/repo",
+          name: "repo",
+        });
         useAppStore.getState().setViewMode("changes");
         useAppStore.getState().toggleAuthorFilter("alice@example.com");
         useAppStore.getState().setDiffDisplayMode("unified");
@@ -1245,6 +1402,11 @@ describe("appStore", () => {
       expect(persisted?.selectedRepoId).toBe(
         useAppStore.getState().repos[0].id
       );
+      expect((persisted?.repos as Record<string, unknown>[])[0]).toMatchObject({
+        path: "/path/to/repo-worktree",
+        canonicalPath: "/path/to/repo",
+        name: "repo",
+      });
       expect(persisted?.viewMode).toBe("changes");
       expect(persisted?.authorFilter).toEqual(["alice@example.com"]);
       expect(persisted?.diffDisplayMode).toBe("unified");
@@ -1340,6 +1502,82 @@ describe("appStore", () => {
           "wordWrap",
         ].sort()
       );
+    });
+
+    it("should rehydrate the active worktree path for the selected repo", async () => {
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      localStorage.setItem(
+        "recap-storage",
+        JSON.stringify({
+          state: {
+            repos: [
+              {
+                id: "repo-1",
+                path: "/path/to/repo-worktree",
+                canonicalPath: "/path/to/repo",
+                name: "repo",
+                addedAt: 123,
+              },
+            ],
+            selectedRepoId: "repo-1",
+            viewMode: "history",
+            authorFilter: [],
+            diffDisplayMode: "split",
+            wordWrap: true,
+          },
+          version: 4,
+        })
+      );
+
+      await act(async () => {
+        await useAppStore.persist.rehydrate();
+      });
+
+      expect(useAppStore.getState().selectedRepoId).toBe("repo-1");
+      expect(useAppStore.getState().repos[0]).toMatchObject({
+        path: "/path/to/repo-worktree",
+        canonicalPath: "/path/to/repo",
+      });
+    });
+
+    it("should migrate persisted repos to canonical identity metadata", async () => {
+      act(() => {
+        useAppStore.getState().clearRepos();
+      });
+
+      localStorage.setItem(
+        "recap-storage",
+        JSON.stringify({
+          state: {
+            repos: [
+              {
+                id: "repo-1",
+                path: "/path/to/repo",
+                name: "repo",
+                addedAt: 123,
+              },
+            ],
+            selectedRepoId: "repo-1",
+            viewMode: "history",
+            authorFilter: [],
+            diffDisplayMode: "split",
+            wordWrap: true,
+          },
+          version: 3,
+        })
+      );
+
+      await act(async () => {
+        await useAppStore.persist.rehydrate();
+      });
+
+      expect(useAppStore.getState().repos[0]).toMatchObject({
+        path: "/path/to/repo",
+        canonicalPath: "/path/to/repo",
+      });
     });
   });
 

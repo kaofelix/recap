@@ -96,6 +96,14 @@ pub fn list_branches(
 }
 
 #[tauri::command]
+pub fn list_worktrees(
+    state: tauri::State<'_, RepoCache>,
+    repo_path: String,
+) -> Result<Vec<git_service::WorktreeInfo>, String> {
+    state.with_repo(&repo_path, git_service::list_worktrees)
+}
+
+#[tauri::command]
 pub fn checkout_branch(
     state: tauri::State<'_, RepoCache>,
     repo_path: String,
