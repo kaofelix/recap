@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-09
+
+### Added
+
+- **First-class Git worktree support** — Recap now recognizes linked worktrees, separates them from branches in the picker, shows the active location path, and switches you to the worktree that already has a branch checked out when needed.
+
+### Fixed
+
+- **Commit avatars recover after temporary Gravatar failures** — Author photos now retry instead of getting stuck on initials for the rest of the session.
+- **Dropdowns no longer trap focus after dismissal** — Closing a dropdown by clicking elsewhere now releases focus so global shortcuts like **⌘↩** work immediately again.
+- **Single-worktree repos now show the active branch correctly** — The branch picker trigger no longer mislabels the primary branch as a worktree when no linked worktrees are present.
+
 ## [0.5.6] - 2026-04-09
 
 ### Added

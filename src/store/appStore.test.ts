@@ -395,6 +395,7 @@ describe("appStore", () => {
             unstaged_deletions: 0,
             old_path: null,
             section: "staged",
+            mtime_ms: null,
           },
         ]);
         result.current.toggleAuthorFilter("alice@example.com");

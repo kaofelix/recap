@@ -515,11 +515,15 @@ export const useAppStore = create<AppState>()(
           ...persistedState,
           diffDisplayMode: persistedState.diffDisplayMode ?? "split",
           wordWrap: persistedState.wordWrap ?? true,
+        } as Partial<AppState> & {
+          repos?: unknown[];
+          diffDisplayMode?: DiffDisplayMode;
+          wordWrap?: boolean;
         };
 
         if (version < 4) {
           const repos = Array.isArray(withDiffPreferences.repos)
-            ? withDiffPreferences.repos.map((repo) => {
+            ? withDiffPreferences.repos.map((repo: unknown) => {
                 const typedRepo = repo as Repository;
                 return {
                   ...typedRepo,

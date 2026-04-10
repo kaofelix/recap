@@ -1,8 +1,4 @@
-import {
-  Content,
-  type ContentProps,
-  Root,
-} from "@radix-ui/react-dropdown-menu";
+import { Content, Root } from "@radix-ui/react-dropdown-menu";
 import {
   type ComponentProps,
   type ElementRef,
@@ -44,7 +40,9 @@ export const DropdownMenuContent = forwardRef<
   ElementRef<typeof Content>,
   DropdownMenuContentProps
 >(({ onCloseAutoFocus, ...props }, ref) => {
-  const handleCloseAutoFocus: ContentProps["onCloseAutoFocus"] = (event) => {
+  const handleCloseAutoFocus: DropdownMenuContentProps["onCloseAutoFocus"] = (
+    event
+  ) => {
     onCloseAutoFocus?.(event);
     event.preventDefault();
     blurActiveElement();

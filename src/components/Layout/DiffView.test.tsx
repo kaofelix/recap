@@ -12,6 +12,7 @@ import { __testing as themeTesting } from "../../hooks/useTheme";
 import { useAppStore } from "../../store/appStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { tauriMocks } from "../../test/setup";
+import type { WorkingFile } from "../../types/file";
 import { codeFoldMessage, DiffView } from "./DiffView";
 
 const mockInvoke = tauriMocks.invoke;
@@ -215,7 +216,7 @@ describe("DiffView", () => {
       is_binary: false,
     });
 
-    const workingChange = {
+    const workingChange: WorkingFile = {
       path: "src/file.ts",
       staged_status: null,
       unstaged_status: "Modified",
