@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { gravatarUrl } from "../lib/gravatar";
 
 type AvatarStatus = "loading" | "loaded" | "failed";
@@ -16,12 +16,7 @@ function notify(entry: CacheEntry) {
   }
 }
 
-function ensureEntry(src: string): CacheEntry {
-  const existing = avatarCache.get(src);
-  if (existing) {
-    return existing;
-  }
-
+function createEntry(src: string): CacheEntry {
   const entry: CacheEntry = {
     status: "loading",
     listeners: new Set(),
@@ -42,11 +37,18 @@ function ensureEntry(src: string): CacheEntry {
   return entry;
 }
 
+function ensureEntry(src: string): CacheEntry {
+  return avatarCache.get(src) ?? createEntry(src);
+}
+
 function subscribe(src: string, listener: () => void): () => void {
   const entry = ensureEntry(src);
   entry.listeners.add(listener);
   return () => {
     entry.listeners.delete(listener);
+    if (entry.status === "failed" && entry.listeners.size === 0) {
+      avatarCache.delete(src);
+    }
   };
 }
 
@@ -56,10 +58,15 @@ function getSnapshot(src: string): AvatarStatus {
 
 export function useGravatar(email: string, size = 40) {
   const src = useMemo(() => gravatarUrl(email, size), [email, size]);
+  const subscribeToAvatar = useCallback(
+    (listener: () => void) => subscribe(src, listener),
+    [src]
+  );
+  const getAvatarSnapshot = useCallback(() => getSnapshot(src), [src]);
   const status = useSyncExternalStore(
-    (listener) => subscribe(src, listener),
-    () => getSnapshot(src),
-    () => getSnapshot(src)
+    subscribeToAvatar,
+    getAvatarSnapshot,
+    getAvatarSnapshot
   );
 
   return {
