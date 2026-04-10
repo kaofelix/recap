@@ -151,19 +151,31 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
     [worktrees]
   );
 
-  const primaryWorktreePath = useMemo(() => {
-    return (
-      worktrees.find((worktree) => worktree.is_main)?.path ??
-      selectedRepo?.canonicalPath ??
-      selectedRepo?.path ??
-      null
-    );
-  }, [selectedRepo?.canonicalPath, selectedRepo?.path, worktrees]);
+  const primaryWorktree = useMemo(
+    () => worktrees.find((worktree) => worktree.is_main) ?? null,
+    [worktrees]
+  );
+
+  const primaryWorktreePath =
+    primaryWorktree?.path ??
+    selectedRepo?.canonicalPath ??
+    selectedRepo?.path ??
+    null;
 
   const linkedWorktrees = useMemo(
     () => worktrees.filter((worktree) => !worktree.is_main),
     [worktrees]
   );
+
+  const selectedWorktree = useMemo(() => {
+    if (!selectedRepo) {
+      return null;
+    }
+
+    return (
+      worktrees.find((worktree) => worktree.path === selectedRepo.path) ?? null
+    );
+  }, [selectedRepo, worktrees]);
 
   const localBranches = useMemo(
     () => branches.filter((branch) => !branch.is_remote),
@@ -177,10 +189,26 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
 
   const displayBranchName =
     currentBranchName ?? currentLocalBranch?.name ?? null;
-  const isPrimaryContext =
-    selectedRepo && primaryWorktreePath
-      ? selectedRepo.path === primaryWorktreePath
-      : true;
+  const isPrimaryContext = useMemo(() => {
+    if (!(selectedRepo && primaryWorktreePath)) {
+      return true;
+    }
+
+    if (selectedWorktree) {
+      return selectedWorktree.is_main;
+    }
+
+    if (linkedWorktrees.length === 0) {
+      return true;
+    }
+
+    return selectedRepo.canonicalPath === primaryWorktreePath;
+  }, [
+    linkedWorktrees.length,
+    primaryWorktreePath,
+    selectedRepo,
+    selectedWorktree,
+  ]);
 
   const activeWorktreeName = useMemo(() => {
     if (!selectedRepo) {
@@ -199,9 +227,10 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
     [localBranches, primaryWorktreePath]
   );
 
-  const selectedLinkedWorktreePath = isPrimaryContext
-    ? null
-    : selectedRepo?.path;
+  const selectedLinkedWorktreePath =
+    selectedWorktree && !selectedWorktree.is_main
+      ? selectedWorktree.path
+      : null;
 
   const fetchBranches = useCallback(
     async ({ silent = false } = {}) => {

@@ -118,6 +118,117 @@ describe("BranchPickerButton", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent("/path/to/my-repo");
   });
 
+  it("treats the selected repo as the primary context when its canonical path matches the main worktree", async () => {
+    const user = userEvent.setup();
+
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return Promise.resolve([
+          {
+            name: "main",
+            is_current: true,
+            is_remote: false,
+            commit_id: "abc1234567890",
+            checked_out_worktree_path: "/path/to/actual-repo",
+          },
+        ]);
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve([
+          {
+            name: "actual-repo",
+            path: "/path/to/actual-repo",
+            branch: "main",
+            is_main: true,
+          },
+        ]);
+      }
+      if (cmd === "checkout_branch") {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/alias-repo",
+        canonicalPath: "/path/to/actual-repo",
+        name: "actual-repo",
+      });
+    });
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /select branch/i })
+      ).toHaveTextContent("main");
+    });
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    const branchItem = screen.getByRole("menuitem", { name: /^main$/i });
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(branchItem.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("treats a repo with no linked worktrees as the primary context even when the selected path differs", async () => {
+    const user = userEvent.setup();
+
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return Promise.resolve([
+          {
+            name: "main",
+            is_current: true,
+            is_remote: false,
+            commit_id: "abc1234567890",
+            checked_out_worktree_path: "/path/to/actual-repo",
+          },
+        ]);
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.resolve([
+          {
+            name: "actual-repo",
+            path: "/path/to/actual-repo",
+            branch: "main",
+            is_main: true,
+          },
+        ]);
+      }
+      if (cmd === "checkout_branch") {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo({
+        path: "/path/to/alias-repo",
+        canonicalPath: "/path/to/alias-repo",
+        name: "alias-repo",
+      });
+    });
+
+    render(<BranchPickerButton />);
+
+    await waitFor(() => {
+      const button = screen.getByRole("button", { name: /select branch/i });
+      expect(button).toHaveTextContent("main");
+      // eslint-disable-next-line testing-library/no-node-access
+      expect(button.querySelector(".lucide-git-branch")).toBeInTheDocument();
+    });
+
+    const button = screen.getByRole("button", { name: /select branch/i });
+    await user.click(button);
+
+    const branchItem = screen.getByRole("menuitem", { name: /^main$/i });
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(branchItem.querySelector("svg")).toBeInTheDocument();
+  });
+
   it("should fetch branches when repo changes", async () => {
     act(() => {
       useAppStore.getState().addRepo("/path/to/my-repo");
