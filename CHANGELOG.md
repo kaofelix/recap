@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-04-12
+
+### Fixed
+
+- **Missing linked worktrees no longer break the branch picker** — If a stale worktree entry points to a deleted directory, Recap now keeps the branch picker usable and shows cleanup guidance with the suggested `git worktree prune` command.
+- **Warning and error toasts are easier to read** — Toast notifications now use solid high-contrast colors so warnings and errors stay legible at a glance.
+
 ## [0.6.0] - 2026-04-09
 
 ### Added
