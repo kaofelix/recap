@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, Repository};
+use git2::{build::CheckoutBuilder, BranchType, Delta, DiffOptions, ErrorCode, Repository};
 use serde::Serialize;
 
 /// Status of a file in a commit or working directory
@@ -996,7 +996,18 @@ fn worktree_display_name(path: &Path) -> String {
         .to_string()
 }
 
-pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
+fn format_missing_worktree_message(worktree_name: &str, worktree_path: &Path) -> String {
+    format!(
+        "Linked worktree '{}' is missing at '{}'.\n\nRun `git worktree prune` to remove stale references, or recreate it with `git worktree add <path> <branch>` if you still need it.",
+        worktree_name,
+        path_to_string(worktree_path)
+    )
+}
+
+fn collect_worktrees(
+    repo: &Repository,
+    skip_missing_linked: bool,
+) -> Result<Vec<WorktreeInfo>, String> {
     let main_repo = main_repository(repo)?;
     let main_workdir = repo_workdir(&main_repo)?;
 
@@ -1019,12 +1030,24 @@ pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
             .map_err(|e| format!("Failed to open worktree '{}': {}", worktree_name, e))?;
 
         let worktree_path = worktree.path().to_path_buf();
-        let worktree_repo = Repository::open(&worktree_path).map_err(|e| {
-            format!(
-                "Failed to open worktree repository '{}': {}",
-                worktree_name, e
-            )
-        })?;
+        let worktree_repo = match Repository::open(&worktree_path) {
+            Ok(repository) => repository,
+            Err(error) if skip_missing_linked && error.code() == ErrorCode::NotFound => {
+                continue;
+            }
+            Err(error) if error.code() == ErrorCode::NotFound => {
+                return Err(format_missing_worktree_message(
+                    worktree_name,
+                    &worktree_path,
+                ));
+            }
+            Err(error) => {
+                return Err(format!(
+                    "Failed to open worktree repository '{}': {}",
+                    worktree_name, error
+                ));
+            }
+        };
 
         let worktree_display = worktree
             .name()
@@ -1049,6 +1072,10 @@ pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
     Ok(worktrees)
 }
 
+pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
+    collect_worktrees(repo, false)
+}
+
 /// Lists all branches in the repository
 ///
 /// # Arguments
@@ -1059,7 +1086,7 @@ pub fn list_worktrees(repo: &Repository) -> Result<Vec<WorktreeInfo>, String> {
 pub fn list_branches(repo: &Repository) -> Result<Vec<Branch>, String> {
     // Get current branch name for comparison
     let current_branch = get_current_branch(repo).ok();
-    let checked_out_worktrees: HashMap<_, _> = list_worktrees(repo)?
+    let checked_out_worktrees: HashMap<_, _> = collect_worktrees(repo, true)?
         .into_iter()
         .map(|worktree| (worktree.branch, worktree.path))
         .collect();
@@ -2748,6 +2775,44 @@ mod tests {
             linked_branch.checked_out_worktree_path,
             Some(fixture.linked_path.clone())
         );
+    }
+
+    #[test]
+    fn test_list_branches_ignores_missing_linked_worktrees() {
+        let fixture = create_test_repo_with_linked_worktree();
+        std::fs::remove_dir_all(&fixture.linked_path)
+            .expect("Should remove linked worktree directory");
+
+        let repo = Repository::open(&fixture.main_path).unwrap();
+        let branches = list_branches(&repo).expect("Should still return branches");
+
+        let main_branch = branches
+            .iter()
+            .find(|branch| branch.name == fixture.main_branch)
+            .expect("Should include main branch");
+        assert_eq!(
+            main_branch.checked_out_worktree_path,
+            Some(fixture.main_path.clone())
+        );
+
+        let linked_branch = branches
+            .iter()
+            .find(|branch| branch.name == fixture.linked_branch)
+            .expect("Should include linked branch");
+        assert_eq!(linked_branch.checked_out_worktree_path, None);
+    }
+
+    #[test]
+    fn test_list_worktrees_reports_missing_linked_worktree_with_prune_guidance() {
+        let fixture = create_test_repo_with_linked_worktree();
+        std::fs::remove_dir_all(&fixture.linked_path)
+            .expect("Should remove linked worktree directory");
+
+        let repo = Repository::open(&fixture.main_path).unwrap();
+        let error = list_worktrees(&repo).expect_err("Should report missing worktree");
+
+        assert!(error.contains("\n\nRun `git worktree prune`"));
+        assert!(error.contains(&fixture.linked_path));
     }
 
     #[test]

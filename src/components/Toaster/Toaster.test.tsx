@@ -17,7 +17,7 @@ describe("Toaster", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("should render toast messages", () => {
+  it("should render error toasts with solid high-contrast styles", () => {
     act(() => {
       useToastStore.getState().addToast({ message: "Something went wrong" });
     });
@@ -25,7 +25,10 @@ describe("Toaster", () => {
     render(<Toaster />);
 
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toBeInTheDocument();
+    expect(alert).toHaveClass("border-danger", "bg-danger", "text-white");
   });
 
   it("should render multiple toasts", () => {
@@ -74,6 +77,27 @@ describe("Toaster", () => {
 
     expect(screen.getByText("Keep this one")).toBeInTheDocument();
     expect(screen.queryByText("Dismiss this one")).not.toBeInTheDocument();
+  });
+
+  it("should render warning toasts with solid high-contrast styles and preserve line breaks", () => {
+    act(() => {
+      useToastStore.getState().addToast({
+        message:
+          "Missing linked worktree.\n\nRun `git worktree prune` to remove stale references.",
+        type: "warning",
+      });
+    });
+
+    render(<Toaster />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("border-warning", "bg-warning", "text-black");
+    expect(alert).toHaveTextContent(
+      "Missing linked worktree. Run `git worktree prune` to remove stale references."
+    );
+
+    const message = screen.getByText(/Missing linked worktree\./i);
+    expect(message).toHaveClass("whitespace-pre-line");
   });
 
   it("should update when a new toast is added after render", () => {

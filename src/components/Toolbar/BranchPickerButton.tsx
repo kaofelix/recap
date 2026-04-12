@@ -74,6 +74,10 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function getToastType(message: string): "error" | "warning" {
+  return message.includes("git worktree prune") ? "warning" : "error";
+}
+
 async function loadPickerData<T>({
   repoPath,
   latestRepoPathRef,
@@ -250,7 +254,8 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
         onSuccess: setBranches,
         onError: (error) => {
           if (!silent) {
-            addToast({ message: getErrorMessage(error) });
+            const message = getErrorMessage(error);
+            addToast({ message, type: getToastType(message) });
           }
           setBranches([]);
         },
@@ -278,7 +283,8 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
         onSuccess: setWorktrees,
         onError: (error) => {
           if (!silent) {
-            addToast({ message: getErrorMessage(error) });
+            const message = getErrorMessage(error);
+            addToast({ message, type: getToastType(message) });
           }
           setWorktrees([]);
         },
@@ -348,7 +354,7 @@ export function BranchPickerButton({ className }: BranchPickerButtonProps) {
       selectCommit(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      addToast({ message });
+      addToast({ message, type: getToastType(message) });
     } finally {
       setIsLoading(false);
     }

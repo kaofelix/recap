@@ -752,6 +752,42 @@ describe("BranchPickerButton", () => {
     });
   });
 
+  it("shows missing worktree guidance as a warning toast", async () => {
+    tauriMocks.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_branches") {
+        return Promise.resolve(createMockBranches());
+      }
+      if (cmd === "list_worktrees") {
+        return Promise.reject(
+          new Error(
+            "Linked worktree 'feature-worktree' is missing at '/tmp/feature-worktree'.\n\nRun `git worktree prune` to remove stale references, or recreate it with `git worktree add <path> <branch>` if you still need it."
+          )
+        );
+      }
+      if (cmd === "checkout_branch") {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(`Unknown command: ${cmd}`));
+    });
+
+    act(() => {
+      useAppStore.getState().addRepo("/path/to/my-repo");
+    });
+
+    render(
+      <>
+        <BranchPickerButton />
+        <Toaster />
+      </>
+    );
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveClass("border-warning", "bg-warning", "text-black");
+      expect(alert).toHaveTextContent(/git worktree prune/i);
+    });
+  });
+
   it("should show loading state while fetching branches", async () => {
     // Make list_branches hang
     tauriMocks.invoke.mockImplementation((cmd: string) => {
