@@ -190,6 +190,7 @@ html {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
 }
 
 body {
@@ -197,6 +198,12 @@ body {
   min-height: 100vh;
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100vh;
+  overscroll-behavior: none;
 }
 
 /* Custom scrollbar */
