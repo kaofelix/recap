@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-04-13
+
+### Fixed
+
+- **Scrolling no longer rubber-bands past the app edges** — Recap now disables overscroll bounce in the diff view and across the app shell, so trackpad scrolling no longer pulls the UI beyond its bounds.
+
 ## [0.6.1] - 2026-04-12
 
 ### Fixed
