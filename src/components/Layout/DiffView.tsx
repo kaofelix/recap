@@ -826,7 +826,7 @@ export function DiffView({ className }: DiffViewProps) {
         </Provider>
       </div>
 
-      <div className="diff-scroll-wrapper min-h-0 flex-1 select-text overflow-hidden">
+      <div className="diff-scroll-wrapper min-h-0 flex-1 select-text overflow-hidden overscroll-none">
         <DiffContent
           compareMethod={getDiffMethodForPath(selectedFilePath)}
           error={error}

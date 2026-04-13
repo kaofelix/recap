@@ -254,9 +254,11 @@ tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
 
 /* Fix react-diff-viewer: the library sets inline overflowX: 'hidden' on its
    scroll container when infiniteLoading is enabled. Override to allow
-   horizontal scrolling when word wrap is off. */
+   horizontal scrolling when word wrap is off, and disable overscroll
+   rubber-banding in the diff view. */
 .diff-scroll-wrapper > div[style] {
   overflow-x: auto !important;
+  overscroll-behavior: none;
 }
 
 /* Theme toggle icon animation */
