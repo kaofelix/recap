@@ -18,6 +18,7 @@
     "prepare": "bun x lefthook install"
   },
   "dependencies": {
+    "@pierre/diffs": "^1.2.7",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -36,9 +37,7 @@
     "lucide-react": "^0.563.0",
     "md5": "^2.3.0",
     "postcss": "^8.5.6",
-    "prismjs": "^1.30.0",
     "react": "^19.1.0",
-    "react-diff-viewer-continued": "^4.1.2",
     "react-dom": "^19.1.0",
     "react-resizable-panels": "^4.6.2",
     "tailwind-merge": "^3.4.0",
@@ -52,7 +51,6 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/md5": "^2.3.6",
-    "@types/prismjs": "^1.26.5",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",

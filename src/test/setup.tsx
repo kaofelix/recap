@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { HotkeyManager } from "@tanstack/react-hotkeys";
 import { act, cleanup } from "@testing-library/react";
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 // Mock IntersectionObserver (not available in jsdom)
@@ -218,73 +218,89 @@ export const tauriMocks = {
   menuItemNew: mockMenuItemNew,
 };
 
-// Mock react-diff-viewer-continued (has worker bundle issues in test env)
-vi.mock("react-diff-viewer-continued", () => ({
-  default: ({
-    oldValue,
-    newValue,
-    splitView,
-    compareMethod,
-    codeFoldMessageRenderer,
-    renderContent,
-    useDarkTheme,
-    styles,
-  }: {
-    oldValue: string;
-    newValue: string;
-    splitView: boolean;
-    compareMethod?: string;
-    codeFoldMessageRenderer?: (
-      totalFoldedLines: number,
-      leftStartLineNumber: number,
-      rightStartLineNumber: number
-    ) => React.ReactElement;
-    renderContent?: (source: string) => React.ReactElement;
-    useDarkTheme?: boolean;
-    styles?: {
-      variables?: {
-        light?: Record<string, string>;
-        dark?: Record<string, string>;
-      };
-    };
-  }) => {
-    // If renderContent is provided, use it to render the content
-    const renderValue = (value: string) => {
-      if (renderContent) {
-        return renderContent(value);
+// Mock @pierre/diffs/react (uses browser APIs and workers outside test needs)
+vi.mock("@pierre/diffs/react", () => ({
+  useWorkerPool: () =>
+    (
+      globalThis as typeof globalThis & {
+        __mockDiffsWorkerPool?: unknown;
       }
-      return value;
+    ).__mockDiffsWorkerPool ?? null,
+  WorkerPoolContextProvider: ({
+    children,
+    highlighterOptions,
+    poolOptions,
+  }: {
+    children: React.ReactNode;
+    highlighterOptions?: { langs?: string[]; tokenizeMaxLineLength?: number };
+    poolOptions?: { poolSize?: number };
+  }) => (
+    <div
+      data-langs={highlighterOptions?.langs?.join(",")}
+      data-pool-size={poolOptions?.poolSize}
+      data-testid="worker-pool-provider"
+      data-tokenize-max-line-length={highlighterOptions?.tokenizeMaxLineLength}
+    >
+      {children}
+    </div>
+  ),
+  MultiFileDiff: ({
+    oldFile,
+    newFile,
+    options,
+    style,
+  }: {
+    oldFile: { name: string; contents: string; cacheKey?: string };
+    newFile: { name: string; contents: string; cacheKey?: string };
+    options?: {
+      diffStyle?: "split" | "unified";
+      overflow?: "wrap" | "scroll";
+      theme?: { dark?: string; light?: string } | string;
+      themeType?: "dark" | "light" | "system";
+      disableFileHeader?: boolean;
+      hunkSeparators?: string;
+      lineDiffType?: string;
     };
+    style?: React.CSSProperties;
+  }) => {
+    useEffect(() => {
+      const globalWithCounter = globalThis as typeof globalThis & {
+        __mockDiffsMountCount?: number;
+      };
+      globalWithCounter.__mockDiffsMountCount =
+        (globalWithCounter.__mockDiffsMountCount ?? 0) + 1;
+    }, []);
 
     return (
       <div
-        data-compare-method={compareMethod}
-        data-gutter-background-dark-dark={
-          styles?.variables?.dark?.gutterBackgroundDark
-        }
-        data-gutter-background-dark-light={
-          styles?.variables?.light?.gutterBackgroundDark
-        }
-        data-has-code-fold-renderer={String(!!codeFoldMessageRenderer)}
-        data-split-view={splitView}
+        data-diff-style={options?.diffStyle}
+        data-disable-file-header={String(Boolean(options?.disableFileHeader))}
+        data-hunk-separators={options?.hunkSeparators}
+        data-line-diff-type={options?.lineDiffType}
+        data-new-cache-key={newFile.cacheKey}
+        data-new-file-name={newFile.name}
+        data-old-cache-key={oldFile.cacheKey}
+        data-old-file-name={oldFile.name}
+        data-overflow={options?.overflow}
+        data-split-view={String(options?.diffStyle === "split")}
         data-testid="diff-viewer"
-        data-use-dark-theme={String(Boolean(useDarkTheme))}
+        data-theme-dark={
+          typeof options?.theme === "object"
+            ? options.theme.dark
+            : options?.theme
+        }
+        data-theme-light={
+          typeof options?.theme === "object"
+            ? options.theme.light
+            : options?.theme
+        }
+        data-theme-type={options?.themeType}
+        style={style}
       >
-        <div data-testid="diff-old">{renderValue(oldValue)}</div>
-        <div data-testid="diff-new">{renderValue(newValue)}</div>
+        <div data-testid="diff-old">{oldFile.contents}</div>
+        <div data-testid="diff-new">{newFile.contents}</div>
       </div>
     );
-  },
-  DiffMethod: {
-    CHARS: "diffChars",
-    WORDS: "diffWords",
-    WORDS_WITH_SPACE: "diffWordsWithSpace",
-    LINES: "diffLines",
-    TRIMMED_LINES: "diffTrimmedLines",
-    SENTENCES: "diffSentences",
-    CSS: "diffCss",
-    JSON: "diffJson",
-    YAML: "diffYaml",
   },
 }));
 

@@ -1,4 +1,11 @@
 import {
+  type FileContents,
+  MultiFileDiff,
+  type MultiFileDiffProps,
+  useWorkerPool,
+  WorkerPoolContextProvider,
+} from "@pierre/diffs/react";
+import {
   Content,
   Portal,
   Provider,
@@ -15,18 +22,13 @@ import {
   SquareSplitHorizontal,
   WrapText,
 } from "lucide-react";
-import type { ReactElement } from "react";
-import { useCallback, useMemo } from "react";
-import ReactDiffViewer, { type DiffMethod } from "react-diff-viewer-continued";
+import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsFocused } from "../../context/FocusContext";
 import { useFileContents } from "../../hooks/useFileContents";
 import { useTheme } from "../../hooks/useTheme";
 import { useWorkingChangesListModel } from "../../hooks/useWorkingChangesListModel";
-import {
-  getDiffMethodForPath,
-  getLanguageFromPath,
-  highlightCode,
-} from "../../lib/syntax";
+import { workerFactory } from "../../lib/diffsWorker";
 import { cn, splitPath } from "../../lib/utils";
 import { parseWorkingChangeId } from "../../lib/workingChangesList";
 import {
@@ -55,147 +57,62 @@ export interface DiffViewProps {
   className?: string;
 }
 
-/** Render a user-friendly code fold message instead of the default @@ hunk header */
-export function codeFoldMessage(
-  totalFoldedLines: number,
-  _leftStartLineNumber: number,
-  _rightStartLineNumber: number
-): ReactElement {
-  const label =
-    totalFoldedLines === 1
-      ? "1 unchanged line"
-      : `${totalFoldedLines} unchanged lines`;
-  return (
-    <span style={{ color: "var(--color-text-tertiary)", fontWeight: "normal" }}>
-      {label}
-    </span>
-  );
-}
-
 const NON_CONSECUTIVE_SELECTION_ERROR =
   "Unable to display diff for multiple non-consecutive commits";
 
 /** Stable empty array reference to avoid triggering useFileContents re-fetches */
 const EMPTY_COMMIT_IDS: string[] = [];
 
-/** Theme variables for the diff viewer using CSS variables */
-const themeVariables = {
-  light: {
-    diffViewerBackground: "var(--color-panel-bg)",
-    diffViewerColor: "var(--color-text-primary)",
-    diffViewerTitleBackground: "var(--color-panel-header-bg)",
-    diffViewerTitleColor: "var(--color-text-primary)",
-    diffViewerTitleBorderColor: "var(--color-border-primary)",
-    addedBackground: "var(--color-diff-add-bg)",
-    addedColor: "var(--color-diff-add-text)",
-    removedBackground: "var(--color-diff-delete-bg)",
-    removedColor: "var(--color-diff-delete-text)",
-    changedBackground: "var(--color-bg-hover)",
-    wordAddedBackground: "var(--color-diff-add-word-bg)",
-    wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-    addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-    removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-    gutterBackground: "var(--color-panel-header-bg)",
-    gutterBackgroundDark: "var(--color-bg-hover)",
-    highlightBackground: "var(--color-bg-hover)",
-    highlightGutterBackground: "var(--color-bg-hover)",
-    gutterColor: "var(--color-text-tertiary)",
-    addedGutterColor: "var(--color-text-primary)",
-    removedGutterColor: "var(--color-text-primary)",
-    codeFoldContentColor: "var(--color-text-tertiary)",
-    codeFoldBackground: "var(--color-bg-secondary)",
-    codeFoldGutterBackground: "var(--color-bg-secondary)",
-    emptyLineBackground: "var(--color-bg-secondary)",
-  },
-  dark: {
-    diffViewerBackground: "var(--color-panel-bg)",
-    diffViewerColor: "var(--color-text-primary)",
-    diffViewerTitleBackground: "var(--color-panel-header-bg)",
-    diffViewerTitleColor: "var(--color-text-primary)",
-    diffViewerTitleBorderColor: "var(--color-border-primary)",
-    addedBackground: "var(--color-diff-add-bg)",
-    addedColor: "var(--color-diff-add-text)",
-    removedBackground: "var(--color-diff-delete-bg)",
-    removedColor: "var(--color-diff-delete-text)",
-    changedBackground: "var(--color-bg-hover)",
-    wordAddedBackground: "var(--color-diff-add-word-bg)",
-    wordRemovedBackground: "var(--color-diff-delete-word-bg)",
-    addedGutterBackground: "var(--color-diff-add-gutter-bg)",
-    removedGutterBackground: "var(--color-diff-delete-gutter-bg)",
-    gutterBackground: "var(--color-panel-header-bg)",
-    gutterBackgroundDark: "var(--color-bg-hover)",
-    highlightBackground: "var(--color-bg-hover)",
-    highlightGutterBackground: "var(--color-bg-hover)",
-    gutterColor: "var(--color-text-tertiary)",
-    addedGutterColor: "var(--color-text-primary)",
-    removedGutterColor: "var(--color-text-primary)",
-    codeFoldContentColor: "var(--color-text-tertiary)",
-    codeFoldBackground: "var(--color-bg-secondary)",
-    codeFoldGutterBackground: "var(--color-bg-secondary)",
-    emptyLineBackground: "var(--color-bg-secondary)",
-  },
+const workerPoolLanguages = [
+  "typescript",
+  "javascript",
+  "tsx",
+  "jsx",
+  "css",
+  "json",
+  "yaml",
+  "rust",
+  "python",
+  "go",
+  "markdown",
+] as const;
+
+const diffWorkerPoolOptions = {
+  poolSize: 4,
+  totalASTLRUCacheSize: 200,
+  workerFactory,
 };
 
-/** Generate diff styles based on word wrap setting */
-/** Shared styles for code fold rows */
-/** Shared styles for code fold rows */
-const codeFoldStyles = {
-  codeFold: {
-    fontSize: "12px",
-    lineHeight: "32px",
-  },
-  codeFoldGutter: {
-    paddingLeft: "12px", // pl-3
-  },
+const diffHighlighterOptions = {
+  langs: [...workerPoolLanguages],
+  lineDiffType: "word-alt" as const,
+  maxLineDiffLength: 500,
+  theme: { dark: "pierre-dark", light: "pierre-light" },
+  tokenizeMaxLineLength: 500,
 };
 
-// In split view, content columns share space after fixed gutter (2×50px)
-// and marker (2×28px) columns = 156px total. Each content column gets at
-// least half the remaining space so columns stay stable under virtualization
-// (prevents empty-side columns from collapsing when only additions/deletions
-// are visible in the current scroll window).
-const splitContentMinWidth = "calc((100% - 156px) / 2)";
+function hashDiffContent(value: string): string {
+  let hash = 5381;
 
-function getDiffStyles(wordWrap: boolean, splitView: boolean) {
-  // Stabilize column widths for split view under virtualization
-  const contentStyle = splitView
-    ? { minWidth: splitContentMinWidth }
-    : undefined;
-
-  if (wordWrap) {
-    // Word wrap enabled: always fit, no horizontal scroll
-    return {
-      variables: themeVariables,
-      ...codeFoldStyles,
-      ...(contentStyle && { content: contentStyle }),
-      diffContainer: {
-        minWidth: "unset",
-        width: "100%",
-        overflowX: "hidden" as const,
-        tableLayout: "fixed" as const,
-      },
-      contentText: {
-        whiteSpace: "pre-wrap" as const,
-        wordBreak: "break-word" as const,
-      },
-    };
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33 + value.charCodeAt(index)) % 4_294_967_291;
   }
 
-  // Word wrap disabled: whole table scrolls horizontally together
-  return {
-    variables: themeVariables,
-    ...codeFoldStyles,
-    ...(contentStyle && { content: contentStyle }),
-    diffContainer: {
-      minWidth: "max-content",
-      overflowX: "visible" as const,
-      tableLayout: "auto" as const,
-    },
-    contentText: {
-      whiteSpace: "pre" as const,
-    },
-  };
+  return hash.toString(16);
 }
+
+const diffStyleVariables = {
+  "--diffs-font-family":
+    'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+  "--diffs-font-size": "12px",
+  "--diffs-line-height": "1.5",
+  "--diffs-header-font-family":
+    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  "--diffs-deletion-color-override": "var(--color-diff-delete-text)",
+  "--diffs-addition-color-override": "var(--color-diff-add-text)",
+  "--diffs-bg-selection-override": "var(--color-bg-hover)",
+  "--diffs-selection-color-override": "var(--color-accent-primary)",
+} as CSSProperties;
 
 /** Placeholder message component */
 function DiffPlaceholder({ message }: { message: string }) {
@@ -452,8 +369,47 @@ interface DiffContentProps {
   splitView: boolean;
   wordWrap: boolean;
   isDarkTheme: boolean;
-  compareMethod: DiffMethod;
-  renderContent: (source: string) => ReactElement;
+  filePath: string | null;
+  cacheKeyBase: string;
+}
+
+function useWorkerHighlightRefreshKey(diffInstanceKey: string): string {
+  const workerPool = useWorkerPool();
+  const [refreshState, setRefreshState] = useState({
+    diffInstanceKey,
+    count: 0,
+  });
+  const sawWorkRef = useRef(false);
+
+  const refreshCount =
+    refreshState.diffInstanceKey === diffInstanceKey ? refreshState.count : 0;
+
+  useEffect(() => {
+    if (workerPool == null) {
+      return;
+    }
+
+    return workerPool.subscribeToStatChanges((stats) => {
+      const isWorking =
+        stats.busyWorkers > 0 || stats.activeTasks > 0 || stats.queuedTasks > 0;
+
+      if (isWorking) {
+        sawWorkRef.current = true;
+        return;
+      }
+
+      if (sawWorkRef.current) {
+        sawWorkRef.current = false;
+        setRefreshState((current) => ({
+          diffInstanceKey,
+          count:
+            current.diffInstanceKey === diffInstanceKey ? current.count + 1 : 1,
+        }));
+      }
+    });
+  }, [diffInstanceKey, workerPool]);
+
+  return `${diffInstanceKey}:${refreshCount}`;
 }
 
 function DiffContent({
@@ -468,18 +424,52 @@ function DiffContent({
   splitView,
   wordWrap,
   isDarkTheme,
-  compareMethod,
-  renderContent,
+  filePath,
+  cacheKeyBase,
 }: DiffContentProps) {
-  const diffStyles = useMemo(
-    () => getDiffStyles(wordWrap, splitView),
-    [wordWrap, splitView]
+  const diffOptions = useMemo<
+    NonNullable<MultiFileDiffProps<undefined>["options"]>
+  >(
+    () => ({
+      diffStyle: splitView ? "split" : "unified",
+      overflow: wordWrap ? "wrap" : "scroll",
+      disableFileHeader: true,
+      theme: { dark: "pierre-dark", light: "pierre-light" },
+      themeType: isDarkTheme ? "dark" : "light",
+      hunkSeparators: "line-info",
+      lineDiffType: "word-alt",
+    }),
+    [isDarkTheme, splitView, wordWrap]
+  );
+
+  const oldContentHash = useMemo(() => hashDiffContent(oldValue), [oldValue]);
+  const newContentHash = useMemo(() => hashDiffContent(newValue), [newValue]);
+  const diffInstanceKey = useWorkerHighlightRefreshKey(
+    `${cacheKeyBase}:${oldContentHash}:${newContentHash}`
+  );
+
+  const oldFile = useMemo<FileContents>(
+    () => ({
+      name: filePath ?? "file",
+      contents: oldValue,
+      cacheKey: `${cacheKeyBase}:old:${oldContentHash}`,
+    }),
+    [cacheKeyBase, filePath, oldContentHash, oldValue]
+  );
+
+  const newFile = useMemo<FileContents>(
+    () => ({
+      name: filePath ?? "file",
+      contents: newValue,
+      cacheKey: `${cacheKeyBase}:new:${newContentHash}`,
+    }),
+    [cacheKeyBase, filePath, newContentHash, newValue]
   );
 
   if (!hasFile) {
     return <DiffPlaceholder message="Select a file to view diff" />;
   }
-  if (!hasData && isLoading) {
+  if (isLoading) {
     return <DiffPlaceholder message="Loading diff..." />;
   }
   if (!hasData && error) {
@@ -496,17 +486,12 @@ function DiffContent({
   }
 
   return (
-    <ReactDiffViewer
-      codeFoldMessageRenderer={codeFoldMessage}
-      compareMethod={compareMethod}
-      hideLineNumbers={false}
-      infiniteLoading={{ pageSize: 100, containerHeight: "100%" }}
-      newValue={newValue}
-      oldValue={oldValue}
-      renderContent={renderContent}
-      splitView={splitView}
-      styles={diffStyles}
-      useDarkTheme={isDarkTheme}
+    <MultiFileDiff
+      key={diffInstanceKey}
+      newFile={newFile}
+      oldFile={oldFile}
+      options={diffOptions}
+      style={diffStyleVariables}
     />
   );
 }
@@ -635,19 +620,28 @@ export function DiffView({ className }: DiffViewProps) {
     isFocused,
   });
 
-  // Memoize the syntax highlighting render function
-  const renderContent = useMemo(() => {
-    const language = selectedFilePath
-      ? getLanguageFromPath(selectedFilePath)
-      : null;
+  const diffCacheKeyBase = useMemo(() => {
+    const revisionKey =
+      viewMode === "history"
+        ? activeCommitIds.join(",") || commitId || "working-tree"
+        : `${selectedChangeId ?? selectedFilePath ?? "working-tree"}:${refreshKey}`;
 
-    return (source: string) => (
-      <span
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Prism output is safe
-        dangerouslySetInnerHTML={{ __html: highlightCode(source, language) }}
-      />
-    );
-  }, [selectedFilePath]);
+    return [
+      selectedRepo?.id ?? "no-repo-id",
+      selectedRepo?.path ?? "no-repo-path",
+      revisionKey,
+      selectedFilePath ?? "no-file",
+    ].join(":");
+  }, [
+    activeCommitIds,
+    commitId,
+    refreshKey,
+    selectedChangeId,
+    selectedFilePath,
+    selectedRepo?.id,
+    selectedRepo?.path,
+    viewMode,
+  ]);
 
   const {
     buttonLabel: maximizeButtonLabel,
@@ -826,22 +820,27 @@ export function DiffView({ className }: DiffViewProps) {
         </Provider>
       </div>
 
-      <div className="diff-scroll-wrapper min-h-0 flex-1 select-text overflow-hidden overscroll-none">
-        <DiffContent
-          compareMethod={getDiffMethodForPath(selectedFilePath)}
-          error={error}
-          hasChanges={hasChanges}
-          hasData={hasData}
-          hasFile={!!selectedFilePath}
-          isBinary={isBinary}
-          isDarkTheme={isDarkTheme}
-          isLoading={isLoading}
-          newValue={newValue}
-          oldValue={oldValue}
-          renderContent={renderContent}
-          splitView={effectiveDisplayMode === "split"}
-          wordWrap={wordWrap}
-        />
+      <div className="diff-scroll-wrapper min-h-0 flex-1 select-text overflow-auto overscroll-none">
+        <WorkerPoolContextProvider
+          highlighterOptions={diffHighlighterOptions}
+          poolOptions={diffWorkerPoolOptions}
+        >
+          <DiffContent
+            cacheKeyBase={diffCacheKeyBase}
+            error={error}
+            filePath={selectedFilePath}
+            hasChanges={hasChanges}
+            hasData={hasData}
+            hasFile={!!selectedFilePath}
+            isBinary={isBinary}
+            isDarkTheme={isDarkTheme}
+            isLoading={isLoading}
+            newValue={newValue}
+            oldValue={oldValue}
+            splitView={effectiveDisplayMode === "split"}
+            wordWrap={wordWrap}
+          />
+        </WorkerPoolContextProvider>
       </div>
     </div>
   );

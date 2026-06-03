@@ -13,7 +13,7 @@ import { useAppStore } from "../../store/appStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { tauriMocks } from "../../test/setup";
 import type { WorkingFile } from "../../types/file";
-import { codeFoldMessage, DiffView } from "./DiffView";
+import { DiffView } from "./DiffView";
 
 const mockInvoke = tauriMocks.invoke;
 
@@ -35,6 +35,12 @@ describe("DiffView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    (
+      globalThis as typeof globalThis & { __mockDiffsWorkerPool?: unknown }
+    ).__mockDiffsWorkerPool = undefined;
+    (
+      globalThis as typeof globalThis & { __mockDiffsMountCount?: number }
+    ).__mockDiffsMountCount = undefined;
     themeTesting.resetState();
     useSettingsStore.setState({ themeMode: "system" });
     document.documentElement.classList.remove("dark");
@@ -107,6 +113,14 @@ describe("DiffView", () => {
     );
   });
 
+  it("allows the diff panel itself to scroll", () => {
+    const { container } = render(<DiffView />);
+
+    expect(container.querySelector(".diff-scroll-wrapper")).toHaveClass(
+      "overflow-auto"
+    );
+  });
+
   it("shows loading state while fetching diff", () => {
     useAppStore.setState({
       repos: [
@@ -128,7 +142,7 @@ describe("DiffView", () => {
     expect(screen.getByText("Loading diff...")).toBeInTheDocument();
   });
 
-  it("displays diff when loaded successfully", async () => {
+  it("renders the selected file with MultiFileDiff inputs and Recap defaults", async () => {
     const mockContents = {
       old_content:
         "import React from 'react';\nimport { useState } from 'react';",
@@ -149,10 +163,19 @@ describe("DiffView", () => {
 
     render(<DiffView />);
 
-    await waitFor(() => {
-      // Check that the diff viewer is rendered
-      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
-    });
+    const viewer = await screen.findByTestId("diff-viewer");
+
+    expect(viewer).toHaveAttribute("data-old-file-name", "src/App.tsx");
+    expect(viewer).toHaveAttribute("data-new-file-name", "src/App.tsx");
+    expect(viewer).toHaveAttribute("data-diff-style", "split");
+    expect(viewer).toHaveAttribute("data-overflow", "wrap");
+    expect(viewer).toHaveAttribute("data-disable-file-header", "true");
+    expect(screen.getByTestId("diff-old")).toHaveTextContent(
+      "import React from 'react';"
+    );
+    expect(screen.getByTestId("diff-new")).toHaveTextContent(
+      "useState, useEffect"
+    );
   });
 
   it("uses selected change section for duplicate paths in changes view", async () => {
@@ -277,7 +300,7 @@ describe("DiffView", () => {
     });
   });
 
-  it("provides explicit gutter hover colors for both light and dark diff themes", async () => {
+  it("passes Recap CSS variables to the diff renderer", async () => {
     mockInvoke.mockResolvedValue({
       old_content: "line one",
       new_content: "line two",
@@ -297,14 +320,13 @@ describe("DiffView", () => {
 
     const viewer = await screen.findByTestId("diff-viewer");
 
-    expect(viewer).toHaveAttribute(
-      "data-gutter-background-dark-light",
-      "var(--color-bg-hover)"
-    );
-    expect(viewer).toHaveAttribute(
-      "data-gutter-background-dark-dark",
-      "var(--color-bg-hover)"
-    );
+    expect(viewer.style.getPropertyValue("--diffs-font-size")).toBe("12px");
+    expect(
+      viewer.style.getPropertyValue("--diffs-addition-color-override")
+    ).toBe("var(--color-diff-add-text)");
+    expect(
+      viewer.style.getPropertyValue("--diffs-deletion-color-override")
+    ).toBe("var(--color-diff-delete-text)");
   });
 
   it("uses resolved theme to drive diff dark mode instead of DOM class", async () => {
@@ -329,7 +351,7 @@ describe("DiffView", () => {
     render(<DiffView />);
 
     const viewer = await screen.findByTestId("diff-viewer");
-    expect(viewer).toHaveAttribute("data-use-dark-theme", "true");
+    expect(viewer).toHaveAttribute("data-theme-type", "dark");
   });
 
   it("shows binary file message", async () => {
@@ -467,7 +489,7 @@ describe("DiffView", () => {
     });
   });
 
-  it("keeps previous diff visible while loading next file", async () => {
+  it("shows loading state instead of stale previous diff while loading next file", async () => {
     let resolveSecond: (value: unknown) => void = () => {
       throw new Error("Second diff request resolver not initialized");
     };
@@ -505,8 +527,8 @@ describe("DiffView", () => {
       rerender(<DiffView />);
     });
 
-    expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
-    expect(screen.queryByText("Loading diff...")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("diff-viewer")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading diff...")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_file_contents", {
@@ -744,7 +766,7 @@ describe("DiffView", () => {
     });
   });
 
-  it("applies syntax highlighting to TypeScript files", async () => {
+  it("passes TypeScript file names to Pierre Diffs for language detection", async () => {
     const mockContents = {
       old_content: "const x = 1;",
       new_content: "const x = 2;",
@@ -768,13 +790,12 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    // Check that syntax highlighting tokens are present
-    // Prism adds spans with class "token" for highlighted code
     const diffViewer = screen.getByTestId("diff-viewer");
-    expect(diffViewer.innerHTML).toContain('class="token');
+    expect(diffViewer).toHaveAttribute("data-old-file-name", "src/app.ts");
+    expect(diffViewer).toHaveAttribute("data-new-file-name", "src/app.ts");
   });
 
-  it("renders plain text for unknown file types", async () => {
+  it("passes unknown file names through to Pierre Diffs", async () => {
     const mockContents = {
       old_content: "some text",
       new_content: "some other text",
@@ -798,9 +819,9 @@ describe("DiffView", () => {
       expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
     });
 
-    // Should not have syntax highlighting tokens
     const diffViewer = screen.getByTestId("diff-viewer");
-    expect(diffViewer.innerHTML).not.toContain('class="token');
+    expect(diffViewer).toHaveAttribute("data-old-file-name", "file.unknown");
+    expect(diffViewer).toHaveAttribute("data-new-file-name", "file.unknown");
   });
 
   it("forces unified view for added files", async () => {
@@ -995,60 +1016,8 @@ describe("DiffView", () => {
     expect(screen.getByRole("button", { name: "Unified view" })).toBeEnabled();
   });
 
-  describe("format-specific diff method", () => {
-    it("uses JSON diff method for .json files", async () => {
-      mockInvoke.mockResolvedValue({
-        old_content: '{"key": "old"}',
-        new_content: '{"key": "new"}',
-        is_binary: false,
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedCommitIds: ["abc123"],
-        selectedFilePath: "package.json",
-      });
-
-      render(<DiffView />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
-          "data-compare-method",
-          "diffJson"
-        );
-      });
-    });
-
-    it("uses YAML diff method for .yml files", async () => {
-      mockInvoke.mockResolvedValue({
-        old_content: "key: old",
-        new_content: "key: new",
-        is_binary: false,
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedCommitIds: ["abc123"],
-        selectedFilePath: "config.yml",
-      });
-
-      render(<DiffView />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
-          "data-compare-method",
-          "diffYaml"
-        );
-      });
-    });
-
-    it("uses WORDS diff method for regular code files", async () => {
+  describe("diff renderer options", () => {
+    it("uses a worker pool for Pierre Diffs highlighting", async () => {
       mockInvoke.mockResolvedValue({
         old_content: "const x = 1;",
         new_content: "const x = 2;",
@@ -1066,12 +1035,91 @@ describe("DiffView", () => {
 
       render(<DiffView />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
-          "data-compare-method",
-          "diffWords"
-        );
+      const provider = await screen.findByTestId("worker-pool-provider");
+      expect(provider).toHaveAttribute("data-pool-size", "4");
+      expect(provider).toHaveAttribute("data-tokenize-max-line-length", "500");
+      expect(provider).toHaveAttribute(
+        "data-langs",
+        "typescript,javascript,tsx,jsx,css,json,yaml,rust,python,go,markdown"
+      );
+    });
+
+    it("remounts the diff after worker highlighting finishes so cached highlighted content is shown", async () => {
+      let statsCallback:
+        | ((stats: {
+            busyWorkers: number;
+            activeTasks: number;
+            queuedTasks: number;
+          }) => unknown)
+        | null = null;
+      (
+        globalThis as typeof globalThis & { __mockDiffsWorkerPool?: unknown }
+      ).__mockDiffsWorkerPool = {
+        subscribeToStatChanges: vi.fn((callback) => {
+          statsCallback = callback;
+          return vi.fn();
+        }),
+      };
+
+      mockInvoke.mockResolvedValue({
+        old_content: "const x = 1;",
+        new_content: "const x = 2;",
+        is_binary: false,
       });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitIds: ["abc123"],
+        selectedFilePath: "src/app.ts",
+      });
+
+      render(<DiffView />);
+
+      await screen.findByTestId("diff-viewer");
+      expect(
+        (globalThis as typeof globalThis & { __mockDiffsMountCount?: number })
+          .__mockDiffsMountCount
+      ).toBe(1);
+
+      act(() => {
+        statsCallback?.({ busyWorkers: 1, activeTasks: 1, queuedTasks: 0 });
+        statsCallback?.({ busyWorkers: 0, activeTasks: 0, queuedTasks: 0 });
+      });
+
+      await waitFor(() => {
+        expect(
+          (globalThis as typeof globalThis & { __mockDiffsMountCount?: number })
+            .__mockDiffsMountCount
+        ).toBe(2);
+      });
+    });
+
+    it("uses Shiki-backed Pierre Diffs defaults for inline highlighting and hunk separators", async () => {
+      mockInvoke.mockResolvedValue({
+        old_content: "const x = 1;",
+        new_content: "const x = 2;",
+        is_binary: false,
+      });
+
+      useAppStore.setState({
+        repos: [
+          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
+        ],
+        selectedRepoId: "1",
+        selectedCommitIds: ["abc123"],
+        selectedFilePath: "src/app.ts",
+      });
+
+      render(<DiffView />);
+
+      const viewer = await screen.findByTestId("diff-viewer");
+      expect(viewer).toHaveAttribute("data-line-diff-type", "word-alt");
+      expect(viewer).toHaveAttribute("data-hunk-separators", "line-info");
+      expect(viewer).toHaveAttribute("data-theme-dark", "pierre-dark");
+      expect(viewer).toHaveAttribute("data-theme-light", "pierre-light");
     });
   });
 
@@ -1339,44 +1387,6 @@ describe("DiffView", () => {
 
       // Should stay on last file
       expect(useAppStore.getState().selectedFilePath).toBe("src/c.ts");
-    });
-  });
-
-  describe("codeFoldMessage", () => {
-    it("shows the number of unchanged lines for singular", () => {
-      const { container } = render(codeFoldMessage(1, 5, 5));
-      expect(container.textContent).toBe("1 unchanged line");
-    });
-
-    it("shows the number of unchanged lines for plural", () => {
-      const { container } = render(codeFoldMessage(42, 10, 10));
-      expect(container.textContent).toBe("42 unchanged lines");
-    });
-
-    it("passes codeFoldMessageRenderer to diff viewer", async () => {
-      mockInvoke.mockResolvedValue({
-        old_content: "old content",
-        new_content: "new content",
-        is_binary: false,
-      });
-
-      useAppStore.setState({
-        repos: [
-          { id: "1", path: "/test/repo", name: "repo", addedAt: Date.now() },
-        ],
-        selectedRepoId: "1",
-        selectedCommitIds: ["abc123"],
-        selectedFilePath: "src/app.ts",
-      });
-
-      render(<DiffView />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId("diff-viewer")).toHaveAttribute(
-          "data-has-code-fold-renderer",
-          "true"
-        );
-      });
     });
   });
 });

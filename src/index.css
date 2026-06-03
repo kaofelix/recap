@@ -242,32 +242,6 @@ body {
   }
 }
 
-/* Fix react-diff-viewer: blank content lines should have normal background
-   The library applies emptyLine class when content is empty/falsy, treating 
-   real blank lines the same as placeholders. We want only placeholders grey.
-   
-   Strategy: Make all empty-line cells normal background, then use :has() to 
-   re-apply grey only to rows that contain an empty-gutter (true placeholders) */
-
-/* Default: all empty-line content cells get normal background */
-td[class*="empty-line"] {
-  background-color: var(--color-panel-bg) !important;
-}
-
-/* Re-apply grey for placeholder rows (rows containing empty-gutter cells) */
-tr:has(td[class*="empty-gutter"]) td[class*="empty-line"] {
-  background-color: var(--color-bg-secondary) !important;
-}
-
-/* Fix react-diff-viewer: the library sets inline overflowX: 'hidden' on its
-   scroll container when infiniteLoading is enabled. Override to allow
-   horizontal scrolling when word wrap is off, and disable overscroll
-   rubber-banding in the diff view. */
-.diff-scroll-wrapper > div[style] {
-  overflow-x: auto !important;
-  overscroll-behavior: none;
-}
-
 /* Theme toggle icon animation */
 @keyframes theme-icon-spin {
   0% {
