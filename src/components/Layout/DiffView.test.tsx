@@ -300,7 +300,7 @@ describe("DiffView", () => {
     });
   });
 
-  it("passes Recap CSS variables to the diff renderer", async () => {
+  it("uses Pierre Diffs default component styling", async () => {
     mockInvoke.mockResolvedValue({
       old_content: "line one",
       new_content: "line two",
@@ -320,13 +320,7 @@ describe("DiffView", () => {
 
     const viewer = await screen.findByTestId("diff-viewer");
 
-    expect(viewer.style.getPropertyValue("--diffs-font-size")).toBe("12px");
-    expect(
-      viewer.style.getPropertyValue("--diffs-addition-color-override")
-    ).toBe("var(--color-diff-add-text)");
-    expect(
-      viewer.style.getPropertyValue("--diffs-deletion-color-override")
-    ).toBe("var(--color-diff-delete-text)");
+    expect(viewer).not.toHaveAttribute("style");
   });
 
   it("uses resolved theme to drive diff dark mode instead of DOM class", async () => {

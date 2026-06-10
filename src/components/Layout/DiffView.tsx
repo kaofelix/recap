@@ -22,7 +22,6 @@ import {
   SquareSplitHorizontal,
   WrapText,
 } from "lucide-react";
-import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsFocused } from "../../context/FocusContext";
 import { useFileContents } from "../../hooks/useFileContents";
@@ -100,19 +99,6 @@ function hashDiffContent(value: string): string {
 
   return hash.toString(16);
 }
-
-const diffStyleVariables = {
-  "--diffs-font-family":
-    'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-  "--diffs-font-size": "12px",
-  "--diffs-line-height": "1.5",
-  "--diffs-header-font-family":
-    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  "--diffs-deletion-color-override": "var(--color-diff-delete-text)",
-  "--diffs-addition-color-override": "var(--color-diff-add-text)",
-  "--diffs-bg-selection-override": "var(--color-bg-hover)",
-  "--diffs-selection-color-override": "var(--color-accent-primary)",
-} as CSSProperties;
 
 /** Placeholder message component */
 function DiffPlaceholder({ message }: { message: string }) {
@@ -491,7 +477,6 @@ function DiffContent({
       newFile={newFile}
       oldFile={oldFile}
       options={diffOptions}
-      style={diffStyleVariables}
     />
   );
 }
